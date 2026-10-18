@@ -63,6 +63,16 @@ gallery {
   gap: space.4
 }
 
+// v0.3.2 regression: repeat() counts used to get px'd → repeat(4px, 1fr)
+.feature-grid {
+  display: grid
+  grid-template-columns: repeat(4, 1fr)
+  gap: 24
+}
+
+.span-2 { grid-column: span 2 }
+.auto-grid { grid-template-columns: repeat(auto-fill, minmax(200, 1fr)) }
+
 @media (width >= 768) {
   .card { padding: space.6 }
 }
@@ -133,6 +143,15 @@ assert(doc.rules.some(r => r.sel === ':root' && r.signals.length === 1), 'signal
 assert(doc.rules.some(r => r.layer === 'utilities' && r.sel === '.mt-0'), 'layer assignment');
 assert(doc.rules.some(r => r.layer === 'pin' && r.sel === '.hero-title'), 'pin layer');
 assert(doc.rules.some(r => r.sel === 'gallery' && r.decls.some(d => String(d.value).includes('minmax(220px'))), 'grid sugar');
+// v0.3.2: repeat() regression — the count must stay an integer, tracks may px
+const fg = doc.rules.find(r => r.sel === '.feature-grid');
+assert(fg && fg.decls.some(d => d.prop === 'grid-template-columns' && d.value === 'repeat(4, 1fr)'), `repeat(4, 1fr) stays integer (got: ${fg?.decls.find(d => d.prop === 'grid-template-columns')?.value})`);
+assert(fg && fg.decls.some(d => d.prop === 'gap' && d.value === 'var(--dssl-space-4)') === false, 'gap: 24 resolved (not token)');
+assert(fg && fg.decls.some(d => d.prop === 'gap' && d.value === '24px'), 'bare gap gets px');
+const span2 = doc.rules.find(r => r.sel === '.span-2');
+assert(span2 && span2.decls.some(d => d.value === 'span 2'), `grid-column: span 2 unitless (got: ${span2?.decls[0]?.value})`);
+const autoGrid = doc.rules.find(r => r.sel === '.auto-grid');
+assert(autoGrid && autoGrid.decls.some(d => d.value === 'repeat(auto-fill, minmax(200px, 1fr))'), `repeat(auto-fill, minmax) works (got: ${autoGrid?.decls[0]?.value})`);
 assert(doc.rules.some(r => r.sel === '.card' && r.media.length === 1), 'media rule for .card');
 assert(doc.rules.some(r => r.media.includes('(prefers-color-scheme: dark)')), '@media dark sugar');
 assert(doc.rules.some(r => r.media.includes('(prefers-color-scheme: light)')), '@media light sugar');

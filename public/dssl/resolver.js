@@ -41,6 +41,7 @@ const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,none,au
   'system-ui,-apple-system,Roboto,Helvetica,Arial,Menlo,Consolas,SFMono-Regular,Liberation-Mono,Inter,Noto-Sans,Ubuntu,Cantarell,Oxygen,Fira-Sans,Droid-Sans,' +
   'border-box,content-box,padding-box,fill-box,stroke-box,view-box,' +
   'contain,cover,fill,fit-content,min-content,max-content,minmax,repeat,clamp,calc,var,url,env,attr,' +
+  'auto-fill,auto-fit,subgrid,dense,stretch,' +
   'scaleX,scaleY,translateX,translateY,translate,rotate,skew,skewX,skewY,matrix,' +
   'ease,ease-in,ease-out,ease-in-out,linear,step-start,step-end,steps,cubic-bezier,spring,bounce,smooth,snap,' +
   'forwards,backwards,both,infinite,alternate,alternate-reverse,running,paused,reverse,' +
@@ -60,6 +61,8 @@ const UNITLESS_PROPS = new Set([
   'flex', 'order', 'scale', 'widows', 'orphans', 'column-count', 'aspect-ratio',
   'animation-iteration-count', 'flood-opacity', 'fill-opacity', 'stop-opacity',
   'shape-image-threshold', 'animation-delay', 'transition-delay',
+  // grid line placement takes integers, not lengths:  grid-column: span 2
+  'grid-row', 'grid-column', 'grid-area',
 ]);
 
 // A practical whitelist of standard CSS properties (loud errors beat silent ones)
@@ -197,6 +200,18 @@ function resolveValue(raw, ctx) {
         }
         const inner = raw.slice(i + 1, j - 1);
         const fname = ident.toLowerCase();
+        // v0.3.2 fix: repeat(COUNT, tracks) — the leading count is an integer,
+        // never a length. `repeat(4, 1fr)` used to become `repeat(4px, 1fr)`,
+        // which the browser rejected and the whole grid silently collapsed.
+        if (fname === 'repeat') {
+          const rm = inner.match(/^\s*(\d+(?:\.\d+)?)\s*,([\s\S]*)$/);
+          if (rm) {
+            out += ident + '(' + rm[1] + ',' + resolveValue(rm[2], { ...ctx, unitless: ctx.unitless }) + ')';
+            i = j;
+            continue;
+          }
+          // auto-fill / auto-fit / nested weirdness — fall through to generic
+        }
         // color-ish functions keep bare numbers bare; calc-family gets px
         const innerUnitless = UNITLESS_FN.has(fname) ? true : LENGTH_FN.has(fname) ? false : ctx.unitless;
         const resolvedInner = resolveValue(inner, { ...ctx, unitless: innerUnitless });

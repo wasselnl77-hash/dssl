@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import HomeView from "./views/HomeView";
 import DocsView from "./views/DocsView";
 import CheatSheetView from "./views/CheatSheetView";
@@ -67,39 +67,9 @@ export default function SiteRoot() {
     viewFromHash,
     () => "home" as ViewName,
   );
-  const [dsslReady, setDsslReady] = useState(false);
-
-  // ---- boot the DSSL engine (once) ----
-  useEffect(() => {
-    if (window.DSSL) {
-      const t = setTimeout(() => setDsslReady(true), 0);
-      return () => clearTimeout(t);
-    }
-    const existing = document.getElementById("dssl-engine-script");
-    const onReady = () => setDsslReady(true);
-    window.addEventListener("dssl-ready", onReady);
-    if (!existing) {
-      const s = document.createElement("script");
-      s.id = "dssl-engine-script";
-      s.type = "module";
-      s.src = "/dssl/boot.js";
-      document.head.appendChild(s);
-    }
-    return () => window.removeEventListener("dssl-ready", onReady);
-  }, []);
-
-  // ---- apply the stylesheets (once the engine is up) ----
-  useEffect(() => {
-    if (!dsslReady || !window.DSSL) return;
-    void window.DSSL.load([
-      "/styles/tokens.dssl",
-      "/styles/site.dssl",
-      "/styles/home.dssl",
-      "/styles/docs.dssl",
-      "/styles/playground.dssl",
-      "/styles/changelog.dssl",
-    ]);
-  }, [dsslReady]);
+  // v0.3.2: engine boot + stylesheet application moved into the document head
+  // (inline <style type="text/dssl"> + a module script). Styles now land before
+  // first paint instead of after hydration + six sequential fetches.
 
   // ---- hash router: view IS the hash (bare anchors like #tokens don't re-route) ----
 
@@ -150,7 +120,7 @@ export default function SiteRoot() {
           </nav>
 
           <div className="nav-side">
-            <span className="ver-badge">v0.3.0</span>
+            <span className="ver-badge">v0.3.2</span>
             <button type="button" className="theme-btn" onClick={cycleTheme} aria-label="Toggle color theme" title="Theme: auto / light / dark">
               <span className="icon-sun"><SunIcon /></span>
               <span className="icon-moon"><MoonIcon /></span>
@@ -173,10 +143,15 @@ export default function SiteRoot() {
 
       <footer className="footer">
         <div className="wrap footer-inner">
-          <div className="footer-note">
-            <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.3 while
-            building this site; every feature it needed, it grew, and every bug you sent got
-            fixed for real. This page runs on its own engine, no stylesheet attached.
+          <div className="footer-col">
+            <div className="footer-note">
+              <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.3.2 while
+              building this site; every feature it needed, it grew, and every bug you sent got
+              fixed for real. This page runs on its own engine, no stylesheet attached.
+            </div>
+            <div className="footer-fine">
+              © 2026 <strong>Firstlight</strong> — the studio that grows DSSL.
+            </div>
           </div>
           <nav className="footer-links" aria-label="Footer">
             {VIEWS.map(v => (

@@ -455,6 +455,17 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
   line-height: 1.6
 }
 
+.footer-col {
+  column: gap space.3
+}
+
+.footer-fine {
+  color: color.muted
+  font-size: 12
+  font-family: font.mono
+  letter-spacing: 0.02em
+}
+
 .footer-links {
   row: gap 4 center
 }

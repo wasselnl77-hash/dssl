@@ -18,7 +18,7 @@ import { parse } from './parser.js';
 import { resolve, DEFAULT_TOKENS } from './resolver.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.3.2';
 
 let counter = 0;
 const engines = new Map();
@@ -100,20 +100,29 @@ export function apply(source, opts = {}) {
   return result;
 }
 
-/** Fetch and apply one or more .dssl files, in order. */
+/** Fetch and apply one or more .dssl files, in order.
+ *  v0.3.2: files are fetched IN PARALLEL but applied in the order given —
+ *  the old sequential await chain made six stylesheets cost six round-trips. */
 export async function load(urls, opts = {}) {
   const list = Array.isArray(urls) ? urls : [urls];
+  const texts = await Promise.all(list.map(async (url) => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return { url, ok: false, text: '', status: res.status };
+      return { url, ok: true, text: await res.text(), status: res.status };
+    } catch (e) {
+      return { url, ok: false, text: '', status: 0, why: e && e.message };
+    }
+  }));
   const results = [];
-  for (const url of list) {
-    const res = await fetch(url);
-    if (!res.ok) {
-      const errors = [{ file: url, line: 0, message: `could not load stylesheet (HTTP ${res.status})` }];
-      reportErrors(errors, url);
+  for (const r of texts) {
+    if (!r.ok) {
+      const errors = [{ file: r.url, line: 0, message: `could not load stylesheet (HTTP ${r.status || 'network error'}${r.why ? ': ' + r.why : ''})` }];
+      reportErrors(errors, r.url);
       results.push({ ok: false, errors });
       continue;
     }
-    const text = await res.text();
-    results.push(apply(text, { ...opts, name: opts.name || url }));
+    results.push(apply(r.text, { ...opts, name: opts.name || r.url }));
   }
   return results;
 }
@@ -141,7 +150,10 @@ if (typeof window !== 'undefined') {
 
       const sources = [];
       for (const l of links) sources.push({ name: l.getAttribute('href'), kind: 'link', el: l });
-      for (const s of inlines) sources.push({ name: 'inline-<style>-' + (++counter), kind: 'style', el: s });
+      for (const s of inlines) sources.push({
+        name: s.getAttribute('data-dssl-name') || 'inline-<style>-' + (++counter),
+        kind: 'style', el: s,
+      });
 
       for (const src of sources) {
         try {

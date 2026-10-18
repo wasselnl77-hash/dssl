@@ -324,7 +324,14 @@ export class DsslEngine {
         try {
           el.style.setProperty(d.prop, d.value, imp);
           newOwned.push(d.prop);
-        } catch { /* invalid value — resolver should have caught it */ }
+        } catch (why) {
+          // v0.3.2: the language promises loud errors — if the browser rejects
+          // a value we resolved, say so instead of failing silently. This is
+          // how the repeat(4px, 1fr) grid collapse would have been caught.
+          const msg = `[DSSL] browser rejected "${d.prop}: ${d.value}" — ${why && why.message || 'invalid value'}`;
+          if (!this._warned) this._warned = new Set();
+          if (!this._warned.has(msg)) { this._warned.add(msg); console.warn(msg); }
+        }
       }
     }
 

@@ -173,6 +173,30 @@ const base = rule.sel
 @media 768  { grid: 3 }                 // was (width >= 768px)
 @media 480..960 { grid: 2 }             // range, no paren-math`,
   },
+  {
+    version: "v0.3.2",
+    date: "bug report → fix",
+    title: "Grids collapsed to one column",
+    why: "user report: “these arent centered”",
+    body:
+      "The bare-number→px rule treated repeat()'s leading count as a length: repeat(4, 1fr) resolved to repeat(4px, 1fr), the browser rejected the whole declaration, and every grid silently fell back to a single full-width column — the home feature grid, the pain grid, all of them. repeat() now keeps its count integer, grid-row/column/area are unitless properties, and — most importantly — the engine no longer swallows browser rejections: a value the browser refuses is announced in the console. A language that promises loud errors cannot fail quietly.",
+    code: `grid-template-columns: repeat(4, 1fr)
+// was:  repeat(4px, 1fr)   ← count got px'd, browser dropped it
+// now:  repeat(4, 1fr)    ✓ four centered columns`,
+  },
+  {
+    version: "v0.3.2",
+    date: "user feedback → release",
+    title: "The page styles before first paint now",
+    why: "user report: “DSSL loads painfully slow”",
+    kind: "add",
+    body:
+      "The boot chain was: wait for React hydration, inject the engine script, import four modules over the network, then fetch six stylesheets strictly one-after-another — on localhost that was ~600 ms before the last rule applied; on a real connection, seconds of unstyled page. Now the stylesheets ride inside the server-rendered HTML as <style type=\"text/dssl\"> tags and the engine module loads from the document head, so parsing finishes and the page is fully styled before first paint — no hydration wait, no fetch waterfall. DSSL.load() itself also switched to parallel fetch with in-order apply for everyone else.",
+    code: `<!-- before: engine injected post-hydration, then 6 × await fetch -->
+<!-- after: -->
+<style type="text/dssl" data-dssl-name="tokens.dssl">…</style>
+<script type="module" src="/dssl/boot.js"></script>  <!-- in <head> -->`,
+  },
 ];
 
 export default function ChangelogView() {
