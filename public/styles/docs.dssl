@@ -423,3 +423,68 @@ motion pop {
   font-size: 13
   line-height: 1.5
 }
+
+// ---------------------------------------------------- v0.4.0 · power tools
+
+// scoped tokens live demo — inside this box, --color.accent re-declares the
+// accent token as color.ok. The tok-dots run the same rules as the palette
+// demo above, but the var() references inherit our override, so they go green.
+.tok-scope {
+  --color.accent: color.ok
+  padding: space.4
+  border: 1 dashed color.line
+  radius: md
+  background: color.card
+  column: gap 10
+}
+
+// seen + stagger live demo — four cards that cascade in when you scroll here
+motion rise-in {
+  from {
+    opacity: 0
+    translate: 0 14
+  }
+}
+
+.pt-grid {
+  display: grid
+  grid-template-columns: repeat(4, 1fr)
+  gap: space.3
+  stagger: 70
+}
+
+@media (width <= 920) {
+  .pt-grid {
+    grid-template-columns: repeat(2, 1fr)
+  }
+}
+
+@media (width <= 560) {
+  .pt-grid {
+    grid-template-columns: 1fr
+  }
+}
+
+.pt-card {
+  padding: space.4 space.3
+  radius: md
+  background: color.card
+  border: 1 solid color.line
+  column: gap 6
+  seen {
+    animate: rise-in 420 snap
+  }
+}
+
+.pt-num {
+  font-family: font.mono
+  font-size: 18
+  font-weight: 700
+  color: color.accent
+}
+
+.pt-card span:last-child {
+  font-family: font.mono
+  font-size: 12.5
+  color: color.muted
+}

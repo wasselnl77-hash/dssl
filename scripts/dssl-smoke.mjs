@@ -81,6 +81,44 @@ gallery {
 .chip-x { center: x }
 .chip-y { center: y }
 
+// ------------------- v0.4.0 — power tools -------------------
+
+// stagger: choreograph the children's animations
+.feature-grid-v4 {
+  stagger: 60
+}
+
+// seen: engine-native scroll-into-view state (block form)
+.reveal-card {
+  seen {
+    animate: rise-in 480 snap
+  }
+}
+
+// seen: compound-selector form
+.reveal-alt:seen { opacity: 1 }
+
+// scoped tokens: dotted --names re-declare a token for the subtree
+.scope-demo {
+  --color.accent: color.ok
+  --brand: 12
+}
+
+// visually-hidden: the a11y classic, one word
+.sr-demo {
+  visually-hidden
+}
+
+// transition: per-property specs
+.transition-multi {
+  transition: 150 snap background-color, 300 transform
+}
+
+// structural / relational selectors pass through to the engine's matches()
+nth-demo:nth-child(2) { translate: 0 -2 }
+nth-demo:first-child + nth-demo { border-top: none }
+has-demo:has(.badge) { padding: space.5 }
+
 @media (width >= 768) {
   .card { padding: space.6 }
 }
@@ -169,6 +207,25 @@ assert(chipX && chipX.decls.some(d => d.prop === 'justify-items' && d.value === 
 const chipY = doc.rules.find(r => r.sel === '.chip-y');
 assert(chipY && chipY.decls.some(d => d.prop === 'align-items' && d.value === 'center') && chipY.decls.some(d => d.prop === 'align-content' && d.value === 'center'), 'center: y axis emits align pair');
 assert(!doc.errors.some(e => e.message.includes('center')), 'no false center errors');
+// ------------------- v0.4.0 asserts -------------------
+const stag = doc.rules.find(r => r.sel === '.feature-grid-v4');
+assert(stag && stag.decls.some(d => d.prop === '@stagger' && d.value === 60), `stagger: 60 → @stagger 60 (got: ${JSON.stringify(stag?.decls)})`);
+const reveal = doc.rules.find(r => r.sel === '.reveal-card:seen');
+assert(reveal, 'seen state block compiles to .reveal-card:seen');
+assert(reveal && reveal.states.has('seen'), 'seen registered in rule.states');
+assert(reveal && reveal.decls.some(d => d.prop === '@animate' && d.value.motion === 'rise-in'), 'seen block carries the animate spec');
+assert(doc.rules.some(r => r.sel === '.reveal-alt:seen'), 'compound .reveal-alt:seen passes through');
+const scope = doc.rules.find(r => r.sel === '.scope-demo');
+assert(scope && scope.decls.some(d => d.prop === '--dssl-color-accent' && d.value === 'var(--dssl-color-ok)'), `scoped token --color.accent → --dssl-color-accent (got: ${scope?.decls.map(d => d.prop + '=' + d.value).join('; ')})`);
+assert(scope && scope.decls.some(d => d.prop === '--brand' && d.value === '12px'), 'plain --brand stays a free-form custom property');
+const sr = doc.rules.find(r => r.sel === '.sr-demo');
+assert(sr && sr.decls.some(d => d.prop === 'clip-path' && d.value === 'inset(50%)') && sr.decls.some(d => d.prop === 'position' && d.value === 'absolute'), 'visually-hidden expands to the clip pattern');
+const tm = doc.rules.find(r => r.sel === '.transition-multi');
+assert(tm && tm.decls.some(d => d.prop === 'transition' && d.value === 'background-color 150ms cubic-bezier(0.2, 0.9, 0.3, 1), transform 300ms ease'), `per-property transition (got: ${tm?.decls.find(d => d.prop === 'transition')?.value})`);
+assert(doc.rules.some(r => r.sel === 'nth-demo:nth-child(2)'), ':nth-child() selector passes through');
+assert(doc.rules.some(r => r.sel === 'nth-demo:first-child + nth-demo'), 'sibling combinator passes through');
+assert(doc.rules.some(r => r.sel === 'has-demo:has(.badge)'), ':has() selector passes through');
+assert(!doc.errors.some(e => /stagger|seen|visually-hidden|nth|has\(/.test(e.message)), 'no false errors on v0.4.0 features');
 assert(doc.rules.some(r => r.sel === '.card' && r.media.length === 1), 'media rule for .card');
 assert(doc.rules.some(r => r.media.includes('(prefers-color-scheme: dark)')), '@media dark sugar');
 assert(doc.rules.some(r => r.media.includes('(prefers-color-scheme: light)')), '@media light sugar');

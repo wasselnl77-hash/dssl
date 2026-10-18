@@ -421,3 +421,31 @@ motion rise-in {
 .cta-band .hero-ctas {
   justify-content: center
 }
+
+// ------------------------------------------------------ v0.4.0 · the reveal
+// This page dogfoods the power tools: both grids below the fold hold their
+// rise-in motion until each card scrolls into view (seen — engine-native,
+// fires once), and the container staggers the children so they cascade
+// instead of arriving as a wall. Reduced-motion skips the motion entirely —
+// the cards are simply there, because opacity 0 only ever exists inside the
+// WAAPI from-frame, never in the base styles.
+
+.pain-grid {
+  stagger: 70
+}
+
+.pain-card {
+  seen {
+    animate: rise-in 480 snap
+  }
+}
+
+.feature-grid {
+  stagger: 60
+}
+
+.feature {
+  seen {
+    animate: rise-in 480 snap
+  }
+}

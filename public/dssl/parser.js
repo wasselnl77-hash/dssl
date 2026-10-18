@@ -18,6 +18,7 @@ const STATE_WORDS = new Set([
   'placeholder-shown', 'read-only', 'read-write', 'enabled',
   'indeterminate', 'first-child', 'last-child', 'only-child',
   'first-of-type', 'last-of-type', 'link', 'visited',
+  'seen', // v0.4.0 — engine-native: fires once when the element enters the viewport
 ]);
 
 const PSEUDO_ELEMENTS = new Set([
@@ -178,7 +179,9 @@ export function parse(source, file = 'inline.dssl') {
       const prop = part.slice(0, colon).trim().toLowerCase();
       const value = part.slice(colon + 1).trim();
       if (!prop) { err(line, 'declaration is missing a property name'); continue; }
-      if (!/^(-{1,2}[a-z][a-z0-9-]*|[a-z][a-z0-9-]*)$/i.test(prop)) {
+      // v0.4.0: dotted custom properties are legal — `--color.accent: …` is
+      // scoped-token sugar (resolver maps it to the engine's token variable)
+      if (!/^(-{1,2}[a-z][a-z0-9.-]*|[a-z][a-z0-9-]*)$/i.test(prop)) {
         err(line, `"${prop}" is not a valid property name`);
         continue;
       }

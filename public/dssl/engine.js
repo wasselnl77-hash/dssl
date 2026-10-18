@@ -8,9 +8,11 @@
  *     layers:  tokens < base < components < utilities < pin
  *
  * States (hover/focus/active/…) are implemented by the engine with event
- * delegation + live `matches()` checks. `@media` uses matchMedia listeners,
- * `@signal` is driven from JS, `@container` is evaluated against the nearest
- * tracked container. Motion runs through the Web Animations API.
+ * delegation + live `matches()` checks. `seen` (v0.4) is engine-native too: it
+ * fires once per element when it scrolls into view, via IntersectionObserver.
+ * `@media` uses matchMedia listeners, `@signal` is driven from JS, `@container`
+ * is evaluated against the nearest tracked container. Motion runs through the
+ * Web Animations API, and `stagger:` choreographs children's delays.
  *
  * Pseudo-elements (::before/::after/…) cannot be expressed inline, so they
  * are the one thing compiled to real CSS in a shadow <style> tag — using the
@@ -37,7 +39,7 @@ const HAS_CONTEXT_RE = /^(flex|inline-flex|grid|inline-grid)$/;
 
 // state pseudo-classes that may appear inside a rule selector. Used to strip
 // them back OFF when collecting recompute candidates (see stateEvent).
-const STATE_PSEUDO_RE = /:(hover|focus|focus-visible|active|focus-within|visited|target|disabled|enabled|checked|placeholder-shown|read-only|read-write|open|closed|empty|required|invalid|valid|link|indeterminate)\b/g;
+const STATE_PSEUDO_RE = /:(hover|focus|focus-visible|active|focus-within|visited|target|disabled|enabled|checked|placeholder-shown|read-only|read-write|open|closed|empty|required|invalid|valid|link|indeterminate|seen)\b/g;
 
 function parseSizeQuery(q) {
   // supports (min-width: 480px) | (max-width: 480px) | (width >= 480px) | (width <= 480px)
@@ -69,6 +71,9 @@ export class DsslEngine {
     this.shadowStyle = null;
     this.seq = 0;                          // bundle insertion order
     this.lastApply = 0;
+    this.seenSet = new WeakSet();          // v0.4.0 — elements that entered the viewport
+    this.staggerEls = new Map();           // v0.4.0 — element → stagger delay (ms)
+    this.io = null;                        // IntersectionObserver backing `seen`
   }
 
   /* ------------------------------------------------------------ *
@@ -209,6 +214,22 @@ export class DsslEngine {
       this.reducedMotion = rm;
     } catch { this.reducedMotion = { matches: false }; }
 
+    // --- `seen` state (v0.4.0): fires once when the element scrolls into view ---
+    if (typeof IntersectionObserver !== 'undefined') {
+      this.io = new IntersectionObserver((entries) => {
+        const batch = new Set();
+        for (const en of entries) {
+          if (!en.isIntersecting) continue;
+          this.seenSet.add(en.target);
+          try { this.io.unobserve(en.target); } catch { }
+          batch.add(en.target);
+        }
+        if (batch.size) this.schedule(batch);
+      }, { threshold: 0.08, rootMargin: '0px 0px -6% 0px' });
+    }
+    // without IntersectionObserver (ancient engines), isSeen() treats every
+    // element as seen — content must never be trapped invisible by a missing API.
+
     // --- container tracking via ResizeObserver ---
     this.ro = new ResizeObserver(() => this.computeAll());
   }
@@ -257,6 +278,7 @@ export class DsslEngine {
       this._applying = true;
       for (const el of batch) this.computeElement(el);
       this._applying = false;
+      this.applyStagger();
     });
   }
 
@@ -305,12 +327,17 @@ export class DsslEngine {
     const root = this.scope || document;
     for (const rule of this.rules) {
       if (rule.sel === ':root') { els.add(rootEl); continue; }
+      // v0.4.0: `:seen` is engine-native and invalid inside querySelectorAll —
+      // enumerate the stripped selector; computeElement re-checks the real state.
+      let sel = rule.sel;
+      if (rule.states.has('seen')) sel = sel.replace(/:seen\b/g, '') || '*';
       let found;
-      try { found = root.querySelectorAll(rule.sel); } catch { continue; }
+      try { found = root.querySelectorAll(sel); } catch { continue; }
       found.forEach(el => els.add(el));
     }
     for (const el of els) this.computeElement(el);
     this._applying = false;
+    this.applyStagger();
   }
 
   computeElement(el) {
@@ -323,7 +350,17 @@ export class DsslEngine {
     for (const rule of this.rules) {
       if (rule.sel === ':root') {
         if (el !== rootEl) continue;
-      } else if (!this.matches(el, rule.sel)) continue;
+      } else {
+        let sel = rule.sel;
+        if (rule.states.has('seen')) {
+          // v0.4.0 — `seen` belongs to the engine, not to CSS selectors: until
+          // the element has intersected, the rule cannot match. Make sure the
+          // element IS observed so it re-computes the moment it scrolls in.
+          if (!this.isSeen(el)) { this.observeSeen(el); continue; }
+          sel = sel.replace(/:seen\b/g, '') || '*';
+        }
+        if (!this.matches(el, sel)) continue;
+      }
       if (!rule.media.every(q => this.mql(q).matches)) continue;
       if (!this.signalsPass(rule)) continue;
       if (!this.containerPass(el, rule)) continue;
@@ -341,6 +378,7 @@ export class DsslEngine {
     const animSpecs = [];
     let cancelAnims = false;
     let stack = false;
+    let staggerMs;                         // v0.4.0 — @stagger value, if any
 
     // flatten matched decls in cascade order (the promotion below may prepend)
     const flat = [];
@@ -368,6 +406,7 @@ export class DsslEngine {
           continue;
         }
         if (d.prop === '@stack') { stack = true; continue; }
+        if (d.prop === '@stagger') { staggerMs = d.value; continue; }
         try {
           el.style.setProperty(d.prop, d.value, imp);
           newOwned.push(d.prop);
@@ -383,6 +422,15 @@ export class DsslEngine {
 
     this.ownMap.set(el, newOwned);
     this.lastApply = Date.now();
+
+    // v0.4.0 — stagger bookkeeping: remember (or forget) this container
+    const hadStagger = this.staggerEls.has(el);
+    if (staggerMs !== undefined && staggerMs !== null && Number.isFinite(Number(staggerMs))) {
+      this.staggerEls.set(el, Number(staggerMs));
+    } else if (hadStagger) {
+      this.staggerEls.delete(el);
+      this.resetStagger(el); // rule stopped matching — restore natural delays
+    }
 
     // container registration
     if (newOwned.includes('container-type')) {
@@ -429,6 +477,54 @@ export class DsslEngine {
       } catch { /* WAAPI unsupported property — skip */ }
     }
     if (animSpecs.length) this.animMap.set(el, anims);
+  }
+
+  /* ------------------------------------------------------------ *
+   * `seen` state + stagger choreography (v0.4.0)
+   * ------------------------------------------------------------ */
+
+  isSeen(el) {
+    // no IntersectionObserver → everything counts as seen: content must
+    // never be trapped invisible by a missing API.
+    return !this.io || this.seenSet.has(el);
+  }
+
+  observeSeen(el) {
+    if (!this.io) return;
+    try { this.io.observe(el); } catch { } // re-observe is a no-op per spec
+  }
+
+  /* A parent with `stagger: 60` offsets each element child's animation delay
+   * by its DOM position, so lists and grids cascade in. Runs after every
+   * compute drain, so animations created by a late `seen` still get a slot. */
+  applyStagger() {
+    if (!this.staggerEls.size) return;
+    for (const [el, ms] of this.staggerEls) {
+      if (!el.isConnected) { this.staggerEls.delete(el); continue; }
+      const kids = el.children;
+      for (let i = 0; i < kids.length; i++) {
+        const kid = kids[i];
+        if (kid.nodeType !== 1) continue;
+        const anims = this.animMap.get(kid);
+        if (!anims || !anims.size) continue;
+        anims.forEach(a => {
+          try { if (a.effect && a.effect.updateTiming) a.effect.updateTiming({ delay: i * ms }); } catch { }
+        });
+      }
+    }
+  }
+
+  /* The stagger rule stopped matching — cancel the children's shifted
+   * animations so they restart with their own declared delays. */
+  resetStagger(el) {
+    for (const kid of el.children) {
+      if (kid.nodeType !== 1) continue;
+      const anims = this.animMap.get(kid);
+      if (!anims || !anims.size) continue;
+      anims.forEach(a => { try { a.cancel(); } catch { } });
+      anims.clear();
+      this.schedule([kid]);
+    }
   }
 
   /* ------------------------------------------------------------ *
@@ -516,5 +612,6 @@ export class DsslEngine {
       this.computeElement(el);
     }
     this._applying = false;
+    this.applyStagger();
   }
 }

@@ -46,6 +46,23 @@ const DEMOS = {
 .demo-card {
   animate: rise-in 500 snap both
 }`,
+  // v0.4.0 — the reveal tab: seen + stagger, both engine-native
+  reveal: `motion rise-in {
+  from {
+    opacity: 0
+    translate: 0 12
+  }
+}
+
+.feature-grid {
+  stagger: 60        // child i waits i × 60ms
+}
+
+.feature {
+  seen {             // engine-native state: fires once,
+    animate: rise-in 480 snap   // as the card scrolls into view
+  }
+}`,
 };
 
 type DemoKey = keyof typeof DEMOS;
@@ -126,6 +143,11 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
                 {demo === "motion" && (
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => window.DSSL?.replay(".demo-card")}>
                     <PlayIcon /> replay rise-in
+                  </button>
+                )}
+                {demo === "reveal" && (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => window.DSSL?.replay(".demo-card")}>
+                    <PlayIcon /> replay the reveal
                   </button>
                 )}
               </div>
@@ -260,7 +282,7 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
             <div className="card card-hover feature">
               <span className="feature-icon">✦</span>
               <h3>Motion in four words</h3>
-              <p>Declare a motion, then animate: rise-in 400 snap both. Reduced-motion is respected by default.</p>
+              <p>animate: rise-in 400 snap both. seen + stagger reveal grids on scroll — reduced-motion is respected by default.</p>
             </div>
             <div className="card card-hover feature">
               <span className="feature-icon">§</span>

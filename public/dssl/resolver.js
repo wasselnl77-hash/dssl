@@ -41,7 +41,7 @@ const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,none,au
   'system-ui,-apple-system,Roboto,Helvetica,Arial,Menlo,Consolas,SFMono-Regular,Liberation-Mono,Inter,Noto-Sans,Ubuntu,Cantarell,Oxygen,Fira-Sans,Droid-Sans,' +
   'border-box,content-box,padding-box,fill-box,stroke-box,view-box,' +
   'contain,cover,fill,fit-content,min-content,max-content,minmax,repeat,clamp,calc,var,url,env,attr,' +
-  'auto-fill,auto-fit,subgrid,dense,stretch,' +
+  'auto-fill,auto-fit,subgrid,dense,stretch,span,' +
   'scaleX,scaleY,translateX,translateY,translate,rotate,skew,skewX,skewY,matrix,' +
   'ease,ease-in,ease-out,ease-in-out,linear,step-start,step-end,steps,cubic-bezier,spring,bounce,smooth,snap,' +
   'forwards,backwards,both,infinite,alternate,alternate-reverse,running,paused,reverse,' +
@@ -261,6 +261,20 @@ function resolveValue(raw, ctx) {
   return out;
 }
 
+/** split on a top-level separator (parens-aware) — commas inside fn() survive */
+function topSplit(str, sep) {
+  const out = [];
+  let cur = '', depth = 0;
+  for (const ch of str) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === sep && depth === 0) { out.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
 function findToken(tokens, ident) {
   if (tokens.has(ident)) return ident;
   // try progressive dot paths (a.b.c defined, user typed a.b.c — exact only, plus flat fallback)
@@ -441,14 +455,59 @@ const SEMANTIC = {
       { prop: 'white-space', value: 'nowrap' },
     ];
   },
+  // v0.4.0 — the accessibility classic: visually hidden, still announced by
+  // screen readers. One word instead of nine lines of clip folklore.
+  'visually-hidden'() {
+    return [
+      { prop: 'position', value: 'absolute' },
+      { prop: 'width', value: '1px' },
+      { prop: 'height', value: '1px' },
+      { prop: 'padding', value: '0' },
+      { prop: 'margin', value: '-1px' },
+      { prop: 'overflow', value: 'hidden' },
+      { prop: 'clip-path', value: 'inset(50%)' },
+      { prop: 'white-space', value: 'nowrap' },
+      { prop: 'border', value: '0' },
+    ];
+  },
+  // v0.4.0 — transition grew per-property specs. Each comma part is
+  //   duration [easing] [property]     (property omitted → all)
+  // The one-value form keeps working exactly as before:
+  //   transition: 200 snap
+  //   transition: 150 snap background-color, 300 transform
   transition(v, ctx) {
     const t = v.trim();
     if (t === 'none') return [{ prop: 'transition', value: 'none' }];
-    const atoms = t.split(/\s+/);
-    const dur = atoms[0];
-    const easing = atoms[1] && EASINGS[atoms[1]] ? EASINGS[atoms[1]] : (atoms[1] || 'ease');
-    const ms = /^\d+$/.test(dur) ? dur + 'ms' : dur;
-    return [{ prop: 'transition', value: `all ${ms} ${easing}` }];
+    const parts = topSplit(t, ',').map(s => s.trim()).filter(Boolean);
+    const out = [];
+    for (const part of parts) {
+      const atoms = part.split(/\s+/);
+      const dur = atoms[0];
+      if (!/^\d*\.?\d+(ms|s)?$/.test(dur)) {
+        ctx.errors.push({ file: ctx.file, line: ctx.line, message: `transition duration "${dur}" is not a time`, hint: 'order is duration · easing · property — try 200 or 0.2s' });
+        continue;
+      }
+      const ms = /^\d+$/.test(dur) ? dur + 'ms' : dur;
+      let k = 1;
+      let easing = 'ease';
+      if (atoms[k] && EASINGS[atoms[k]]) { easing = EASINGS[atoms[k]]; k++; }
+      else if (atoms[k] && /^(cubic-bezier|steps)\(/.test(atoms[k])) {
+        easing = resolveValue(atoms[k], { ...ctx, unitless: true });
+        k++;
+      }
+      let prop = 'all';
+      if (atoms.length > k) {
+        const p = atoms.slice(k).join(' ').toLowerCase();
+        if (p !== 'all' && !KNOWN_PROPS.has(p)) {
+          ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown transition property "${p}"`, hint: didYouMean(p, [...KNOWN_PROPS]) });
+          continue;
+        }
+        prop = p;
+      }
+      out.push(`${prop} ${ms} ${easing}`);
+    }
+    if (!out.length) return [];
+    return [{ prop: 'transition', value: out.join(', ') }];
   },
   animate(v, ctx) {
     const t = v.trim();
@@ -468,6 +527,19 @@ const SEMANTIC = {
     }
     return [{ prop: '@animate', value: spec }];
   },
+  // v0.4.0 — choreography: a parent with `stagger: 60` offsets each element
+  // child's animation delay by its DOM position. Pairs with `seen` + `animate`
+  // on the children: grids and lists cascade in as they scroll into view.
+  stagger(v, ctx) {
+    const t = (v || '').trim();
+    if (t === 'none') return [{ prop: '@stagger', value: null }];
+    if (!/^\d+(?:\.\d+)?(?:ms|s)?$/.test(t)) {
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `stagger needs a duration like "60" or "120ms", or "none"`, hint: 'stagger offsets each child\'s animation delay by its position' });
+      return [];
+    }
+    const ms = t.endsWith('s') && !t.endsWith('ms') ? parseFloat(t) * 1000 : parseFloat(t);
+    return [{ prop: '@stagger', value: ms }];
+  },
 };
 
 /* ------------------------------------------------------------------ *
@@ -478,7 +550,17 @@ function resolveDecl(prop, value, ctx) {
   const errors = ctx.errors;
   const ctx2 = { ...ctx, prop, errors };
 
-  if (prop.startsWith('--')) return [{ prop, value: resolveValue(value, { ...ctx2, unitless: false }) }];
+  if (prop.startsWith('--')) {
+    // v0.4.0 — scoped tokens. Dotted names are token re-declarations:
+    //   .danger { --color.accent: color.err }
+    // sets --dssl-color-accent ON the element, and custom properties inherit,
+    // so every var() reference in the subtree re-resolves. Plain names
+    // (--brand) stay free-form custom properties, passed through unvalidated.
+    const outProp = prop.includes('.')
+      ? '--dssl-' + prop.slice(2).replace(/\./g, '-')
+      : prop;
+    return [{ prop: outProp, value: resolveValue(value, { ...ctx2, unitless: false }) }];
+  }
 
   const sem = SEMANTIC[prop];
   if (sem) return sem(value, ctx2);
@@ -815,7 +897,7 @@ function combine(parent, child) {
   return parent + ' ' + child;
 }
 
-const STATE_SCAN = /:(hover|focus-visible|focus|active|disabled|checked|empty|target|invalid|valid|required|open|closed|read-only|read-write|placeholder-shown|first-child|last-child|only-child)\b/g;
+const STATE_SCAN = /:(hover|focus-visible|focus|active|disabled|checked|empty|target|invalid|valid|required|open|closed|read-only|read-write|placeholder-shown|first-child|last-child|only-child|seen)\b/g;
 function scanStates(sel) {
   const s = new Set();
   if (!sel) return s;
