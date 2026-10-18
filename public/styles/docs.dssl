@@ -8,15 +8,17 @@
 
 .page-title {
   fluid: 30, 44
-  font-weight: 800
-  letter-spacing: -0.03em
+  font-family: font.serif
+  font-weight: 650
+  letter-spacing: -0.01em
   margin: space.2 0 space.2
 }
 
 .page-sub {
+  font-family: font.serif
   color: color.muted
   font-size: 16.5
-  line-height: 1.65
+  line-height: 1.7
   max-width: 640
 }
 
@@ -88,9 +90,10 @@
 }
 
 .doc-lead {
+  font-family: font.serif
   color: color.muted
   font-size: 15.5
-  line-height: 1.7
+  line-height: 1.75
   margin: 0
 }
 
@@ -190,7 +193,7 @@
 
 .doc-btn:hover {
   border-color: color.accent/50
-  translate: 0 -1px
+  background: color.card
   shadow: sm
 }
 
@@ -207,8 +210,8 @@
 }
 
 .doc-card:hover {
-  translate: 0 -4px
-  shadow: lg
+  shadow: md
+  border-color: color.ink/38
 }
 
 .doc-card-title {
@@ -249,7 +252,6 @@
     background: color.accent
     border-color: color.accent
     color: color.accent-ink
-    translate: 0 -3px
     shadow: md
   }
 }
@@ -272,8 +274,7 @@
 }
 
 .tok-dot:hover {
-  translate: 0 -3px
-  shadow: md
+  shadow: sm
   border-color: color.accent/40
   color: color.accent
 }

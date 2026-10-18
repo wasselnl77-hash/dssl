@@ -16,7 +16,7 @@
   right: -160
   size: 560
   circle: 560
-  background: radial-gradient(circle, color.accent/16, transparent 65%)
+  background: radial-gradient(circle, color.accent/12, transparent 65%)
   pointer-events: none
 }
 
@@ -26,7 +26,7 @@
   left: -200
   size: 520
   circle: 520
-  background: radial-gradient(circle, color.accent/9, transparent 60%)
+  background: radial-gradient(circle, color.accent/6, transparent 60%)
   pointer-events: none
 }
 
@@ -49,20 +49,22 @@
 
 .hero-title {
   fluid: 40, 62
-  font-weight: 800
-  line-height: 1.04
-  letter-spacing: -0.035em
+  font-family: font.serif
+  font-weight: 650
+  line-height: 1.08
+  letter-spacing: -0.015em
   margin: space.3 0 space.4
 }
 
 .hero-title em {
-  font-style: normal
+  font-style: italic
   color: color.accent
 }
 
 .hero-sub {
+  font-family: font.serif
   font-size: 17.5
-  line-height: 1.7
+  line-height: 1.75
   color: color.muted
   margin: 0 0 space.5
 }
@@ -84,7 +86,7 @@
   inline-size: 4
   aspect-ratio: 1
   background: color.ok
-  radius: full
+  radius: 0
   display: inline-block
   margin-right: 7
   vertical-align: 1
@@ -104,7 +106,7 @@
 
 .demo-tab {
   padding: 7 14
-  radius: full
+  radius: sm
   font-size: 13
   font-weight: 600
   color: color.muted
@@ -116,7 +118,7 @@
 
 .demo-tab:hover {
   color: color.ink
-  translate: 0 -1px
+  border-color: color.ink/40
 }
 
 .demo-tab[aria-pressed="true"] {
@@ -176,9 +178,8 @@ motion rise-in {
 }
 
 .demo-card:hover {
-  translate: 0 -5px
-  shadow: lg
-  border-color: color.accent/40
+  shadow: md
+  border-color: color.ink/38
 }
 
 .demo-swatch {
@@ -211,7 +212,7 @@ motion rise-in {
   color: color.accent
   background: color.accent/12
   padding: 3 9
-  radius: full
+  radius: sm
 }
 
 // states demo: a real focusable button styled by focus-visible
@@ -227,7 +228,7 @@ motion rise-in {
   border: none
 }
 
-.demo-btn:hover { translate: 0 -2px; shadow: md }
+.demo-btn:hover { shadow: md; filter: brightness(1.15) }
 
 // motion demo
 .demo-motion {

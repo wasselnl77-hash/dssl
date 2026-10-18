@@ -58,9 +58,9 @@ select { use focus-ring }
   position: sticky
   top: 0
   z: 50
-  background: color.paper/82
-  backdrop-filter: blur(14) saturate(1.5)
-  border-bottom: 1 solid color.line
+  background: color.paper/92
+  backdrop-filter: blur(10)
+  border-bottom: 1 solid color.ink/30
   transition: 200
 }
 
@@ -72,17 +72,19 @@ select { use focus-ring }
 
 .nav-logo {
   row: gap 2 center
-  font-weight: 800
-  font-size: 21
-  letter-spacing: -0.02em
+  font-family: font.serif
+  font-weight: 700
+  font-size: 22
+  letter-spacing: 0
   color: color.ink
   transition: 120
 }
 
 .logo-mark {
-  font-family: font.mono
+  font-family: font.serif
   color: color.accent
-  font-weight: 700
+  font-weight: 400
+  font-size: 24
   margin-right: 6
 }
 
@@ -145,7 +147,7 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
   font-size: 11.5
   color: color.muted
   border: 1 solid color.line
-  radius: full
+  radius: sm
   padding: 4 10
   background: color.card/60
 }
@@ -206,13 +208,13 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 }
 
 .btn-primary:hover {
-  translate: 0 -2px
   shadow: md
+  filter: brightness(1.12)
 }
 
 .btn-primary:active {
-  translate: 0 0
   shadow: sm
+  filter: brightness(0.96)
   transition: 60
 }
 
@@ -224,8 +226,7 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 
 .btn-ghost:hover {
   background: color.line/45
-  translate: 0 -2px
-  shadow: sm
+  border-color: color.ink/35
 }
 
 .btn-sm {
@@ -244,9 +245,8 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 }
 
 .card-hover:hover {
-  translate: 0 -3px
-  shadow: lg
-  border-color: color.accent/35
+  shadow: md
+  border-color: color.ink/38
 }
 
 .kicker {
@@ -260,7 +260,7 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 }
 
 .kicker::before {
-  content: "//"
+  content: "§"
   color: color.accent/55
 }
 
@@ -269,16 +269,18 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 }
 
 .section-title {
-  font-size: 30
-  font-weight: 750
-  letter-spacing: -0.025em
+  font-family: font.serif
+  font-size: 31
+  font-weight: 650
+  letter-spacing: -0.01em
   margin: space.2 0 space.3
 }
 
 .section-sub {
+  font-family: font.serif
   color: color.muted
   font-size: 16.5
-  line-height: 1.65
+  line-height: 1.7
   max-width: 640
 }
 
@@ -358,8 +360,9 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 }
 
 .prose p {
+  font-family: font.serif
   margin: 0 0 space.4
-  line-height: 1.8
+  line-height: 1.85
   color: color.ink/88
   font-size: 16
 }
@@ -367,16 +370,18 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 .prose p:last-child { margin-bottom: 0 }
 
 .prose h2 {
-  font-size: 26
-  font-weight: 750
-  letter-spacing: -0.02em
+  font-family: font.serif
+  font-size: 27
+  font-weight: 650
+  letter-spacing: -0.01em
   margin: space.7 0 space.3
   scroll-margin-top: 88
 }
 
 .prose h3 {
-  font-size: 19
-  font-weight: 700
+  font-family: font.serif
+  font-size: 19.5
+  font-weight: 650
   margin: space.5 0 space.2
   scroll-margin-top: 88
 }
@@ -396,13 +401,13 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 }
 
 .prose li::before {
-  content: ""
+  content: "—"
   position: absolute
   left: 0
-  top: 9
-  size: 6
-  circle: 6
-  background: color.accent
+  top: 0
+  background: none
+  color: color.accent/70
+  font-family: font.serif
 }
 
 .prose strong {
@@ -439,7 +444,7 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 
 .footer {
   margin-top: auto
-  border-top: 1 solid color.line
+  border-top: 1 solid color.ink/30
   padding: space.6 0 space.5
   background: color.card/40
 }
@@ -461,9 +466,10 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 
 .footer-fine {
   color: color.muted
-  font-size: 12
-  font-family: font.mono
-  letter-spacing: 0.02em
+  font-size: 12.5
+  font-family: font.serif
+  font-style: italic
+  letter-spacing: 0.01em
 }
 
 .footer-links {

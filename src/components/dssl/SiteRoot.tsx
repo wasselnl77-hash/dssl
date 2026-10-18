@@ -98,11 +98,11 @@ export default function SiteRoot() {
   }, []);
 
   return (
-    <div className="site">
+    <div className="site" data-view={view}>
       <header className="nav">
         <div className="wrap nav-inner">
           <a href="#/" className="nav-logo" onClick={(e) => { e.preventDefault(); go("home"); }}>
-            <span className="logo-mark">{"//"}</span>
+            <span className="logo-mark">{"§"}</span>
             DSSL
           </a>
 
@@ -120,7 +120,7 @@ export default function SiteRoot() {
           </nav>
 
           <div className="nav-side">
-            <span className="ver-badge">v0.3.2</span>
+            <span className="ver-badge">v0.3.3</span>
             <button type="button" className="theme-btn" onClick={cycleTheme} aria-label="Toggle color theme" title="Theme: auto / light / dark">
               <span className="icon-sun"><SunIcon /></span>
               <span className="icon-moon"><MoonIcon /></span>
@@ -132,7 +132,10 @@ export default function SiteRoot() {
         </div>
       </header>
 
-      <main className="main" data-view={view}>
+      {/* data-view lives on the ROOT so the nav-active rules can reach the
+          header links — on <main> they never matched (main is a SIBLING of
+          the header, and descendant selectors only look down the tree) */}
+      <main className="main">
         {view === "home" && <HomeView go={go} />}
         {view === "docs" && <DocsView />}
         {view === "cheat" && <CheatSheetView />}
@@ -145,12 +148,13 @@ export default function SiteRoot() {
         <div className="wrap footer-inner">
           <div className="footer-col">
             <div className="footer-note">
-              <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.3.2 while
+              <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.3.3 while
               building this site; every feature it needed, it grew, and every bug you sent got
               fixed for real. This page runs on its own engine, no stylesheet attached.
             </div>
             <div className="footer-fine">
-              © 2026 <strong>Firstlight</strong> — the studio that grows DSSL.
+              © 2026 <strong>DSSL. inc</strong> — named after the product, because naming things
+              is hard.
             </div>
           </div>
           <nav className="footer-links" aria-label="Footer">

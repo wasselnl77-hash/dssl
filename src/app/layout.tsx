@@ -19,8 +19,8 @@ export const viewport: Viewport = {
 // The ONLY non-DSSL styling in this app: a pre-paint shim so the very first
 // frame doesn't flash white before the DSSL engine boots (dark-mode respect).
 const prePaint = `
-  html { background: #faf8f4; }
-  @media (prefers-color-scheme: dark) { html { background: #14111c; } }
+  html { background: #f5f0e4; }
+  @media (prefers-color-scheme: dark) { html { background: #181310; } }
 `;
 
 // v0.3.2 — performance: the stylesheets ride INSIDE the HTML. The engine's
