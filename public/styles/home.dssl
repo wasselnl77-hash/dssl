@@ -1,0 +1,422 @@
+// =========================================================================
+// home.dssl — the landing view
+// =========================================================================
+
+// ------------------------------------------------------------------- hero
+
+.hero {
+  position: relative
+  overflow: hidden
+  padding: space.8 0 space.7
+}
+
+.hero-glow {
+  position: absolute
+  top: -220
+  right: -160
+  size: 560
+  circle: 560
+  background: radial-gradient(circle, color.accent/16, transparent 65%)
+  pointer-events: none
+}
+
+.hero-glow-2 {
+  position: absolute
+  bottom: -260
+  left: -200
+  size: 520
+  circle: 520
+  background: radial-gradient(circle, color.accent/9, transparent 60%)
+  pointer-events: none
+}
+
+.hero-grid {
+  row: gap space.6 between
+  align: center
+  position: relative
+}
+
+@media (width <= 940) {
+  .hero-grid {
+    display: grid
+    gap: space.6
+  }
+}
+
+.hero-copy {
+  max-width: 560
+}
+
+.hero-title {
+  fluid: 40, 62
+  font-weight: 800
+  line-height: 1.04
+  letter-spacing: -0.035em
+  margin: space.3 0 space.4
+}
+
+.hero-title em {
+  font-style: normal
+  color: color.accent
+}
+
+.hero-sub {
+  font-size: 17.5
+  line-height: 1.7
+  color: color.muted
+  margin: 0 0 space.5
+}
+
+.hero-ctas {
+  row: gap 12 center
+}
+
+.hero-meta {
+  row: gap 14 center
+  margin-top: space.5
+  color: color.muted
+  font-size: 13
+  font-family: font.mono
+}
+
+.hero-meta span::before {
+  content: ""
+  inline-size: 4
+  aspect-ratio: 1
+  background: color.ok
+  radius: full
+  display: inline-block
+  margin-right: 7
+  vertical-align: 1
+}
+
+// ------------------------------------------------------- hero demo stage
+
+.demo {
+  width: 100%
+  max-width: 480
+}
+
+.demo-tabs {
+  row: gap 6
+  margin-bottom: 10
+}
+
+.demo-tab {
+  padding: 7 14
+  radius: full
+  font-size: 13
+  font-weight: 600
+  color: color.muted
+  border: 1 solid color.line
+  background: color.card/50
+  cursor: pointer
+  transition: 140
+}
+
+.demo-tab:hover {
+  color: color.ink
+  translate: 0 -1px
+}
+
+.demo-tab[aria-pressed="true"] {
+  background: color.accent
+  border-color: color.accent
+  color: color.accent-ink
+}
+
+.demo-stage {
+  background: color.card
+  border: 1 solid color.line
+  radius: xl
+  overflow: hidden
+  shadow: lg
+}
+
+.demo-code {
+  border: none
+  border-bottom: 1 solid color.code-line/60
+  radius: 0
+  font-size: 12.5
+  padding: space.3 space.4
+  min-height: 168
+}
+
+.demo-canvas {
+  padding: space.5
+  display: grid
+  place: center
+  gap: 14
+  min-height: 190
+}
+
+// shared vertical rhythm between intro text and grids
+.sect-gap {
+  margin-top: space.4
+}
+
+// the live demo card — every rule below is real, hovering it really works
+motion rise-in {
+  from {
+    opacity: 0
+    translate: 0 12
+  }
+}
+
+.demo-card {
+  width: 240
+  padding: space.4
+  radius: md
+  background: color.card
+  border: 1 solid color.line
+  shadow: md
+  transition: 200
+  column: gap 10
+  animate: rise-in 500 snap
+}
+
+.demo-card:hover {
+  translate: 0 -5px
+  shadow: lg
+  border-color: color.accent/40
+}
+
+.demo-swatch {
+  height: 64
+  radius: sm
+  background: linear-gradient(135deg, color.accent, color.accent/45)
+  transition: 250
+}
+
+.demo-card:hover .demo-swatch {
+  background: linear-gradient(135deg, color.accent/60, color.ink/80)
+}
+
+.demo-card h4 {
+  font-size: 15.5
+  font-weight: 700
+}
+
+.demo-card p {
+  font-size: 13
+  color: color.muted
+  line-height: 1.5
+  margin: 0
+}
+
+.demo-chip {
+  align-self: start
+  font-family: font.mono
+  font-size: 11
+  color: color.accent
+  background: color.accent/12
+  padding: 3 9
+  radius: full
+}
+
+// states demo: a real focusable button styled by focus-visible
+.demo-btn {
+  padding: 12 22
+  radius: md
+  background: color.ink
+  color: color.paper
+  font-weight: 650
+  font-size: 14.5
+  cursor: pointer
+  transition: 160
+  border: none
+}
+
+.demo-btn:hover { translate: 0 -2px; shadow: md }
+
+// motion demo
+.demo-motion {
+  width: 200
+  padding: space.4
+  radius: md
+  background: color.code-bg
+  color: color.code-ink
+  font-family: font.mono
+  font-size: 13
+  text-align: center
+}
+
+// signal demo — the button toggles a JS signal; DSSL re-styles live
+.demo-signal-card {
+  width: 240
+  padding: space.4
+  radius: md
+  background: color.card
+  border: 1 solid color.line
+  transition: 300
+  column: gap 8
+  font-size: 13.5
+  color: color.muted
+}
+
+@signal demo == on {
+  .demo-signal-card {
+    background: color.accent
+    border-color: color.accent
+    color: color.accent-ink
+    translate: 0 -4px
+    shadow: lg
+  }
+}
+
+// ------------------------------------------------------------ pain cards
+
+.pain-grid {
+  display: grid
+  grid-template-columns: repeat(2, 1fr)
+  gap: space.4
+}
+
+@media (width <= 760) {
+  .pain-grid {
+    grid-template-columns: 1fr
+  }
+}
+
+.pain-card {
+  padding: space.5
+  column: gap 10
+}
+
+.pain-label {
+  font-family: font.mono
+  font-size: 12
+  color: color.err
+  font-weight: 600
+}
+
+.pain-cure {
+  font-family: font.mono
+  font-size: 12
+  color: color.ok
+  font-weight: 600
+}
+
+.pain-card h3 {
+  font-size: 17
+  font-weight: 700
+  margin: 0
+}
+
+.pain-card p {
+  margin: 0
+  font-size: 14
+  line-height: 1.65
+  color: color.muted
+}
+
+// ------------------------------------------------------------ comparison
+
+.compare {
+  display: grid
+  grid-template-columns: 1fr 1fr
+  gap: space.4
+  align-items: start
+}
+
+@media (width <= 820) {
+  .compare {
+    grid-template-columns: 1fr
+  }
+}
+
+.compare-col {
+  column: gap 10
+}
+
+.compare-tag {
+  font-family: font.mono
+  font-size: 12.5
+  font-weight: 700
+  row: gap 8 center
+}
+
+.compare-tag-css { color: color.err }
+.compare-tag-dssl { color: color.ok }
+
+// ---------------------------------------------------------- feature grid
+
+.feature-grid {
+  display: grid
+  grid-template-columns: repeat(4, 1fr)
+  gap: space.4
+}
+
+@media (width <= 980) {
+  .feature-grid {
+    grid-template-columns: repeat(2, 1fr)
+  }
+}
+
+@media (width <= 560) {
+  .feature-grid {
+    grid-template-columns: 1fr
+  }
+}
+
+.feature {
+  padding: space.5
+  column: gap 10
+}
+
+.feature-icon {
+  size: 40
+  circle: 40
+  place: center
+  background: color.accent/12
+  color: color.accent
+  font-size: 19
+  font-weight: 700
+  font-family: font.mono
+}
+
+.feature h3 {
+  font-size: 16
+  font-weight: 700
+  margin: 0
+}
+
+.feature p {
+  margin: 0
+  font-size: 13.5
+  line-height: 1.6
+  color: color.muted
+}
+
+// ------------------------------------------------------------------- cta
+
+.cta-band {
+  text-align: center
+  padding: space.8 space.4
+  radius: xl
+  background:
+    radial-gradient(ellipse at 30% 0%, color.accent/14, transparent 55%),
+    radial-gradient(ellipse at 75% 100%, color.accent/10, transparent 50%),
+    color.card
+  border: 1 solid color.line
+  column: gap space.4
+  align-items: center
+}
+
+.cta-band h2 {
+  fluid: 28, 40
+  font-weight: 800
+  letter-spacing: -0.03em
+  margin: 0
+}
+
+.cta-band p {
+  color: color.muted
+  max-width: 520
+  line-height: 1.65
+  margin: 0
+}
+
+.cta-band .hero-ctas {
+  justify-content: center
+}

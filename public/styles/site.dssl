@@ -1,0 +1,472 @@
+// =========================================================================
+// site.dssl — chrome shared by every view of the DSSL site
+// =========================================================================
+
+html {
+  font-family: font.sans
+  -webkit-font-smoothing: antialiased
+  scroll-behavior: smooth
+}
+
+body {
+  background: color.paper
+  color: color.ink
+}
+
+::selection {
+  background: color.accent/22
+}
+
+// accessibility: one behavior, used everywhere
+behavior focus-ring {
+  focus-visible {
+    outline: 2 solid color.accent
+    outline-offset: 2
+    radius: 4
+  }
+}
+
+a { use focus-ring }
+button { use focus-ring }
+input { use focus-ring }
+textarea { use focus-ring }
+select { use focus-ring }
+[tabindex] { use focus-ring }
+
+// ---------------------------------------------------------------- layout
+
+.site {
+  min-height: 100vh
+  display: flex
+  flex-direction: column
+}
+
+.wrap {
+  width: 100%
+  max-width: 1140
+  margin: 0 auto
+  padding: 0 space.5
+}
+
+.main {
+  flex: 1
+}
+
+// ------------------------------------------------------------------ nav
+
+.nav {
+  position: sticky
+  top: 0
+  z: 50
+  background: color.paper/82
+  backdrop-filter: blur(14) saturate(1.5)
+  border-bottom: 1 solid color.line
+  transition: 200
+}
+
+.nav-inner {
+  row: gap space.4 between
+  height: 64
+  align: center
+}
+
+.nav-logo {
+  row: gap 2 center
+  font-weight: 800
+  font-size: 21
+  letter-spacing: -0.02em
+  color: color.ink
+  transition: 120
+}
+
+.logo-mark {
+  font-family: font.mono
+  color: color.accent
+  font-weight: 700
+  margin-right: 6
+}
+
+.nav-links {
+  row: gap 4 center
+}
+
+.nav-link {
+  padding: 8 13
+  radius: sm
+  color: color.muted
+  font-size: 14.5
+  font-weight: 550
+  transition: 130
+}
+
+.nav-link:hover {
+  color: color.ink
+  background: color.line/60
+}
+
+// active view highlighting via a data attribute on <main> — no JS needed
+[data-view="home"] .nl-home,
+[data-view="docs"] .nl-docs,
+[data-view="spec"] .nl-spec,
+[data-view="playground"] .nl-playground,
+[data-view="changelog"] .nl-changelog {
+  color: color.accent
+  background: color.accent/10
+}
+
+.nav-side {
+  row: gap 8 center
+}
+
+.theme-btn {
+  circle: 36
+  place: center
+  color: color.muted
+  transition: 150
+  border: 1 solid color.line
+}
+
+.theme-btn:hover {
+  color: color.ink
+  background: color.line/70
+  translate: 0 -1px
+}
+
+// icon switching driven by an html attribute — the engine re-styles on
+// attribute mutations, so the toggle needs zero style manipulation in JS
+html[data-theme-mode="dark"] .icon-sun { display: none }
+html[data-theme-mode="light"] .icon-moon { display: none }
+html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
+  border-style: dashed
+}
+
+.ver-badge {
+  font-family: font.mono
+  font-size: 11.5
+  color: color.muted
+  border: 1 solid color.line
+  radius: full
+  padding: 4 10
+  background: color.card/60
+}
+
+.nav-toggle { display: none }
+
+@media (width <= 860) {
+  .nav-toggle {
+    display: grid
+    place: center
+    size: 36
+    radius: sm
+    color: color.muted
+    border: 1 solid color.line
+    transition: 130
+  }
+  .nav-toggle:hover { color: color.ink; background: color.line/60 }
+
+  .nav-links {
+    display: none
+    position: absolute
+    top: 64
+    left: 0
+    right: 0
+    column: gap 2
+    padding: space.3 space.5 space.4
+    background: color.paper
+    border-bottom: 1 solid color.line
+    box-shadow: shadow.lg
+  }
+
+  @signal nav == open {
+    .nav-links { display: flex }
+  }
+}
+
+// ---------------------------------------------------------------- buttons
+
+.btn {
+  row: gap 8 center
+  padding: 11 20
+  radius: md
+  font-weight: 620
+  font-size: 15
+  transition: 160
+  cursor: pointer
+  border: 1 solid transparent
+  user-select: none
+  line-height: 1.2
+}
+
+.btn-primary {
+  background: color.accent
+  color: color.accent-ink
+  shadow: sm
+}
+
+.btn-primary:hover {
+  translate: 0 -2px
+  shadow: md
+}
+
+.btn-primary:active {
+  translate: 0 0
+  shadow: sm
+  transition: 60
+}
+
+.btn-ghost {
+  border-color: color.line
+  color: color.ink
+  background: color.card/40
+}
+
+.btn-ghost:hover {
+  background: color.line/45
+  translate: 0 -2px
+  shadow: sm
+}
+
+.btn-sm {
+  padding: 8 14
+  font-size: 13.5
+  radius: sm
+}
+
+// ------------------------------------------------------------------ cards
+
+.card {
+  background: color.card
+  border: 1 solid color.line
+  radius: lg
+  transition: 180
+}
+
+.card-hover:hover {
+  translate: 0 -3px
+  shadow: lg
+  border-color: color.accent/35
+}
+
+.kicker {
+  font-family: font.mono
+  font-size: 12.5
+  font-weight: 600
+  color: color.accent
+  letter-spacing: 0.14em
+  text-transform: uppercase
+  row: gap 8 center
+}
+
+.kicker::before {
+  content: "//"
+  color: color.accent/55
+}
+
+.section {
+  padding: space.8 0
+}
+
+.section-title {
+  font-size: 30
+  font-weight: 750
+  letter-spacing: -0.025em
+  margin: space.2 0 space.3
+}
+
+.section-sub {
+  color: color.muted
+  font-size: 16.5
+  line-height: 1.65
+  max-width: 640
+}
+
+// -------------------------------------------------------------- code block
+
+.code {
+  background: color.code-bg
+  color: color.code-ink
+  radius: md
+  padding: space.4
+  font-family: font.mono
+  font-size: 13
+  line-height: 1.75
+  overflow-x: auto
+  tab-size: 2
+  border: 1 solid color.code-line/60
+}
+
+.code code {
+  font-family: font.mono
+}
+
+.code-head {
+  row: gap 8 between
+  align: center
+  padding: 10 space.4
+  background: color.code-bg
+  border: 1 solid color.code-line/60
+  border-bottom: none
+  radius: md md 0 0
+  font-family: font.mono
+  font-size: 12
+  color: color.code-com
+}
+
+.code-head + .code {
+  radius: 0 0 md md
+}
+
+.code-plain {
+  radius: md
+}
+
+.copy-btn {
+  color: color.code-com
+  font-size: 11.5
+  row: gap 6 center
+  padding: 4 10
+  radius: full
+  border: 1 solid color.code-line
+  transition: 130
+  cursor: pointer
+  font-family: font.mono
+}
+
+.copy-btn:hover {
+  color: color.code-ink
+  border-color: color.code-com
+}
+
+// syntax token colors (spans produced by the site's tiny highlighter)
+.tok-com { color: color.code-com; font-style: italic }
+.tok-sel { color: color.code-sel }
+.tok-prop { color: color.code-prop }
+.tok-at { color: color.code-key; font-weight: 600 }
+.tok-state { color: color.code-key }
+.tok-num { color: color.code-num }
+.tok-str { color: color.code-str }
+.tok-val { color: color.code-ink }
+.tok-punct { color: color.code-com }
+.tok-use { color: color.code-num }
+
+// ------------------------------------------------------------------ prose
+
+.prose {
+  max-width: 780
+}
+
+.prose p {
+  margin: 0 0 space.4
+  line-height: 1.8
+  color: color.ink/88
+  font-size: 16
+}
+
+.prose p:last-child { margin-bottom: 0 }
+
+.prose h2 {
+  font-size: 26
+  font-weight: 750
+  letter-spacing: -0.02em
+  margin: space.7 0 space.3
+  scroll-margin-top: 88
+}
+
+.prose h3 {
+  font-size: 19
+  font-weight: 700
+  margin: space.5 0 space.2
+  scroll-margin-top: 88
+}
+
+.prose ul {
+  margin: 0 0 space.4
+  column: gap 8
+  padding: 0
+}
+
+.prose li {
+  padding-left: 18
+  position: relative
+  line-height: 1.7
+  color: color.ink/88
+  font-size: 15.5
+}
+
+.prose li::before {
+  content: ""
+  position: absolute
+  left: 0
+  top: 9
+  size: 6
+  circle: 6
+  background: color.accent
+}
+
+.prose strong {
+  font-weight: 700
+  color: color.ink
+}
+
+.prose code {
+  font-family: font.mono
+  font-size: 0.86em
+  background: color.accent/10
+  color: color.accent
+  padding: 2 6
+  radius: 6
+}
+
+.prose .code code {
+  background: transparent
+  color: inherit
+  padding: 0
+}
+
+.inline-tag {
+  font-family: font.mono
+  font-size: 12
+  background: color.accent/10
+  color: color.accent
+  border: 1 solid color.accent/25
+  padding: 2 8
+  radius: full
+}
+
+// ----------------------------------------------------------------- footer
+
+.footer {
+  margin-top: auto
+  border-top: 1 solid color.line
+  padding: space.6 0 space.5
+  background: color.card/40
+}
+
+.footer-inner {
+  row: gap space.4 between
+  align: center
+}
+
+.footer-note {
+  color: color.muted
+  font-size: 13.5
+  line-height: 1.6
+}
+
+.footer-links {
+  row: gap 4 center
+}
+
+// -------------------------------------------------------------- utilities
+
+@layer utilities {
+  .visually-hidden {
+    position: absolute
+    width: 1
+    height: 1
+    overflow: hidden
+    clip-path: inset(50%)
+    white-space: nowrap
+  }
+  .mt-0 { margin-top: 0 }
+}

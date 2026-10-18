@@ -1,0 +1,97 @@
+// =========================================================================
+// changelog.dssl — the "grown while building" timeline
+// =========================================================================
+
+.tl {
+  border-left: 2 solid color.line
+  margin-left: 8
+  padding-left: 26
+  column: gap space.6
+  margin-top: space.5
+}
+
+.tl-item {
+  position: relative
+}
+
+.tl-item::before {
+  content: ""
+  position: absolute
+  left: -33
+  top: 5
+  size: 12
+  circle: 12
+  background: color.accent
+  border: 2 solid color.paper
+  box-shadow: 0 0 0 2 color.accent/25
+}
+
+.tl-item-add::before {
+  background: color.ok
+  box-shadow: 0 0 0 2 color.ok/25
+}
+
+.tl-date {
+  font-family: font.mono
+  font-size: 11.5
+  color: color.muted
+  letter-spacing: 0.06em
+  text-transform: uppercase
+}
+
+.tl-item h3 {
+  font-size: 17
+  font-weight: 700
+  margin: 3 0 6
+  letter-spacing: -0.01em
+}
+
+.tl-item p {
+  font-size: 14
+  color: color.muted
+  line-height: 1.65
+  margin: 0 0 8
+  max-width: 640
+}
+
+.tl-why {
+  font-family: font.mono
+  font-size: 12
+  color: color.accent
+  background: color.accent/8
+  border: 1 solid color.accent/20
+  padding: 3 9
+  radius: full
+  display: inline-block
+  margin-bottom: 8
+}
+
+.tl-version {
+  font-family: font.mono
+  font-size: 12
+  color: color.muted
+  border: 1 solid color.line
+  padding: 3 9
+  radius: full
+  display: inline-block
+  margin-bottom: 8
+  margin-right: 6
+  background: color.card
+}
+
+.vote-badge {
+  font-family: font.mono
+  font-size: 12
+  padding: 3 10
+  radius: full
+  border: 1 solid color.ok/35
+  color: color.ok
+  background: color.ok/8
+  display: inline-block
+}
+
+.vote-badge-veto {
+  border-color: color.err/35
+  color: color.err
+  background: color.err/8
+}

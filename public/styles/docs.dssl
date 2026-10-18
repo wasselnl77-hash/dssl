@@ -1,0 +1,321 @@
+// =========================================================================
+// docs.dssl — language reference layout (also used by the spec view)
+// =========================================================================
+
+.page-head {
+  padding: space.6 0 space.2
+}
+
+.page-title {
+  fluid: 30, 44
+  font-weight: 800
+  letter-spacing: -0.03em
+  margin: space.2 0 space.2
+}
+
+.page-sub {
+  color: color.muted
+  font-size: 16.5
+  line-height: 1.65
+  max-width: 640
+}
+
+.docs-layout {
+  display: grid
+  grid-template-columns: 230 minmax(0, 1fr)
+  gap: space.6
+  align-items: start
+  padding-bottom: space.7
+}
+
+@media (width <= 920) {
+  .docs-layout {
+    grid-template-columns: 1fr
+  }
+  .docs-side {
+    display: none
+  }
+}
+
+.docs-side {
+  position: sticky
+  top: 88
+  column: gap 1
+  max-height: calc(100vh - 110)
+  overflow-y: auto
+  padding-right: 6
+  scrollbar-width: thin
+}
+
+.side-head {
+  font-family: font.mono
+  font-size: 10.5
+  text-transform: uppercase
+  letter-spacing: 0.14em
+  color: color.muted
+  padding: 0 12
+  margin: space.3 0 4
+}
+
+.side-head:first-child {
+  margin-top: 0
+}
+
+.docs-side a {
+  padding: 6 12
+  radius: 0 sm sm 0
+  font-size: 13.5
+  color: color.muted
+  transition: 130
+  border-left: 2 solid transparent
+  line-height: 1.4
+}
+
+.docs-side a:hover {
+  color: color.ink
+  background: color.line/50
+  border-left-color: color.accent/40
+}
+
+.docs-body {
+  min-width: 0
+  column: gap space.7
+}
+
+.doc-block {
+  column: gap space.3
+  scroll-margin-top: 92
+}
+
+.doc-lead {
+  color: color.muted
+  font-size: 15.5
+  line-height: 1.7
+  margin: 0
+}
+
+// live example well
+.demo-box {
+  display: grid
+  place: center
+  gap: 12
+  border: 1 dashed color.line
+  radius: md
+  padding: space.5
+  background:
+    radial-gradient(color.line/45 1, transparent 1)
+  background-size: 16 16
+  min-height: 96
+}
+
+// tables (semantic property reference, spec votes, …)
+.tbl {
+  width: 100%
+  border-collapse: collapse
+  font-size: 13.5
+}
+
+.tbl th {
+  text-align: left
+  padding: 9 12
+  background: color.card
+  border-bottom: 2 solid color.line
+  font-size: 11
+  text-transform: uppercase
+  letter-spacing: 0.09em
+  color: color.muted
+  font-family: font.mono
+}
+
+.tbl td {
+  padding: 10 12
+  border-bottom: 1 solid color.line
+  vertical-align: top
+  line-height: 1.55
+  color: color.ink/90
+}
+
+.tbl tr:hover td {
+  background: color.accent/4
+}
+
+.tbl code {
+  font-family: font.mono
+  font-size: 12.5
+  color: color.accent
+  background: color.accent/9
+  padding: 1 6
+  radius: 5
+  white-space: nowrap
+}
+
+.tbl-note {
+  font-size: 12.5
+  color: color.muted
+  margin: 8 0 0
+}
+
+// callouts
+.note {
+  border-left: 3 solid color.accent
+  background: color.accent/7
+  radius: 0 md md 0
+  padding: space.3 space.4
+  font-size: 14
+  line-height: 1.65
+  color: color.ink/90
+}
+
+.note-warn {
+  border-left-color: color.err
+  background: color.err/7
+}
+
+.note b {
+  font-weight: 700
+}
+
+// docs live-demo widgets
+.doc-btn {
+  padding: 10 18
+  radius: sm
+  background: color.card
+  border: 1 solid color.line
+  font-weight: 600
+  font-size: 14
+  cursor: pointer
+  transition: 150
+  color: color.ink
+}
+
+.doc-btn:hover {
+  border-color: color.accent/50
+  translate: 0 -1px
+  shadow: sm
+}
+
+.doc-card {
+  width: 250
+  padding: space.4
+  radius: md
+  background: color.card
+  border: 1 solid color.line
+  shadow: sm
+  transition: 200
+  column: gap 8
+  font-size: 13.5
+}
+
+.doc-card:hover {
+  translate: 0 -4px
+  shadow: lg
+}
+
+.doc-card-title {
+  font-weight: 700
+  font-size: 14.5
+}
+
+.doc-card-sub {
+  color: color.muted
+  font-size: 12.5
+  line-height: 1.5
+}
+
+.motion-box {
+  padding: space.4 space.5
+  radius: md
+  background: color.code-bg
+  color: color.code-ink
+  font-family: font.mono
+  font-size: 13.5
+  min-width: 220
+  text-align: center
+}
+
+.signal-box {
+  padding: space.4 space.5
+  radius: md
+  border: 1 solid color.line
+  background: color.card
+  font-size: 14
+  font-weight: 600
+  transition: 250
+  color: color.muted
+}
+
+@signal docdemo == hot {
+  .signal-box {
+    background: color.accent
+    border-color: color.accent
+    color: color.accent-ink
+    translate: 0 -3px
+    shadow: md
+  }
+}
+
+.tok-demo {
+  row: gap 10 center
+}
+
+.tok-dot {
+  size: 34
+  circle: 34
+  place: center
+  font-family: font.mono
+  font-size: 11
+  border: 1 solid color.line
+  background: color.card
+  color: color.muted
+  transition: 200
+  cursor: pointer
+}
+
+.tok-dot:hover {
+  translate: 0 -3px
+  shadow: md
+  border-color: color.accent/40
+  color: color.accent
+}
+
+.scale-bar {
+  row: gap 6
+  align-items: flex-end
+}
+
+.scale-step {
+  width: 34
+  background: color.accent/70
+  radius: 4 4 0 0
+  transition: 150
+}
+
+.scale-step:hover {
+  background: color.accent
+}
+
+// motion demo — replayed via DSSL.replay()
+motion pop {
+  from {
+    opacity: 0
+    translate: 0 16
+    scale: 0.9
+  }
+}
+
+.motion-box {
+  animate: pop 500 snap
+}
+
+// fluid type demo
+.fluid-demo {
+  fluid: 20, 44
+  font-weight: 800
+  letter-spacing: -0.02em
+  line-height: 1.15
+  text-align: center
+}
+
+.fine-print {
+  font-size: 13
+}

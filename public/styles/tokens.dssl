@@ -1,0 +1,104 @@
+// =========================================================================
+// tokens.dssl — DSSL's own design tokens
+// The dark palette lives in a behavior and is `use`d by both the system
+// preference and the manual theme signal — define once, apply twice.
+// =========================================================================
+
+tokens {
+  color {
+    paper: #faf8f4
+    card: #ffffff
+    ink: #1a1721
+    muted: #6d6680
+    line: #e9e3d9
+    accent: oklch(0.58 0.19 33)
+    accent-ink: #fff6ee
+    ok: #2e7d4f
+    err: #b3372e
+    code-bg: #211d2b
+    code-ink: #ece9f4
+    code-line: #37314a
+    code-key: #f2a86c
+    code-sel: #8fd0b2
+    code-prop: #9ec1f0
+    code-str: #d8b16e
+    code-num: #d8a0df
+    code-com: #857d9c
+  }
+  radius {
+    sm: 8
+    md: 14
+    lg: 20
+    xl: 28
+    full: 999
+  }
+  shadow {
+    sm: 0 1 2 color.ink/8, 0 1 3 color.ink/6
+    md: 0 2 4 color.ink/10, 0 4 14 color.ink/8
+    lg: 0 4 8 color.ink/12, 0 14 36 color.ink/12
+  }
+}
+
+// ---- dark palette (shared) ---------------------------------------------
+
+behavior palette-dark {
+  tokens {
+    color {
+      paper: #14111c
+      card: #1d1927
+      ink: #edeaf6
+      muted: #a29ab8
+      line: #2c2739
+      accent: oklch(0.72 0.15 45)
+      accent-ink: #241304
+      ok: #6fc793
+      err: #e5766a
+      code-bg: #100e18
+      code-ink: #e4e0f0
+      code-line: #292438
+      code-key: #f2a86c
+      code-sel: #8fd0b2
+      code-prop: #9ec1f0
+      code-str: #d8b16e
+      code-num: #d8a0df
+      code-com: #6f6885
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  use palette-dark
+}
+
+@signal theme == dark {
+  use palette-dark
+}
+
+@signal theme == light {
+  use palette-light
+}
+
+behavior palette-light {
+  tokens {
+    color {
+      paper: #faf8f4
+      card: #ffffff
+      ink: #1a1721
+      muted: #6d6680
+      line: #e9e3d9
+      accent: oklch(0.58 0.19 33)
+      accent-ink: #fff6ee
+      ok: #2e7d4f
+      err: #b3372e
+      code-bg: #211d2b
+      code-ink: #ece9f4
+      code-line: #37314a
+      code-key: #f2a86c
+      code-sel: #8fd0b2
+      code-prop: #9ec1f0
+      code-str: #d8b16e
+      code-num: #d8a0df
+      code-com: #857d9c
+    }
+  }
+}
