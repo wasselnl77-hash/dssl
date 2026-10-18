@@ -61,7 +61,7 @@
   background: color.accent/8
   border: 1 solid color.accent/20
   padding: 3 9
-  radius: full
+  radius: sm
   display: inline-block
   margin-bottom: 8
 }

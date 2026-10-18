@@ -30,15 +30,6 @@
   padding-bottom: space.7
 }
 
-@media (width <= 920) {
-  .docs-layout {
-    grid-template-columns: 1fr
-  }
-  .docs-side {
-    display: none
-  }
-}
-
 .docs-side {
   position: sticky
   top: 88
@@ -47,6 +38,20 @@
   overflow-y: auto
   padding-right: 6
   scrollbar-width: thin
+}
+
+// v0.3.3 fix: this block MUST come after the .docs-side rule above —
+// `column:` expands to display:flex, and "later wins" in the cascade,
+// so an earlier display:none silently loses (same gotcha as the mobile
+// nav sheet in v0.3.0). Here it lives after, so the sidebar actually
+// disappears on small screens instead of pinning over the body text.
+@media (width <= 920) {
+  .docs-layout {
+    grid-template-columns: 1fr
+  }
+  .docs-side {
+    display: none
+  }
 }
 
 .side-head {
@@ -148,7 +153,7 @@
   color: color.accent
   background: color.accent/9
   padding: 1 6
-  radius: 5
+  radius: md
   white-space: nowrap
 }
 
@@ -183,7 +188,7 @@
   padding: 10 18
   radius: sm
   background: color.card
-  border: 1 solid color.line
+  border: 1 solid color.ink/45
   font-weight: 600
   font-size: 14
   cursor: pointer
@@ -384,7 +389,7 @@ motion pop {
   color: color.accent
   background: color.accent/9
   padding: 1 5
-  radius: 5
+  radius: md
 }
 
 .cheat-p a {
@@ -409,7 +414,7 @@ motion pop {
   color: color.accent
   background: color.accent/9
   padding: 1 6
-  radius: 5
+  radius: md
   white-space: nowrap
 }
 

@@ -93,27 +93,31 @@ select { use focus-ring }
 }
 
 .nav-link {
-  padding: 8 13
-  radius: sm
-  color: color.muted
-  font-size: 14.5
+  padding: 6 12
+  radius: 0
+  color: color.ink/70
+  font-size: 13.5
   font-weight: 550
+  font-variant: small-caps
+  letter-spacing: 0.08em
   transition: 130
+  border-bottom: 2 solid transparent
 }
 
 .nav-link:hover {
   color: color.ink
-  background: color.line/60
 }
 
-// active view highlighting via a data attribute on <main> — no JS needed
+// active view highlighting via a data attribute on the site root — no JS needed.
+// cheat was missing here before v0.3.3 — its tab never lit up.
 [data-view="home"] .nl-home,
 [data-view="docs"] .nl-docs,
+[data-view="cheat"] .nl-cheat,
 [data-view="spec"] .nl-spec,
 [data-view="playground"] .nl-playground,
 [data-view="changelog"] .nl-changelog {
   color: color.accent
-  background: color.accent/10
+  border-bottom-color: color.accent
 }
 
 .nav-side {
@@ -121,11 +125,12 @@ select { use focus-ring }
 }
 
 .theme-btn {
-  circle: 36
+  size: 36
   place: center
   color: color.muted
   transition: 150
-  border: 1 solid color.line
+  border: 1 solid color.ink/40
+  radius: sm
 }
 
 .theme-btn:hover {
@@ -219,14 +224,14 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 }
 
 .btn-ghost {
-  border-color: color.line
+  border-color: color.ink/50
   color: color.ink
   background: color.card/40
 }
 
 .btn-ghost:hover {
   background: color.line/45
-  border-color: color.ink/35
+  border-color: color.accent
 }
 
 .btn-sm {
@@ -325,20 +330,20 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 }
 
 .copy-btn {
-  color: color.code-com
+  color: color.ink/80
   font-size: 11.5
   row: gap 6 center
-  padding: 4 10
-  radius: full
-  border: 1 solid color.code-line
+  padding: 6 11
+  radius: sm
+  border: 1 solid color.ink/40
   transition: 130
   cursor: pointer
   font-family: font.mono
 }
 
 .copy-btn:hover {
-  color: color.code-ink
-  border-color: color.code-com
+  color: color.accent
+  border-color: color.accent
 }
 
 // syntax token colors (spans produced by the site's tiny highlighter)
@@ -421,7 +426,7 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
   background: color.accent/10
   color: color.accent
   padding: 2 6
-  radius: 6
+  radius: md
 }
 
 .prose .code code {
@@ -456,7 +461,7 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 
 .footer-note {
   color: color.muted
-  font-size: 13.5
+  font-size: 14
   line-height: 1.6
 }
 
@@ -466,9 +471,8 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 
 .footer-fine {
   color: color.muted
-  font-size: 12.5
+  font-size: 13.5
   font-family: font.serif
-  font-style: italic
   letter-spacing: 0.01em
 }
 

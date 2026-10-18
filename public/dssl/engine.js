@@ -132,15 +132,21 @@ export class DsslEngine {
     const mo = new MutationObserver((muts) => {
       if (this._applying) return; // our own style writes — ignore
       const batch = new Set();
+      let fullSweep = false;
       for (const m of muts) {
         if (m.type === 'attributes') {
           if (m.attributeName === 'style') continue;
           if (m.target === document.documentElement && m.attributeName.startsWith('data-dssl')) continue;
           batch.add(m.target);
-          // class/attr changes can affect descendant rules — include small subtrees
+          // class/attr changes can affect descendant rules — include small subtrees.
+          // v0.3.3: when the changed element owns a HUGE subtree (view root flips
+          // like data-view on the site shell), don't skip the descendants — a full
+          // debounced sweep keeps every descendant rule honest. Skipping is what
+          // left the nav highlight stuck on the boot-time view after SPA routing.
           if (m.target.querySelectorAll) {
             const kids = m.target.querySelectorAll('*');
             if (kids.length <= 300) kids.forEach(k => batch.add(k));
+            else fullSweep = true;
           }
         } else {
           if (m.addedNodes) m.addedNodes.forEach(n => {
@@ -154,6 +160,14 @@ export class DsslEngine {
             if (n.querySelectorAll) n.querySelectorAll('*').forEach(k => this.touched.delete(k));
           });
         }
+      }
+      if (fullSweep) {
+        // one full recompute per microtask burst, same drain the scheduler uses
+        if (!this._sweepQueued) {
+          this._sweepQueued = true;
+          queueMicrotask(() => { this._sweepQueued = false; this.computeAll(); });
+        }
+        return;
       }
       if (batch.size) this.schedule(batch);
     });

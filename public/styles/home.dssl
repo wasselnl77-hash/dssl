@@ -129,10 +129,9 @@
 
 .demo-stage {
   background: color.card
-  border: 1 solid color.line
+  border: 1 solid color.ink/30
   radius: xl
   overflow: hidden
-  shadow: lg
 }
 
 .demo-code {
@@ -171,7 +170,7 @@ motion rise-in {
   radius: md
   background: color.card
   border: 1 solid color.line
-  shadow: md
+  shadow: sm
   transition: 200
   column: gap 10
   animate: rise-in 500 snap
@@ -260,8 +259,7 @@ motion rise-in {
     background: color.accent
     border-color: color.accent
     color: color.accent-ink
-    translate: 0 -4px
-    shadow: lg
+    shadow: sm
   }
 }
 
@@ -406,15 +404,17 @@ motion rise-in {
 
 .cta-band h2 {
   fluid: 28, 40
-  font-weight: 800
-  letter-spacing: -0.03em
+  font-family: font.serif
+  font-weight: 650
+  letter-spacing: -0.01em
   margin: 0
 }
 
 .cta-band p {
+  font-family: font.serif
   color: color.muted
   max-width: 520
-  line-height: 1.65
+  line-height: 1.7
   margin: 0
 }
 

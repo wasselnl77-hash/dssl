@@ -207,7 +207,7 @@ const base = rule.sel
       "The company is called DSSL. inc. The founder describes the choice as boring; we describe it as honest — the company is named after the thing it ships, and now the footer says so. The re-skin went classic: serif display type (a Charter/Iowan/Palatino stack — no webfonts, still zero dependencies), parchment paper with ink text and an oxblood accent, squared corners, hairline rules instead of glow shadows, book-page code blocks, a candlelit dark mode, and calmer hovers — cards darken their border instead of flying off the page. The § now stands where the comment slash used to. Best part: the entire re-skin is ONE file. radius tokens went 14→4, the palette swapped, serif entered the font tokens — and all six views followed, because that is the whole argument DSSL makes about tokens.",
     code: `// tokens.dssl — the only file the re-skin touched
 radius { md: 14  →  md: 4 }
-color  { paper: #faf8f4 → #f5f0e4, accent: oklch(…) → #8e2c1f }
+color  { paper: #faf8f4 → #f5f0e4, accent: oklch(…) → #7c2d2d }
 font   { serif: "Charter", "Iowan Old Style", "Palatino", … }   // new`,
   },
 ];

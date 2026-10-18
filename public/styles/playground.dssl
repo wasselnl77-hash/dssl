@@ -45,7 +45,7 @@
   font-size: 12
   background: color.card
   color: color.ink
-  border: 1 solid color.line
+  border: 1 solid color.ink/45
   radius: sm
   padding: 5 8
   cursor: pointer

@@ -120,7 +120,7 @@ export default function SiteRoot() {
           </nav>
 
           <div className="nav-side">
-            <span className="ver-badge">v0.3.3</span>
+            <a href="#/changelog" className="ver-badge" onClick={(e) => { e.preventDefault(); go("changelog"); }}>v0.3.3</a>
             <button type="button" className="theme-btn" onClick={cycleTheme} aria-label="Toggle color theme" title="Theme: auto / light / dark">
               <span className="icon-sun"><SunIcon /></span>
               <span className="icon-moon"><MoonIcon /></span>
@@ -150,7 +150,8 @@ export default function SiteRoot() {
             <div className="footer-note">
               <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.3.3 while
               building this site; every feature it needed, it grew, and every bug you sent got
-              fixed for real. This page runs on its own engine, no stylesheet attached.
+              fixed for real. This page runs on its own engine, no CSS files attached —
+              the engine styles this DOM directly.
             </div>
             <div className="footer-fine">
               © 2026 <strong>DSSL. inc</strong> — named after the product, because naming things

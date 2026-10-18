@@ -9,8 +9,10 @@ export default function SpecView() {
         <div className="kicker">normative</div>
         <h1 className="page-title">DSSL v0.2 — “First Light”, ratified</h1>
         <p className="page-sub">
-          The v0.1 draft was put to a seven-point vote. This document is the result —
-          every decision below is implemented by the engine serving this page.
+          The v0.1 draft was put to a seven-point vote. This document is the ratified
+          v0.2 result — every decision below is implemented by the engine serving this
+          page. The engine itself has kept growing since: it is now at v0.3.3 (see the
+          changelog for what the site demanded).
         </p>
       </div>
 
