@@ -18,7 +18,7 @@ import { parse } from './parser.js';
 import { resolve, DEFAULT_TOKENS } from './resolver.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.3.3';
+export const VERSION = '0.3.4';
 
 let counter = 0;
 const engines = new Map();

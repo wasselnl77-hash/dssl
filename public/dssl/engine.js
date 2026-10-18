@@ -19,6 +19,22 @@
 
 const LAYER_RANK = { tokens: 0, base: 1, components: 2, utilities: 3, pin: 4 };
 
+// v0.3.4 — alignment implies a formatting context.
+// place-items / place-content / align-* / justify-* only arrange children
+// inside flex or grid containers. On a plain <span> or <button> they used to
+// silently do nothing — which is exactly how the feature icons, the theme
+// toggle and the token dots ended up pinned top-left inside their circles.
+// The language promises loud failures over silent ones, so when a winning
+// declaration asks for alignment but the element has no layout context, the
+// engine PROMOTES it: inline elements → inline-grid (flow preserved), blockish
+// elements → grid. Explicit `display:` in the same cascade still wins, because
+// the promotion is applied first and "later wins" is the whole cascade.
+const ALIGN_PROPS = new Set([
+  'place-items', 'place-content', 'align-items', 'justify-items',
+  'align-content', 'justify-content',
+]);
+const HAS_CONTEXT_RE = /^(flex|inline-flex|grid|inline-grid)$/;
+
 // state pseudo-classes that may appear inside a rule selector. Used to strip
 // them back OFF when collecting recompute candidates (see stateEvent).
 const STATE_PSEUDO_RE = /:(hover|focus|focus-visible|active|focus-within|visited|target|disabled|enabled|checked|placeholder-shown|read-only|read-write|open|closed|empty|required|invalid|valid|link|indeterminate)\b/g;
@@ -326,9 +342,26 @@ export class DsslEngine {
     let cancelAnims = false;
     let stack = false;
 
+    // flatten matched decls in cascade order (the promotion below may prepend)
+    const flat = [];
     for (const rule of matched) {
       const imp = rule.layer === 'pin' ? 'important' : '';
-      for (const d of rule.decls) {
+      for (const d of rule.decls) flat.push({ d, imp, rule });
+    }
+
+    // v0.3.4: alignment implies a formatting context — see ALIGN_PROPS above.
+    // Read AFTER the wipe so the natural (parent-blockified) display decides;
+    // none/contents are never promoted (promoting would unhide or boxify them).
+    if (flat.some(x => ALIGN_PROPS.has(x.d.prop))) {
+      let disp = '';
+      try { disp = getComputedStyle(el).display; } catch { }
+      if (disp && !HAS_CONTEXT_RE.test(disp) && disp !== 'none' && disp !== 'contents') {
+        const inlineCtx = disp === 'inline' || disp.startsWith('inline-');
+        flat.unshift({ imp: '', d: { prop: 'display', value: inlineCtx ? 'inline-grid' : 'grid' } });
+      }
+    }
+
+    for (const { d, imp, rule } of flat) {
         if (d.prop === '@animate') {
           if (d.value === null) { cancelAnims = true; continue; }
           animSpecs.push({ ...d.value, key: rule.id + '|' + rule.media.join('&') + '|' + rule.signals.map(s => s.name + s.op + s.value).join('&') });
@@ -346,7 +379,6 @@ export class DsslEngine {
           if (!this._warned) this._warned = new Set();
           if (!this._warned.has(msg)) { this._warned.add(msg); console.warn(msg); }
         }
-      }
     }
 
     this.ownMap.set(el, newOwned);

@@ -126,7 +126,10 @@ select { use focus-ring }
 
 .theme-btn {
   size: 36
-  place: center
+  // auto (system) mode shows the sun+moon PAIR, light/dark show one icon.
+  // `center:` centers a single-content box, but a two-item grid would stack
+  // the pair — an explicit flex row centers either state (v0.3.4)
+  row: center gap 2
   color: color.muted
   transition: 150
   border: 1 solid color.ink/40

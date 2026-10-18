@@ -73,6 +73,8 @@ column: gap 8 start
 grid: 3
 grid: auto-fill 220
 stack: center        // overlay children
+center: both         // center: x / center: y — the engine guarantees a
+                     // formatting context, so it can never silently no-op
 place: center        align: center
 cover: fixed         sticky: 0
 size: 40 100%        circle: 36

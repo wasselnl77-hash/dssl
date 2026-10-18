@@ -210,6 +210,23 @@ radius { md: 14  →  md: 4 }
 color  { paper: #faf8f4 → #f5f0e4, accent: oklch(…) → #7c2d2d }
 font   { serif: "Charter", "Iowan Old Style", "Palatino", … }   // new`,
   },
+  {
+    version: "v0.3.4",
+    date: "bug report → fix",
+    title: "Centering that always works",
+    why: "user report: “the {} and stuff in The Engine are still not centered in their circle”",
+    kind: "add",
+    body:
+      "Every glyph chip on this site asked for centering — place: center — and place-items/place-content only arrange children inside flex or grid containers. On a <span> or a <button> they silently did nothing, so the feature icons, the theme toggle and the docs token dots all hugged the top-left of their circles. The fix is engine-level, because the engine is the only part that knows what an element actually is: alignment declarations now IMPLY a formatting context. When a winning declaration asks to align but the element has no layout context, the engine promotes it — inline elements become inline-grid (flow preserved), blocks become grid — while an explicit display: still wins the cascade. And the vocabulary gained the word people actually reach for first: center: both / x / y.",
+    code: `.icon-chip {
+  size: 40
+  circle: 40
+  center: both      // works on a span, a button, anything
+}
+
+// engine rule: alignment implies a formatting context
+// inline → inline-grid · block → grid · explicit display: still wins`,
+  },
 ];
 
 export default function ChangelogView() {

@@ -366,7 +366,7 @@ motion rise-in {
 .feature-icon {
   size: 40
   circle: 40
-  place: center
+  center: both
   background: color.accent/12
   color: color.accent
   font-size: 19

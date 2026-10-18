@@ -73,6 +73,14 @@ gallery {
 .span-2 { grid-column: span 2 }
 .auto-grid { grid-template-columns: repeat(auto-fill, minmax(200, 1fr)) }
 
+// v0.3.4: the one-word centering primitive
+.icon-chip {
+  size: 40
+  center: both
+}
+.chip-x { center: x }
+.chip-y { center: y }
+
 @media (width >= 768) {
   .card { padding: space.6 }
 }
@@ -152,6 +160,15 @@ const span2 = doc.rules.find(r => r.sel === '.span-2');
 assert(span2 && span2.decls.some(d => d.value === 'span 2'), `grid-column: span 2 unitless (got: ${span2?.decls[0]?.value})`);
 const autoGrid = doc.rules.find(r => r.sel === '.auto-grid');
 assert(autoGrid && autoGrid.decls.some(d => d.value === 'repeat(auto-fill, minmax(200px, 1fr))'), `repeat(auto-fill, minmax) works (got: ${autoGrid?.decls[0]?.value})`);
+// v0.3.4: center: primitive — alignment pair, engine promotes the context
+const chip = doc.rules.find(r => r.sel === '.icon-chip');
+assert(chip && chip.decls.some(d => d.prop === 'place-items' && d.value === 'center center'), `center: expands to place-items center center`);
+assert(chip && chip.decls.some(d => d.prop === 'place-content' && d.value === 'center center'), `center: expands to place-content center center`);
+const chipX = doc.rules.find(r => r.sel === '.chip-x');
+assert(chipX && chipX.decls.some(d => d.prop === 'justify-items' && d.value === 'center') && chipX.decls.some(d => d.prop === 'justify-content' && d.value === 'center'), 'center: x axis emits justify pair');
+const chipY = doc.rules.find(r => r.sel === '.chip-y');
+assert(chipY && chipY.decls.some(d => d.prop === 'align-items' && d.value === 'center') && chipY.decls.some(d => d.prop === 'align-content' && d.value === 'center'), 'center: y axis emits align pair');
+assert(!doc.errors.some(e => e.message.includes('center')), 'no false center errors');
 assert(doc.rules.some(r => r.sel === '.card' && r.media.length === 1), 'media rule for .card');
 assert(doc.rules.some(r => r.media.includes('(prefers-color-scheme: dark)')), '@media dark sugar');
 assert(doc.rules.some(r => r.media.includes('(prefers-color-scheme: light)')), '@media light sugar');

@@ -268,7 +268,7 @@
 .tok-dot {
   size: 34
   circle: 34
-  place: center
+  center: both
   font-family: font.mono
   font-size: 11
   border: 1 solid color.line

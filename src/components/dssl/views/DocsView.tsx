@@ -324,7 +324,8 @@ background:                     // values can continue
                 <tr><td><code>row</code> / <code>column</code></td><td><code>row: gap 8 center wrap</code></td><td>flexbox + only the words you name (between, reverse, inline…)</td></tr>
                 <tr><td><code>grid</code></td><td><code>grid: 3</code> · <code>grid: auto-fill 220</code></td><td>repeat(3, 1fr) · repeat(auto-fill, minmax(220px, 1fr))</td></tr>
                 <tr><td><code>stack</code></td><td><code>stack: center</code></td><td>overlay grid; children share cell 1/1</td></tr>
-                <tr><td><code>place</code> / <code>align</code></td><td><code>place: center</code></td><td>place-items/content · align-items</td></tr>
+                <tr><td><code>place</code> / <code>align</code></td><td><code>place: center</code></td><td>place-items/content · align-items — alignment implies a formatting context (see <code>center</code>)</td></tr>
+                <tr><td><code>center</code></td><td><code>center: both</code> · <code>center: x</code> · <code>center: y</code></td><td>the centering primitive. The engine promotes any element to a grid/flex context first (inline → inline-grid, block → grid; an explicit <code>display:</code> still wins), so centering works on a span, a button, anything</td></tr>
                 <tr><td><code>cover</code></td><td><code>cover: fixed</code></td><td>position + inset: 0</td></tr>
                 <tr><td><code>sticky</code></td><td><code>sticky: 0</code></td><td>position: sticky; top: 0px</td></tr>
                 <tr><td><code>font</code></td><td><code>font: 16/1.4 ink</code></td><td>font-size / line-height / color</td></tr>

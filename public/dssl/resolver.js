@@ -344,6 +344,26 @@ const SEMANTIC = {
     }
     return [{ prop: 'place-items', value: `${p[0]} ${p[1]}` }, { prop: 'place-content', value: `${p[0]} ${p[1]}` }];
   },
+  // v0.3.4 — the one-word centering primitive, because "how do I center this
+  // thing" is the first question everyone asks. Emits the alignment pair only;
+  // the ENGINE guarantees a formatting context for alignment declarations
+  // (inline elements → inline-grid, blocks → grid), so `center:` can never
+  // silently no-op the way raw place-items did on spans and buttons.
+  //   center:       both axes   ·   center: x   horizontal only   ·   center: y   vertical only
+  center(v, ctx) {
+    const mode = (v || '').trim().toLowerCase() || 'both';
+    if (mode === 'x') {
+      return [{ prop: 'justify-items', value: 'center' }, { prop: 'justify-content', value: 'center' }];
+    }
+    if (mode === 'y') {
+      return [{ prop: 'align-items', value: 'center' }, { prop: 'align-content', value: 'center' }];
+    }
+    if (mode !== 'both') {
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown center axis "${v}"`, hint: didYouMean(mode, ['both', 'x', 'y']) });
+      return [];
+    }
+    return [{ prop: 'place-items', value: 'center center' }, { prop: 'place-content', value: 'center center' }];
+  },
   cover(v, ctx) {
     const pos = (v || 'absolute').trim();
     return [{ prop: 'position', value: pos }, { prop: 'inset', value: '0' }];

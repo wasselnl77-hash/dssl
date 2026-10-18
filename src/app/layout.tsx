@@ -109,6 +109,7 @@ export default function RootLayout({
         ))}
         {/* engine starts downloading with the document — module defer rules
             mean it executes after parse with the full SSR DOM present */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- type="module" is deferred by spec; the rule cannot see that */}
         <script type="module" src="/dssl/boot.js" />
       </head>
       <body>{children}</body>
