@@ -17,6 +17,7 @@ const SIDE = [
   { head: null, id: "motion", label: "Motion" },
   { head: null, id: "errors", label: "Errors" },
   { head: null, id: "api", label: "JS API" },
+  { head: null, id: "interop", label: "Interop (React & co.)" },
 ];
 
 export default function DocsView() {
@@ -441,6 +442,63 @@ button { use focus-ring }
               <code>style[type=&quot;text/dssl&quot;]</code>, then fires{" "}
               <code>dssl-ready</code> on <code>window</code>.{" "}
               <code>&lt;html data-dssl-reset&gt;</code> enables the small built-in reset.
+            </p>
+          </section>
+
+          <section className="doc-block" id="interop">
+            <h2 className="section-title">Interop — React, hydration &amp; friends</h2>
+            <p className="doc-lead">
+              DSSL is deliberately framework-agnostic: it styles whatever DOM exists,
+              so it works under React, Vue, Svelte or plain HTML. But if you render
+              with React there is <b>one known, harmless notice</b> you should
+              understand — and this very site is the living example.
+            </p>
+            <div className="note">
+              <b>Why the notice happens.</b> The engine applies styles to the SSR DOM
+              <i> before</i> React hydrates — that is the whole anti-flash design. React
+              then compares the DOM against its virtual render, finds extra
+              <code> style="--dssl-*…"</code> attributes it did not put there, and logs
+              one hydration diff to the console. React explicitly <b>does not patch
+              them away</b> — it leaves the engine&apos;s styles alone. Nothing is wrong:
+              the styles are working exactly as intended.
+            </div>
+            <p className="doc-lead">
+              In dev builds that single notice can surface as a "1 Issue" overlay badge,
+              because Next&apos;s dev tools wrap <code>console.error</code> and count
+              everything they see. This site installs an <i>assignment trap</i>: the moment
+              Next assigns its own collector, the shim captures it and re-publishes the
+              filter as the <b>outermost</b> layer — so DSSL&apos;s own diff is swallowed
+              and re-logged as an explained info line <b>before</b> Next can count it.
+              Any genuine hydration mismatch still flows through to the collector at full
+              volume. In production React does not diff attributes at all, so the notice
+              disappears entirely; the shim is dev-only.
+            </p>
+            <CodeBlock file="dev-only console shim (this site's layout.tsx)" code={`// assignment trap: become the OUTERMOST console.error
+// the moment Next assigns its own collector
+let inner = console.error, trapped = false;
+Object.defineProperty(console, 'error', {
+  configurable: true,
+  get: () => (trapped ? outer : inner),
+  set: (fn) => { inner = fn; trapped = true; }
+});
+function outer(...args) {
+  const s = args.map(String).join(' ');
+  // swallow ONLY the DSSL-attribute hydration diff
+  if (s.includes('A tree hydrated but some attributes')
+      && s.includes('--dssl')) {
+    console.info('DSSL styled this page before React hydrated. Expected interop.');
+    return;
+  }
+  return inner.apply(console, args);  // genuine issues flow through
+}`} />
+            <p className="doc-lead">
+              Two more interop notes worth knowing. First, if a framework re-renders a
+              subtree and <i>removes</i> elements the engine had styled, the touched
+              registry notices the removal via MutationObserver and cleans up — no
+              leaked inline styles. Second, if your framework toggles attributes the
+              engine matches on (like <code>data-dssl-*</code> signal mirrors), change
+              them through <code>DSSL.signal()</code> rather than DOM writes, so rules
+              re-evaluate on the same tick instead of waiting for the observer.
             </p>
           </section>
         </div>

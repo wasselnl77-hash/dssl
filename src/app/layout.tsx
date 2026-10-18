@@ -46,27 +46,46 @@ function dsslInlineStyles(): { name: string; src: string }[] {
 
 // Dev-only interop shim: the engine styles the SSR DOM BEFORE React hydrates
 // (that is the whole point — no FOUC). React 19 then logs one console.error
-// about extra style attributes and, helpfully, does not patch them. On our own
-// site that reads as "1 Issue" in the dev overlay. This shim filters ONLY the
-// hydration notices whose diff references DSSL's var(--dssl-*) attributes and
-// re-tells them as an explained info line; any genuine mismatch still shows.
+// about extra style attributes and, helpfully, does not patch them. Next's
+// dev overlay ALSO patches console.error (one layer around everything) and
+// counts every error it sees into the "Issues" badge — so a plain filter
+// installed here would sit INSIDE Next's collector and the badge would still
+// show "1". This shim instead installs an assignment trap: the moment Next
+// assigns its own wrapper, we capture it and re-publish OUR filter as the
+// outermost layer. DSSL's own hydration diff is swallowed + explained; every
+// other console.error still reaches Next's collector untouched.
 const hydrationShim = `
 (function () {
-  var HYD = 'A tree hydrated but some attributes of the server rendered HTML';
-  var orig = console.error;
-  console.error = function () {
+  var HYD = 'A tree hydrated but some attributes';
+  var MARK = '--dssl';
+  var inner = console.error;   // native, until Next assigns its wrapper
+  var trapped = false;
+  function outer() {
     var s = '';
     for (var i = 0; i < arguments.length; i++) {
       var a = arguments[i];
-      s += (typeof a === 'string' ? a : ' ');
+      s += (i ? ' ' : '') + (typeof a === 'string' ? a : (a && a.message ? a.message : ''));
     }
-    if (s.indexOf(HYD) === 0 && s.indexOf('--dssl') !== -1) {
+    if (s.indexOf(HYD) !== -1 && s.indexOf(MARK) !== -1) {
       console.info('%cDSSL%c styled this page before React hydrated. The "hydrated but some attributes didn\\u2019t match" notice is expected interop: the engine owns those style attributes, and React explicitly leaves them alone.',
         'background:#b3372e;color:#fff;padding:1px 6px;border-radius:3px;font-weight:700', '');
       return;
     }
-    return orig.apply(console, arguments);
-  };
+    return inner.apply(console, arguments);
+  }
+  try {
+    var desc = Object.getOwnPropertyDescriptor(console, 'error');
+    if (!desc || !desc.configurable) throw new Error('not configurable');
+    Object.defineProperty(console, 'error', {
+      configurable: true,
+      get: function () { return trapped ? outer : inner; },
+      set: function (fn) { inner = fn; trapped = true; }
+    });
+  } catch (e) {
+    // fallback: plain filter — console noise is still explained away,
+    // though the dev-overlay badge may still count the notice.
+    console.error = outer;
+  }
 })();
 `;
 
