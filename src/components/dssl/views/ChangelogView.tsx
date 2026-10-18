@@ -12,6 +12,25 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.4.0",
+    date: "growth phase · power tools",
+    title: "Reveal, choreograph, re-scope — the power tools release",
+    why: "the site wanted scroll-in reveals, and one card to go dangerous",
+    kind: "add",
+    body:
+      "Four features, all grown the honest way — something the site itself wanted to do, so the language learned to say it. (1) seen — a state that fires once when an element scrolls into view, engine-native because no CSS selector can know that; with no IntersectionObserver everything counts as seen, so content can never be trapped invisible. (2) stagger — a parent declaration that offsets each child's animation delay by its DOM position, turning motion blocks into cascading reveals. (3) scoped tokens — re-declare color.accent inside one rule and the whole subtree re-resolves, no second stylesheet. (4) per-property transitions — transition: 150 snap background-color, 300 transform — plus visually-hidden, the accessibility classic as a single word. The docs page got a live seen + stagger demo and a scoped-token box whose dots hover green inside the box and oxblood everywhere else.",
+    code: `// the reveal, end to end, zero JavaScript:
+.pt-grid { stagger: 70 }          // child i waits i × 70ms
+.pt-card {
+  seen {                          // engine-native scroll state
+    animate: rise-in 420 snap
+  }
+}
+
+// one subtree, different brand:
+.danger { --color.accent: color.err }`,
+  },
+  {
     version: "v0.1",
     date: "phase 1 · draft",
     title: "“First Light” draft published",

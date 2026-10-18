@@ -86,8 +86,13 @@ grow: 1              z: 50`} />
           <span className="cheat-k">text & motion</span>
           <CodeBlock plain code={`font: 16/1.4 color.ink    // size / leading / color
 fluid: 16, 24             // clamp() 360→1200px
-truncate                  // ellipsis
+truncate
+visually-hidden           // a11y: hidden to eyes, read by screen readers
 transition: 150 snap      // all 150ms, named easing
+transition: 150 snap background-color, 300 transform
+                          // per-property specs
+stagger: 60               // children cascade in, i × 60ms
+
 easings: snap smooth bounce ease-in-out…
 
 motion pop { from { opacity: 0; translate: 0 16 } }
@@ -105,6 +110,7 @@ animate: pop 400 snap both`} />
           <CodeBlock plain code={`hover { … }        focus { … }
 focus-visible { … } active { … }
 disabled checked empty open
+seen { … }        // engine-native: fires once on scroll-in
 
 // states can restyle descendants too
 hover { .tip { opacity: 1 } }
@@ -160,7 +166,11 @@ button { use focus-ring }
 tokens {
   color { accent: oklch(62% 0.19 35) }
   space { lg: 24 }
-}   // → var(--dssl-color-accent), shared across files`} />
+}   // → var(--dssl-color-accent), shared across files
+
+.danger {
+  --color.accent: color.err   // re-declare a token per subtree
+}                             // descendants re-resolve automatically`} />
         </div>
 
         {/* ---------------------------------------------- api */}

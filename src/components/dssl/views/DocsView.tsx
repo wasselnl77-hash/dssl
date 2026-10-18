@@ -167,6 +167,39 @@ background:                     // values can continue
               <code>color.*</code> set. Override any of them from your own{" "}
               <code>tokens</code> block.
             </p>
+            <p className="doc-lead" style={{ marginTop: 14 }}>
+              <b>v0.4 — tokens can be re-declared per element.</b> Assign to a dotted
+              token inside any rule and the custom property lands on that element;
+              since custom properties inherit, every <code>var()</code> in the subtree
+              re-resolves. This is how one card goes dangerous without a second
+              stylesheet — and the re-declaration is still a validated token name, not
+              a free-form string.
+            </p>
+            <CodeBlock file="scoped-tokens.dssl" code={`.danger {
+  --color.accent: color.err   // re-declare accent for this subtree
+  --radius.md: 4              // sharper corners too, why not
+}
+
+// everything below re-resolves automatically:
+.danger .badge {
+  color: color.accent-ink
+  background: color.accent    // ← now the error red
+}`} />
+            <div className="demo-box">
+              <div className="tok-scope">
+                <div className="tok-demo">
+                  <button type="button" className="tok-dot">accent</button>
+                  <button type="button" className="tok-dot">err</button>
+                  <button type="button" className="tok-dot">muted</button>
+                </div>
+                <p className="doc-lead fine-print">
+                  Inside this dashed box, <code>--color.accent: color.ok</code> — hover
+                  the dots and their hover accent comes out <i>green</i>, while the same
+                  dots anywhere else on this page hover oxblood. One declaration, whole
+                  subtree re-resolved.
+                </p>
+              </div>
+            </div>
           </section>
 
           <section className="doc-block" id="selectors">
@@ -198,6 +231,12 @@ background:                     // values can continue
               listens to the events and re-evaluates live, both entering{" "}
               <b>and leaving</b> a state. Rules inside a state block can target
               descendants (tooltips, dropdowns) or the element itself.
+            </p>
+            <p className="doc-lead">
+              One state is not CSS at all: <code>seen</code> is engine-native — it fires
+              once, the first time the element scrolls into the viewport. It is how you
+              build reveal-on-scroll without a line of JavaScript (see <b>Motion</b> for
+              the full choreography).
             </p>
             <CodeBlock file="states.dssl" code={`.doc-card {
   transition: 200
@@ -334,9 +373,11 @@ background:                     // values can continue
                 <tr><td><code>circle</code></td><td><code>circle: 36</code></td><td>width + height + border-radius: 50%</td></tr>
                 <tr><td><code>grow</code> / <code>shrink</code> / <code>basis</code></td><td><code>grow: 1</code></td><td>flex-grow / flex-shrink / flex-basis</td></tr>
                 <tr><td><code>truncate</code></td><td><code>truncate</code></td><td>ellipsis overflow (overflow hidden, nowrap)</td></tr>
+                <tr><td><code>visually-hidden</code></td><td><code>visually-hidden</code></td><td>the a11y classic — invisible to eyes, announced by screen readers (clip pattern, one word instead of nine lines)</td></tr>
                 <tr><td><code>z</code></td><td><code>z: 50</code></td><td>z-index</td></tr>
-                <tr><td><code>transition</code></td><td><code>transition: 150 snap</code></td><td>all 150ms cubic-bezier(0.2, 0.9, 0.3, 1)</td></tr>
+                <tr><td><code>transition</code></td><td><code>transition: 150 snap</code> · <code>transition: 150 snap background-color, 300 transform</code></td><td>all 150ms — or per-property specs: duration · easing · property per comma part</td></tr>
                 <tr><td><code>animate</code></td><td><code>animate: pop 400 snap</code></td><td>Web Animations API run of a motion block</td></tr>
+                <tr><td><code>stagger</code></td><td><code>stagger: 60</code> · <code>stagger: none</code></td><td>choreography — each element child&apos;s animation delay is offset by its DOM position × 60ms (works with <code>seen</code>; see Motion)</td></tr>
               </tbody>
             </table>
             <p className="tbl-note">Named easings: <code>snap</code>, <code>smooth</code>, <code>bounce</code> + the standard set.</p>
@@ -390,6 +431,45 @@ button { use focus-ring }
               <button type="button" className="doc-btn" onClick={() => window.DSSL?.replay(".motion-box")}>
                 <span className="tok-demo"><PlayIcon /> DSSL.replay(&apos;.motion-box&apos;)</span>
               </button>
+            </div>
+            <p className="doc-lead" style={{ marginTop: 18 }}>
+              <b>v0.4 — choreography.</b> Two additions turn motion into a
+              reveal-on-scroll system, still with zero JavaScript. <code>seen</code> is
+              an engine-native state that fires once when the element enters the
+              viewport — content can never be trapped invisible, because with no
+              IntersectionObserver everything counts as seen. And a parent with{" "}
+              <code>stagger: 60</code> offsets each element child&apos;s animation delay
+              by its DOM position, so grids and lists cascade in instead of arriving as
+              one wall.
+            </p>
+            <CodeBlock file="reveal.dssl" code={`motion rise-in {
+  from { opacity: 0; translate: 0 14 }
+}
+
+.pt-grid { stagger: 70 }        // child i waits i × 70ms
+
+.pt-card {
+  seen {                        // engine-native: fires once on scroll-in
+    animate: rise-in 420 snap
+  }
+}`} />
+            <div className="demo-box">
+              <div className="pt-grid">
+                {["1 parse", "2 resolve", "3 match", "4 style"].map((s) => {
+                  const [n, ...rest] = s.split(" ");
+                  return (
+                    <div key={s} className="pt-card">
+                      <span className="pt-num">{n}</span>
+                      <span>{rest.join(" ")}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="doc-lead fine-print">
+                These four cards were below your scroll position a moment ago — they
+                cascaded in via <code>seen</code> + <code>stagger: 70</code>, no JS.
+                Reload the page and scroll back here to watch it again.
+              </p>
             </div>
           </section>
 
