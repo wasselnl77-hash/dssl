@@ -19,6 +19,10 @@
 
 const LAYER_RANK = { tokens: 0, base: 1, components: 2, utilities: 3, pin: 4 };
 
+// state pseudo-classes that may appear inside a rule selector. Used to strip
+// them back OFF when collecting recompute candidates (see stateEvent).
+const STATE_PSEUDO_RE = /:(hover|focus|focus-visible|active|focus-within|visited|target|disabled|enabled|checked|placeholder-shown|read-only|read-write|open|closed|empty|required|invalid|valid|link|indeterminate)\b/g;
+
 function parseSizeQuery(q) {
   // supports (min-width: 480px) | (max-width: 480px) | (width >= 480px) | (width <= 480px)
   let m = q.match(/min-width\s*:\s*([0-9.]+)(px)?/) || q.match(/width\s*>=\s*([0-9.]+)(px)?/);
@@ -182,11 +186,27 @@ export class DsslEngine {
   stateEvent(state, target) {
     if (!target || target.nodeType !== 1) return;
     const batch = new Set();
+
+    // the element that just entered/left the state — and its ancestors,
+    // because hover/focus-within rules can style them too
+    let node = target;
+    while (node && node.nodeType === 1 && this.inScope(node)) {
+      batch.add(node);
+      node = node.parentElement;
+    }
+
     for (const rule of this.rules) {
       const hit = rule.states.has(state) || (state === 'focus' && rule.states.has('focus-visible')) || (state === 'focus-visible' && rule.states.has('focus'));
       if (!hit) continue;
+      // v0.3 fix: query the state-less base selector. On pointerout the
+      // element that just LEFT hover no longer matches `:hover` — querying
+      // the stateful selector skipped it and the hover styles stuck forever.
+      // The base selector is a superset; computeElement re-evaluates the
+      // real (stateful) match, so both entering and leaving are handled.
+      const base = rule.sel.replace(STATE_PSEUDO_RE, '').trim() || '*';
       let els;
-      try { els = (this.scope || document).querySelectorAll(rule.sel); } catch { continue; }
+      try { els = (this.scope || document).querySelectorAll(base); }
+      catch { try { els = (this.scope || document).querySelectorAll(rule.sel); } catch { continue; } }
       els.forEach(el => batch.add(el));
     }
     if (batch.size) this.schedule(batch);

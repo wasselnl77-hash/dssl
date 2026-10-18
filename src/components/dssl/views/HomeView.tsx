@@ -255,7 +255,7 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
             <div className="card card-hover feature">
               <span className="feature-icon">≋</span>
               <h3>One-word conditions</h3>
-              <p>@media, @container and @signal in the same shape. Bare numbers mean pixels.</p>
+              <p>@media dark. @media 768. @media 480..960. Same shape for @container and @signal — compose by nesting.</p>
             </div>
             <div className="card card-hover feature">
               <span className="feature-icon">✦</span>
@@ -319,8 +319,8 @@ DSSL.signal('demo', null)   // off`} />
               <button type="button" className="btn btn-primary" onClick={() => go("docs")}>
                 Language tour <ArrowIcon />
               </button>
-              <button type="button" className="btn btn-ghost" onClick={() => go("spec")}>
-                Read the spec
+              <button type="button" className="btn btn-ghost" onClick={() => go("cheat")}>
+                Skip to the cheat sheet
               </button>
             </div>
           </div>

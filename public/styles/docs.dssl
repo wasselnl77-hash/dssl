@@ -319,3 +319,101 @@ motion pop {
 .fine-print {
   font-size: 13
 }
+
+// =========================================================================
+// cheat sheet (v0.3) — one-page quick reference
+// =========================================================================
+
+.cheat-grid {
+  display: grid
+  grid-template-columns: 1fr 1fr
+  gap: space.4
+  padding-bottom: space.7
+  align-items: start
+}
+
+.cheat-wide {
+  grid-column: 1 / -1
+}
+
+@media (width <= 860) {
+  .cheat-grid {
+    grid-template-columns: 1fr
+  }
+}
+
+.cheat-card {
+  background: color.card
+  border: 1 solid color.line
+  radius: md
+  padding: space.4
+  column: gap 10
+  shadow: sm
+  min-width: 0
+}
+
+.cheat-card h3 {
+  font-size: 15
+  font-weight: 700
+  margin: 0
+}
+
+.cheat-k {
+  font-family: font.mono
+  font-size: 11
+  letter-spacing: 0.12em
+  text-transform: uppercase
+  color: color.accent
+  background: color.accent/9
+  padding: 3 10
+  radius: full
+  align-self: start
+}
+
+.cheat-p {
+  font-size: 13
+  color: color.muted
+  line-height: 1.6
+  margin: 0
+}
+
+.cheat-p code {
+  font-family: font.mono
+  font-size: 12
+  color: color.accent
+  background: color.accent/9
+  padding: 1 5
+  radius: 5
+}
+
+.cheat-p a {
+  color: color.accent
+  font-weight: 600
+  text-decoration: underline
+  text-underline-offset: 3
+}
+
+.cheat-list {
+  column: gap 7
+}
+
+.cheat-list .cr {
+  row: gap 10
+  align-items: baseline
+}
+
+.cheat-list code {
+  font-family: font.mono
+  font-size: 12.5
+  color: color.accent
+  background: color.accent/9
+  padding: 1 6
+  radius: 5
+  white-space: nowrap
+}
+
+.cheat-list span {
+  color: color.muted
+  font-size: 13
+  line-height: 1.5
+}

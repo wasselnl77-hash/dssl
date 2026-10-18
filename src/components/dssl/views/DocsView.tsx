@@ -4,18 +4,19 @@ import CodeBlock from "../CodeBlock";
 import { PlayIcon } from "../icons";
 
 const SIDE = [
-  { head: "language", id: "start", label: "Getting started" },
-  { head: null, id: "syntax", label: "Syntax" },
+  { head: "start here", id: "start", label: "Quickstart — 3 steps" },
+  { head: null, id: null, label: "One-page cheat sheet →", href: "#/cheat" },
+  { head: "language", id: "syntax", label: "Syntax" },
   { head: null, id: "tokens", label: "Tokens" },
   { head: null, id: "selectors", label: "Selectors & nesting" },
   { head: null, id: "states", label: "States" },
   { head: null, id: "world", label: "@media · @container · @signal" },
   { head: null, id: "cascade", label: "Cascade & layers" },
-  { head: "properties", id: "semantic", label: "Semantic properties" },
+  { head: "reference", id: "semantic", label: "Semantic properties" },
   { head: null, id: "behaviors", label: "Behaviors" },
   { head: null, id: "motion", label: "Motion" },
   { head: null, id: "errors", label: "Errors" },
-  { head: "runtime", id: "api", label: "JS API" },
+  { head: null, id: "api", label: "JS API" },
 ];
 
 export default function DocsView() {
@@ -29,8 +30,9 @@ export default function DocsView() {
         <div className="kicker">language tour</div>
         <h1 className="page-title">The DSSL docs</h1>
         <p className="page-sub">
-          Everything in v0.2, with live examples — the boxes you can hover, focus and
-          toggle are styled by exactly the rules shown next to them.
+          DSSL is deliberately small: three steps to a working stylesheet, and everything
+          past step three is opt-in. The live boxes on this page are styled by exactly the
+          rules shown next to them.
         </p>
       </div>
 
@@ -38,9 +40,13 @@ export default function DocsView() {
         {/* ------------------------------------------------ sidebar */}
         <aside className="docs-side">
           {SIDE.map((s, i) => (
-            <div key={s.id}>
+            <div key={s.label}>
               {s.head && <div className="side-head">{s.head}</div>}
-              <a href={`#${s.id}`}>{s.label}</a>
+              {s.id ? (
+                <a href={`#${s.id}`}>{s.label}</a>
+              ) : (
+                <a href={s.href}>{s.label}</a>
+              )}
             </div>
           ))}
         </aside>
@@ -48,20 +54,41 @@ export default function DocsView() {
         {/* ------------------------------------------------ body */}
         <div className="docs-body">
           <section className="doc-block" id="start">
-            <h2 className="section-title">Getting started</h2>
+            <h2 className="section-title">Quickstart — three steps</h2>
             <p className="doc-lead">
-              DSSL ships as plain ES modules. No bundler, no build step, no dependencies —
-              drop two files on any HTML page (any vintage), point a link tag at your
-              stylesheet, and the engine does the rest client-side.
+              No bundler, no build step, no dependencies. The engine is two static files;
+              your styles are plain <code>.dssl</code> text the browser fetches and applies
+              itself.
             </p>
-            <CodeBlock file="index.html" code={`<link rel="stylesheet/dssl" href="app.dssl">
+            <CodeBlock file="step 1 — index.html" code={`<link rel="stylesheet/dssl" href="app.dssl">
 <script type="module" src="dssl/boot.js"></script>
 
-<!-- works with React, Vue, Svelte, anything that emits DOM:
-     the engine re-matches automatically on mutations -->`} />
+<!-- that is the whole install. works with any HTML —
+     React, Vue, Svelte, plain files: the engine
+     re-matches automatically when the DOM changes -->`} />
+            <CodeBlock file="step 2 — app.dssl" code={`.go {
+  padding: 12 20
+  radius: md
+  background: color.accent     // a built-in default token
+  color: white
+  font-weight: 700
+  transition: 150
+
+  hover  { translate: 0 -2; shadow: md }
+  active { translate: 0 }
+}`} />
+            <CodeBlock file="step 3 — use it" code={`<button class="go">Hello, DSSL</button>`} />
+            <div className="note">
+              <b>That&apos;s the entire mental model.</b> Bare numbers are pixels, known
+              token names just resolve, and nested blocks like <code>hover</code> are
+              states. You never have to touch the machinery below — but it&apos;s there
+              when you want it.
+            </div>
             <p className="doc-lead">
-              Styles live in <code>.dssl</code> files. The engine fetches them, parses,
-              resolves tokens, and applies the winning declarations straight onto elements.
+              <b>What you can safely ignore on day one:</b> layers (your rules silently
+              live in <code>components</code>), your own tokens (a useful default set is
+              built in), behaviors, <code>@signal</code>, <code>@container</code> and
+              motion. Each section below starts with the 20% you&apos;ll actually use.
             </p>
           </section>
 
@@ -92,10 +119,13 @@ background:                     // values can continue
           <section className="doc-block" id="tokens">
             <h2 className="section-title">Tokens</h2>
             <p className="doc-lead">
-              Design tokens are the variables. They compile to custom properties on
-              <code> :root</code> (inspectable in DevTools), and any bare identifier in a
-              value resolves against them — misspell one and you get an error, not silence.
-              A slash adds alpha via <code>color-mix</code>.
+              Tokens are the variables. A sensible default set ships with the engine —{" "}
+              <code>color.ink</code>, <code>color.accent</code>, <code>space.1–.8</code>,{" "}
+              <code>radius</code>, <code>shadow</code>, <code>font</code> — so your first
+              stylesheet needs zero setup. Define your own when the design outgrows the
+              defaults; any bare identifier in a value resolves against them, and a
+              misspelling is an error, not silence. A slash adds alpha via{" "}
+              <code>color-mix</code>.
             </p>
             <CodeBlock file="tokens.dssl" code={`tokens {
   color {
@@ -131,9 +161,10 @@ background:                     // values can continue
               </div>
             </div>
             <p className="tbl-note">
-              Built-ins ship with sensible defaults: <code>space.1–.8</code>,{" "}
-              <code>radius.sm–full</code>, <code>shadow.sm–xl</code>, <code>font.sans/mono</code>.
-              Override any of them from your own <code>tokens</code> block.
+              Built-ins: <code>space.1–.8</code>, <code>radius.sm–full</code>,{" "}
+              <code>shadow.sm–xl</code>, <code>font.sans/mono</code>, and the{" "}
+              <code>color.*</code> set. Override any of them from your own{" "}
+              <code>tokens</code> block.
             </p>
           </section>
 
@@ -163,8 +194,9 @@ background:                     // values can continue
               An element&apos;s own pseudo-states are plain nested blocks —{" "}
               <code>hover</code>, <code>focus</code>, <code>focus-visible</code>,{" "}
               <code>active</code>, <code>disabled</code>, <code>checked</code>… The engine
-              listens to the events and re-evaluates live. Rules inside a state block can
-              target descendants (tooltips, dropdowns) or the element itself.
+              listens to the events and re-evaluates live, both entering{" "}
+              <b>and leaving</b> a state. Rules inside a state block can target
+              descendants (tooltips, dropdowns) or the element itself.
             </p>
             <CodeBlock file="states.dssl" code={`.doc-card {
   transition: 200
@@ -185,7 +217,7 @@ background:                     // values can continue
               <div className="doc-card">
                 <span className="doc-card-title">Hover me</span>
                 <span className="doc-card-sub">
-                  This card lifts on hover — the engine matched <code>:hover</code> itself.
+                  This card lifts on hover — and settles back down when you leave.
                 </span>
               </div>
               <button type="button" className="doc-btn">Tab to me — focus-visible ring</button>
@@ -195,36 +227,48 @@ background:                     // values can continue
           <section className="doc-block" id="world">
             <h2 className="section-title">@media · @container · @signal</h2>
             <p className="doc-lead">
-              The world around the element is one shape: CSS-shaped conditions.{" "}
-              <code>@media</code> for viewport and preferences (bare numbers mean px),{" "}
-              <code>@container</code> for container queries, and <code>@signal</code> —
-              the JS bridge. Conditions compose by nesting.
+              The world around the element is one shape: CSS-shaped conditions, composed
+              by nesting. v0.3 added one-word sugar for the conditions everyone writes —{" "}
+              <code>@media dark</code>, <code>@media 768</code> (this wide or wider),{" "}
+              <code>@media 480..960</code> (a range) — while the full CSS form keeps
+              working.
             </p>
             <CodeBlock file="world.dssl" code={`.panel {
   padding: space.3
 
-  @media (width >= 768) {
+  @media dark {                   // prefers-color-scheme, one word
+    background: color.ink
+  }
+
+  @media 768 {                    // viewport ≥ 768px
     padding: space.6
   }
 
-  @container (min-width: 480px) {
+  @media 480..960 {               // between 480 and 960
     grid: 2
   }
 
-  @media (prefers-color-scheme: dark) {
+  @media (width >= 768) {         // full CSS shape still works
+    padding: space.6
+  }
+
+  @container (min-width: 480px) { // container queries: same shape
+    grid: 2
+  }
+
+  @signal theme == dark {         // JS: DSSL.signal('theme', 'dark')
     background: color.ink
   }
 
-  @signal theme == dark {          // JS: DSSL.signal('theme', 'dark')
-    background: color.ink
-  }
-
-  @media (width <= 860) {
-    @signal nav == open {          // composed: narrow AND menu open
+  @media <= 860 {
+    @signal nav == open {         // composed: narrow AND menu open
       display: block
     }
   }
 }`} />
+            <p className="tbl-note">
+              Also one word: <code>@media light</code> and <code>@media reduced-motion</code>.
+            </p>
             <div className="demo-box">
               <div className="signal-box">@signal docdemo == hot — cold</div>
               <div className="tok-demo">
@@ -240,8 +284,8 @@ background:                     // values can continue
               The whole cascade in one sentence: <b>later wins, layers trump order.</b>{" "}
               No specificity arithmetic, no <code>!important</code>. Rules live in{" "}
               <code>tokens &lt; base &lt; components &lt; utilities &lt; pin</code>; yours
-              default to <code>components</code>. The <code>pin</code> block is the single
-              sanctioned escape hatch.
+              default to <code>components</code> — most stylesheets never name a layer at
+              all. The <code>pin</code> block is the single sanctioned escape hatch.
             </p>
             <CodeBlock file="cascade.dssl" code={`#hero .title { color: color.ink }
 
@@ -301,7 +345,7 @@ background:                     // values can continue
             <p className="doc-lead">
               A behavior is a named chunk of DSSL — declarations, states, even nested
               rules — spliced into any rule with <code>use</code>. Perfect for focus
-              rings, chip styles, reset-ish bundles. No parameters in v0.2; compose by
+              rings, chip styles, reset-ish bundles. No parameters in v0.3; compose by
               nesting behaviors.
             </p>
             <CodeBlock file="behaviors.dssl" code={`behavior focus-ring {
@@ -392,6 +436,12 @@ button { use focus-ring }
                 <tr><td><code>DSSL.errors()</code></td><td>structured errors from the last apply</td></tr>
               </tbody>
             </table>
+            <p className="tbl-note">
+              Auto-boot picks up <code>link[rel=&quot;stylesheet/dssl&quot;]</code> and{" "}
+              <code>style[type=&quot;text/dssl&quot;]</code>, then fires{" "}
+              <code>dssl-ready</code> on <code>window</code>.{" "}
+              <code>&lt;html data-dssl-reset&gt;</code> enables the small built-in reset.
+            </p>
           </section>
         </div>
       </div>

@@ -466,8 +466,23 @@ function resolveDecl(prop, value, ctx) {
 function normalizeMedia(query, ctx, line) {
   let q = query.trim();
   if (!q) {
-    ctx.errors.push({ file: ctx.file, line, message: '@media needs a condition', hint: 'e.g. @media (width >= 768)' });
+    ctx.errors.push({ file: ctx.file, line, message: '@media needs a condition', hint: 'e.g. @media 768  or  @media dark  or  @media (width >= 768)' });
     return '(min-width: 0)';
+  }
+  // ---- v0.3 one-word sugar (the conditions everyone writes) ----
+  if (/^dark$/i.test(q)) return '(prefers-color-scheme: dark)';
+  if (/^light$/i.test(q)) return '(prefers-color-scheme: light)';
+  if (/^reduced-motion$/i.test(q)) return '(prefers-reduced-motion: reduce)';
+  // ---- bare-width sugar ----
+  //   @media 768        → (min-width: 768px)   "this wide or wider"
+  //   @media <= 768     → (max-width: 768px)   "narrower than this"
+  //   @media 480..960   → min + max range
+  const m = q.match(/^(<=|>=)?\s*(\d+(?:\.\d+)?)\s*(?:\.\.\s*(\d+(?:\.\d+)?))?$/);
+  if (m) {
+    const a = m[2] + 'px';
+    if (m[3] !== undefined) return `(min-width: ${a}) and (max-width: ${m[3]}px)`;
+    if (m[1] === '<=') return `(max-width: ${a})`;
+    return `(min-width: ${a})`;
   }
   // bare numbers become px:  (width >= 768)  →  (width >= 768px)
   q = q.replace(/([>=<]\s*)(\d+(?:\.\d+)?)\b(?!\s*(?:px|%|em|rem|vh|vw|vmin|vmax|s|ms|deg|dppx|x))/g, '$1$2px');

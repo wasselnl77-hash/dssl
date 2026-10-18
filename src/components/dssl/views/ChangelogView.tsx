@@ -146,6 +146,33 @@ accent: oklch(62% 0.19 35)   // now: untouched`,
     body:
       "Every stylesheet bundle re-emitted the full token map unconditionally, so site.dssl's light tokens out-cascaded tokens.dssl's @signal dark palette — dark mode silently stayed light. Bundles now emit only the tokens they actually declare, and the shared registry is installed once as a base bundle that sorts below every author rule.",
   },
+  {
+    version: "v0.3.1",
+    date: "bug report → fix",
+    title: "Hover effects stopped going away",
+    why: "user report: “hover effect not going away”",
+    kind: "add",
+    body:
+      "The engine collected state-recompute candidates by querying each rule's full selector — including the state pseudo-class. The instant pointerout fired, the element that had just LEFT hover no longer matched its own “.card:hover” selector, so it was never recomputed and the hover styles stuck forever. (Active and focus had the same bug; earlier tests only looked clean because full recomputes kept wiping the evidence.) The engine now queries the state-stripped base selector and re-evaluates the real match, so both entering and leaving a state are handled.",
+    code: `// engine.js — stateEvent(), fixed
+const base = rule.sel
+  .replace(STATE_PSEUDO_RE, "")   // ".card:hover" → ".card"
+  .trim() || "*";
+// recompute the superset; computeElement() re-checks
+// the live :hover / :active / :focus match itself`,
+  },
+  {
+    version: "v0.3.0",
+    date: "user feedback → release",
+    title: "The Less-Is-More release",
+    why: "user report: “it's KINDA complicated ngl”",
+    kind: "add",
+    body:
+      "Complexity attack on three fronts. (1) One-word conditions: @media dark, @media light, @media reduced-motion, and bare-width sugar — @media 768 means “this wide or wider”, @media <= 768 narrower, @media 480..960 a range; the full CSS form still works. (2) A new one-page Cheat sheet view: the whole day-to-day language without the prose. (3) The docs now open with a three-step quickstart and say out loud what you can ignore on day one — layers, tokens, behaviors, signals — instead of implying you must learn all of it.",
+    code: `@media dark { background: color.ink }   // was (prefers-color-scheme: dark)
+@media 768  { grid: 3 }                 // was (width >= 768px)
+@media 480..960 { grid: 2 }             // range, no paren-math`,
+  },
 ];
 
 export default function ChangelogView() {

@@ -67,6 +67,14 @@ gallery {
   .card { padding: space.6 }
 }
 
+// v0.3 one-word / bare-width sugar
+@media dark { .card { color: color.ink } }
+@media light { .card { color: color.ink } }
+@media reduced-motion { .card { transition: none } }
+@media 768 { .card { padding: space.6 } }
+@media <= 480 { .card { padding: space.2 } }
+@media 480..960 { gallery { grid: 2 } }
+
 @signal theme == dark {
   tokens { color { paper: #14121a } }
   .card { background: color.card }
@@ -126,6 +134,12 @@ assert(doc.rules.some(r => r.layer === 'utilities' && r.sel === '.mt-0'), 'layer
 assert(doc.rules.some(r => r.layer === 'pin' && r.sel === '.hero-title'), 'pin layer');
 assert(doc.rules.some(r => r.sel === 'gallery' && r.decls.some(d => String(d.value).includes('minmax(220px'))), 'grid sugar');
 assert(doc.rules.some(r => r.sel === '.card' && r.media.length === 1), 'media rule for .card');
+assert(doc.rules.some(r => r.media.includes('(prefers-color-scheme: dark)')), '@media dark sugar');
+assert(doc.rules.some(r => r.media.includes('(prefers-color-scheme: light)')), '@media light sugar');
+assert(doc.rules.some(r => r.media.includes('(prefers-reduced-motion: reduce)')), '@media reduced-motion sugar');
+assert(doc.rules.some(r => r.media.includes('(min-width: 768px)')), '@media 768 sugar');
+assert(doc.rules.some(r => r.media.includes('(max-width: 480px)')), '@media <= 480 sugar');
+assert(doc.rules.some(r => r.media.includes('(min-width: 480px) and (max-width: 960px)')), '@media 480..960 range sugar');
 const shadow = doc.shadowRules.find(s => s.pseudo === 'before');
 assert(shadow && shadow.decls.some(d => d.prop === 'content' && d.value === '""'), 'content autoclosed');
 console.log(process.exitCode ? 'SMOKE TEST FAILED' : 'SMOKE TEST OK');

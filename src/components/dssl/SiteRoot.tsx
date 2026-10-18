@@ -3,16 +3,18 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import HomeView from "./views/HomeView";
 import DocsView from "./views/DocsView";
+import CheatSheetView from "./views/CheatSheetView";
 import SpecView from "./views/SpecView";
 import PlaygroundView from "./views/PlaygroundView";
 import ChangelogView from "./views/ChangelogView";
 import { SunIcon, MoonIcon, MenuIcon } from "./icons";
 
-export type ViewName = "home" | "docs" | "spec" | "playground" | "changelog";
+export type ViewName = "home" | "docs" | "cheat" | "spec" | "playground" | "changelog";
 
 const VIEWS: { name: ViewName; label: string }[] = [
   { name: "home", label: "Home" },
   { name: "docs", label: "Docs" },
+  { name: "cheat", label: "Cheat sheet" },
   { name: "spec", label: "Spec" },
   { name: "playground", label: "Playground" },
   { name: "changelog", label: "Changelog" },
@@ -148,7 +150,7 @@ export default function SiteRoot() {
           </nav>
 
           <div className="nav-side">
-            <span className="ver-badge">v0.2.0</span>
+            <span className="ver-badge">v0.3.0</span>
             <button type="button" className="theme-btn" onClick={cycleTheme} aria-label="Toggle color theme" title="Theme: auto / light / dark">
               <span className="icon-sun"><SunIcon /></span>
               <span className="icon-moon"><MoonIcon /></span>
@@ -163,6 +165,7 @@ export default function SiteRoot() {
       <main className="main" data-view={view}>
         {view === "home" && <HomeView go={go} />}
         {view === "docs" && <DocsView />}
+        {view === "cheat" && <CheatSheetView />}
         {view === "spec" && <SpecView />}
         {view === "playground" && <PlaygroundView />}
         {view === "changelog" && <ChangelogView />}
@@ -171,9 +174,9 @@ export default function SiteRoot() {
       <footer className="footer">
         <div className="wrap footer-inner">
           <div className="footer-note">
-            <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.2 while
-            building this site; every feature it needed, it grew. This page runs on its own
-            engine, no stylesheet attached.
+            <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.3 while
+            building this site; every feature it needed, it grew, and every bug you sent got
+            fixed for real. This page runs on its own engine, no stylesheet attached.
           </div>
           <nav className="footer-links" aria-label="Footer">
             {VIEWS.map(v => (
