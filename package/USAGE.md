@@ -1,16 +1,32 @@
-# DSSL engine — quickstart
+# DSSL engine quickstart
 
 DSSL is a style language that runs in the browser. You write `.dssl` files, add two tags to your page, and the engine does the rest. No compiler, no build step, no CSS output. The engine walks your DOM live and writes styles straight onto the elements it matches, including elements that show up later.
 
 ## 1. Get the engine
 
-Copy the `dssl/` folder from this package into your project, or grab it fresh from a terminal:
+Pick your platform. All three routes land the same thing: a `dssl-engine/` folder with the engine, a starter token set, an example stylesheet and this guide.
+
+macOS or Linux (any distro, bash not required):
 
 ```sh
 curl -fsSL https://dssl-sable.vercel.app/install.sh | sh
 ```
 
-That drops a `dssl-engine/` folder next to you with everything you need.
+The installer runs with plain sh (dash, ash and busybox are fine), downloads with curl or wget, whichever you have, and unpacks with tar, which every distro and macOS ship by default. If tar is somehow missing it falls back to unzip, then to python3.
+
+Windows (PowerShell 5.1 or newer, no admin rights):
+
+```powershell
+irm https://dssl-sable.vercel.app/install.ps1 | iex
+```
+
+No terminal at all? Download the package straight from the browser: [dssl-engine.zip](https://dssl-sable.vercel.app/dssl-engine.zip) or [dssl-engine.tar.gz](https://dssl-sable.vercel.app/dssl-engine.tar.gz), and unzip it anywhere.
+
+To install into a specific folder, append it as an argument:
+
+```sh
+curl -fsSL https://dssl-sable.vercel.app/install.sh | sh -s -- ~/my-site
+```
 
 ## 2. Wire it up
 
@@ -87,6 +103,8 @@ gives one subtree its own engine, its own tokens and its own cascade. The playgr
 - `dssl/` the engine. `boot.js` is the entry, `index.js` the public API.
 - `styles/tokens.dssl` the starter token set (colors, fonts, radii, shadows)
 - `examples/hello.dssl` a tiny starter stylesheet
+- `install.sh` the macOS and Linux installer, same one the one-liner pipes
+- `install.ps1` the Windows installer
 - `USAGE.md` this file
 - `LICENSE` MIT
 

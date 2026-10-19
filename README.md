@@ -62,22 +62,32 @@ This repo eats its own cooking. Everything you see on the website is styled by t
 
 The site is live. No setup, no build, nothing to install: https://dssl-sable.vercel.app
 
-Want the engine on your own page? Two tags:
+Want the engine on your own page? One line per platform.
+
+macOS or Linux (any distro, bash not required):
+
+```sh
+curl -fsSL https://dssl-sable.vercel.app/install.sh | sh
+```
+
+Windows (PowerShell 5.1 or newer, no admin rights):
+
+```powershell
+irm https://dssl-sable.vercel.app/install.ps1 | iex
+```
+
+Both drop a `dssl-engine/` folder next to you: the engine, a starter token set, a tiny example stylesheet and a usage guide. The sh one is a POSIX script. It downloads with curl or wget, whichever you have, and unpacks with tar, which every distro and macOS already ship. If tar is missing it falls back to unzip, then python3. Want it somewhere specific? Append a folder: `... | sh -s -- ~/my-site`.
+
+Prefer to click: [dssl-engine.zip](https://dssl-sable.vercel.app/dssl-engine.zip) or [dssl-engine.tar.gz](https://dssl-sable.vercel.app/dssl-engine.tar.gz). Same package, straight from the browser.
+
+Then wire it into a page with two tags:
 
 ```html
 <script type="module" src="/dssl/boot.js"></script>
 <link rel="stylesheet/dssl" href="/styles/tokens.dssl">
 ```
 
-Every `<link rel="stylesheet/dssl">` on the page gets fetched and applied automatically, and the engine keeps restyling the DOM live as elements come and go. That is the whole install.
-
-Or grab it from a terminal:
-
-```sh
-curl -fsSL https://dssl-sable.vercel.app/install.sh | sh
-```
-
-That drops a `dssl-engine/` folder with the engine, a starter token set, a tiny example stylesheet and a usage guide (also in `package/` in this repo). Plain zip if you prefer: https://dssl-sable.vercel.app/dssl-engine.zip
+Every `<link rel="stylesheet/dssl">` on the page gets fetched and applied automatically, and the engine keeps restyling the DOM live as elements come and go. That is the whole install. The package's USAGE.md covers the same ground in two minutes, and the source files also live in `package/` in this repo.
 
 Clone this repo if you want to read the engine. Everything runs in the browser.
 
@@ -85,6 +95,7 @@ Clone this repo if you want to read the engine. Everything runs in the browser.
 
 - `public/dssl/` the engine: parser, resolver, boot
 - `public/styles/` the styles that drive the site
+- `package/` what ships in the download: engine, starter files, usage guide, installers
 - `src/` the Next.js site
 - `scripts/` smoke tests for the engine
 
