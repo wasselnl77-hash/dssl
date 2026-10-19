@@ -62,7 +62,24 @@ This repo eats its own cooking. Everything you see on the website is styled by t
 
 The site is live. No setup, no build, nothing to install: https://dssl-sable.vercel.app
 
-Clone this repo if you want to read the engine or run it yourself. Everything runs in the browser.
+Want the engine on your own page? Two tags:
+
+```html
+<script type="module" src="/dssl/boot.js"></script>
+<link rel="stylesheet/dssl" href="/styles/tokens.dssl">
+```
+
+Every `<link rel="stylesheet/dssl">` on the page gets fetched and applied automatically, and the engine keeps restyling the DOM live as elements come and go. That is the whole install.
+
+Or grab it from a terminal:
+
+```sh
+curl -fsSL https://dssl-sable.vercel.app/install.sh | sh
+```
+
+That drops a `dssl-engine/` folder with the engine, a starter token set, a tiny example stylesheet and a usage guide (also in `package/` in this repo). Plain zip if you prefer: https://dssl-sable.vercel.app/dssl-engine.zip
+
+Clone this repo if you want to read the engine. Everything runs in the browser.
 
 ## Repo layout
 
