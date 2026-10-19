@@ -10,6 +10,7 @@ const SIDE = [
   { head: null, id: "tokens", label: "Tokens" },
   { head: null, id: "selectors", label: "Selectors & nesting" },
   { head: null, id: "states", label: "States" },
+  { head: null, id: "pseudo-elements", label: "Pseudo-elements" },
   { head: null, id: "world", label: "@media · @container · @signal" },
   { head: null, id: "cascade", label: "Cascade & layers" },
   { head: "reference", id: "semantic", label: "Semantic properties" },
@@ -264,6 +265,52 @@ background:                     // values can continue
             </div>
           </section>
 
+          <section className="doc-block" id="pseudo-elements">
+            <h2 className="section-title">Pseudo-elements</h2>
+            <p className="doc-lead">
+              Inline styles reach every element in the DOM — but a pseudo-element has no
+              DOM handle, so <code>::before</code>, <code>::after</code>,{" "}
+              <code>::selection</code> and friends are the one thing DSSL compiles into a
+              real stylesheet. Both spellings are the same rule: nested inside the block,
+              or written as a full selector. Before v0.5 the full-selector form compiled{" "}
+              <code>ok: true</code> and then matched nothing — a silent dead rule in a
+              language whose whole pitch is loud errors. The trap is closed: the resolver
+              splits any selector carrying <code>::</code> and routes it down the same
+              shadow-CSS pipeline as the nested form.
+            </p>
+            <CodeBlock file="pseudo.dssl" code={`// all three spellings are the same rule now
+.card::before { content: "" }        // full selector
+.card {
+  ::before { content: "" }           // nested
+  &::before { content: "" }          // explicit &
+}
+
+// states, @media, @container and @signal compose as everywhere else
+.card:hover::before { background: color.accent }
+
+// vendor pseudo-elements pass through verbatim, trailing states included
+input::-webkit-slider-thumb { background: color.accent }
+
+// and the loud errors stayed loud:
+//   .card::befor { }        →  error: unknown pseudo-element "::befor"
+//   .card:seen::before { }  →  error: seen can't cross into shadow CSS
+//   .a, .b::before { }      →  error: mixed selector list — split it`} />
+            <div className="demo-box">
+              <div className="pe-demo">
+                <span className="pe-tag">styled by .pe-tag::before — the full-selector form</span>
+                <span className="pe-dot" />
+                <span className="pe-tail">pe-pulse · 1200ms · infinite alternate</span>
+              </div>
+              <p className="doc-lead fine-print">
+                The oxblood square is a <code>.pe-tag::before</code> rule written in the
+                full-selector form in this page&apos;s stylesheet — the spelling that used
+                to die silently. The dot runs{" "}
+                <code>animate: pe-pulse 1200 infinite alternate</code>, v0.5&apos;s first
+                loop. If both look right, the trap is staying closed.
+              </p>
+            </div>
+          </section>
+
           <section className="doc-block" id="world">
             <h2 className="section-title">@media · @container · @signal</h2>
             <p className="doc-lead">
@@ -413,7 +460,9 @@ button { use focus-ring }
               element&apos;s natural state. Apply it with <code>animate</code>. The engine
               runs it through the Web Animations API, and every animation silently
               disables under reduced-motion unless the motion is{" "}
-              <code>essential: true</code>.
+              <code>essential: true</code>. v0.5 adds <code>infinite</code> — loop
+              forever — and <code>alternate</code>, which ping-pongs the direction
+              instead of restarting.
             </p>
             <CodeBlock file="motion.dssl" code={`motion pop {
   from {
@@ -425,6 +474,10 @@ button { use focus-ring }
 
 .motion-box {
   animate: pop 500 snap        // name · duration · easing · fill
+}
+
+.pe-dot {
+  animate: pe-pulse 1200 infinite alternate   // v0.5: loops, ping-pongs
 }`} />
             <div className="demo-box">
               <div className="motion-box">motion pop — replay me</div>

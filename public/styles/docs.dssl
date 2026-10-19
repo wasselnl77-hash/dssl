@@ -117,8 +117,15 @@
 }
 
 // tables (semantic property reference, spec votes, …)
+// v0.5 — display: block + fit-content + internal scroll: the raw table's
+// min-content width (705px) used to push the whole page past 360px viewports
+// — the last un-swept overflow on this page. Same rules, now owned by the
+// stylesheet that actually styles the table, so last-word-wins stays honest.
 .tbl {
-  width: 100%
+  display: block
+  width: fit-content
+  max-width: 100%
+  overflow-x: auto
   border-collapse: collapse
   font-size: 13.5
 }
@@ -487,4 +494,50 @@ motion rise-in {
   font-family: font.mono
   font-size: 12.5
   color: color.muted
+}
+
+// =========================================================================
+// v0.5 — the pseudo-elements section's live demo. The rules below are
+// written in the FULL-SELECTOR form (.pe-tag::before) — the spelling that
+// used to compile ok and then match nothing. The demo renders right only
+// if the trap stays closed. The dot is also the site's first `infinite`
+// animation, so v0.5 dogfoods both headline features at once.
+// =========================================================================
+
+motion pe-pulse {
+  from { opacity: 1 }
+  to { opacity: 0.2 }
+}
+
+.pe-demo {
+  row: gap 12 center wrap
+  padding: space.4 space.5
+  background: color.card
+  border: 1 solid color.line
+  radius: sm
+}
+
+.pe-tag {
+  font: 13 color.muted
+}
+
+.pe-tag::before {
+  content: ""
+  display: inline-block
+  size: 10
+  background: color.accent
+  radius: 3
+  margin-inline-end: 8
+}
+
+.pe-dot {
+  size: 12
+  radius: full
+  background: color.accent
+  animate: pe-pulse 1200 infinite alternate
+}
+
+.pe-tail {
+  font: 12 color.muted
+  font-style: italic
 }

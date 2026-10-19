@@ -21,7 +21,11 @@ const STATE_WORDS = new Set([
   'seen', // v0.4.0 — engine-native: fires once when the element enters the viewport
 ]);
 
-const PSEUDO_ELEMENTS = new Set([
+// v0.5.0 — exported so the resolver can validate the `::name` half whenever a
+// full selector (.card::before) carries a pseudo-element. The resolver splits
+// those into element + pseudo and routes them into shadow CSS — previously a
+// top-level `.card::before { }` compiled ok and then matched NOTHING.
+export const PSEUDO_ELEMENTS = new Set([
   'before', 'after', 'placeholder', 'selection', 'marker',
   'first-line', 'first-letter', 'backdrop', 'file-selector-button',
 ]);
@@ -30,7 +34,7 @@ const PSEUDO_ELEMENTS = new Set([
 // and friends). The DOM gives you no other way to reach native scrollbars,
 // so they ride the same shadow-CSS exception as ::before/::after. The name
 // may carry trailing state (::hover, :horizontal) — it is emitted as-is.
-const VENDOR_PSEUDO = /^-(webkit|moz|ms)-/;
+export const VENDOR_PSEUDO = /^-(webkit|moz|ms)-/;
 
 /** find index of first top-level occurrence of `ch` (skips strings + parens) */
 function scanFor(str, ch, from = 0) {

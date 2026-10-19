@@ -18,6 +18,9 @@
  * ========================================================================= */
 
 import { levenshtein, didYouMean } from './utils.js';
+// v0.5.0 — the resolver validates the `::name` half of full selectors so a
+// typo like .card::befor is a LOUD error, never a silently dead rule.
+import { PSEUDO_ELEMENTS, VENDOR_PSEUDO } from './parser.js';
 
 /* ------------------------------------------------------------------ *
  * Vocabulary
@@ -54,6 +57,9 @@ const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,none,au
   'isolate,plaintext,sideways,upright,mixed,ltr,rtl,transform,auto,' +
   '-webkit-box,-webkit-inline-box,' +
   'thin,thick,medium,separate,collapse,vertical,horizontal,balance,pretty,orphans,' +
+  // v0.5.0 — hyphens: manual used to be rejected ("unknown value") even though
+  // the property existed; plus the rendering keywords people actually type.
+  'manual,pixelated,crisp-edges,optimizeSpeed,optimizeLegibility,geometricPrecision,' +
   'flex-start,flex-end,self-start,self-end,snap-block,snap-inline').split(','));
 
 const UNITLESS_PROPS = new Set([
@@ -237,6 +243,14 @@ function resolveValue(raw, ctx) {
 
       // known keyword?
       if (CSS_KEYWORDS.has(ident) || CSS_KEYWORDS.has(ident.toLowerCase())) {
+        out += ident;
+        continue;
+      }
+
+      // v0.5.0 — font names are proper nouns: JetBrains Mono, IBM Plex Serif.
+      // In font-family values and font.* tokens, bare multi-word names pass
+      // through instead of demanding quotes. Everywhere else stays loud.
+      if (ctx.bareIdents && /^[A-Za-z][A-Za-z0-9_-]*$/.test(ident)) {
         out += ident;
         continue;
       }
@@ -523,7 +537,11 @@ const SEMANTIC = {
       }
       if (EASINGS[a]) { spec.easing = EASINGS[a]; continue; }
       if (['both', 'forwards', 'backwards', 'none', 'auto'].includes(a)) { spec.fill = a; continue; }
-      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown animate part "${a}"`, hint: didYouMean(a, Object.keys(EASINGS).concat(['both', 'forwards', 'backwards'])) });
+      // v0.5.0 — looping: `infinite` runs forever, `alternate` ping-pongs.
+      // animate: pulse 1600 infinite alternate  — was impossible before.
+      if (a === 'infinite') { spec.iterations = Infinity; continue; }
+      if (['alternate', 'alternate-reverse', 'reverse', 'normal'].includes(a)) { spec.direction = a; continue; }
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown animate part "${a}"`, hint: didYouMean(a, Object.keys(EASINGS).concat(['both', 'forwards', 'backwards', 'infinite', 'alternate'])) });
     }
     return [{ prop: '@animate', value: spec }];
   },
@@ -559,7 +577,7 @@ function resolveDecl(prop, value, ctx) {
     const outProp = prop.includes('.')
       ? '--dssl-' + prop.slice(2).replace(/\./g, '-')
       : prop;
-    return [{ prop: outProp, value: resolveValue(value, { ...ctx2, unitless: false }) }];
+    return [{ prop: outProp, value: resolveValue(value, { ...ctx2, unitless: false, bareIdents: true }) }];
   }
 
   const sem = SEMANTIC[prop];
@@ -573,7 +591,7 @@ function resolveDecl(prop, value, ctx) {
     });
     return [];
   }
-  return [{ prop, value: resolveValue(value, { ...ctx2, unitless: UNITLESS_PROPS.has(prop) }) }];
+  return [{ prop, value: resolveValue(value, { ...ctx2, unitless: UNITLESS_PROPS.has(prop), bareIdents: prop === 'font-family' }) }];
 }
 
 /* ------------------------------------------------------------------ *
@@ -722,7 +740,8 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
     for (const key of keys) {
       const raw = tokenMap.get(key);
       const prop = '--dssl-' + key.replace(/\./g, '-');
-      decls.push({ prop, value: resolveValue(raw, { ...ctxBase, prop: key }) });
+      // font.* tokens hold font stacks — proper nouns, not keywords (v0.5.0)
+      decls.push({ prop, value: resolveValue(raw, { ...ctxBase, prop: key, bareIdents: /^font/.test(key) }) });
     }
     if (!decls.length) return null;
     return {
@@ -850,6 +869,45 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       errors.push({ file, line, message: 'declarations must live inside a selector', hint: 'top-level blocks are tokens, behavior, motion, @layer, @media… — or a selector like .card' });
       return;
     }
+    // v0.5.0 — the pseudo-element trap fix. A full selector like `.card::before`
+    // used to compile ok and then match NOTHING: inline styles can never reach
+    // pseudo-elements. Now the selector is split into element + pseudo halves
+    // and the rule rides the shadow-CSS pipeline — exactly what the nested
+    // form (`.card { ::before { } }`) always did. Both forms are now one thing.
+    const ps = analyzePseudo(ctx.sel);
+    if (ps.mode === 'all') {
+      // parity with the nested path: bare `content:` becomes content: ""
+      const decls = sub.decls.map(d => d.prop === 'content' && d.value === '' ? { ...d, value: '""' } : d);
+      for (const { el, pseudo } of ps.parts) {
+        const name = pseudo.split(/[\s:(]/)[0];
+        if (!PSEUDO_ELEMENTS.has(name) && !VENDOR_PSEUDO.test(name)) {
+          errors.push({
+            file, line,
+            message: `unknown pseudo-element "::${pseudo}"`,
+            hint: 'try ::before, ::after, ::selection, or a vendor one like ::-webkit-scrollbar-thumb',
+          });
+          continue;
+        }
+        if (/:seen\b/.test(el)) {
+          errors.push({
+            file, line,
+            message: `the engine-native "seen" state can't combine with "::${name}" in shadow CSS`,
+            hint: 'style the element itself in a seen { } block instead',
+          });
+          continue;
+        }
+        shadowRules.push({
+          id: ruleId++, sel: el, pseudo,
+          media: ctx.media, signals: ctx.signals, containers: ctx.containers,
+          layer: ctx.layer, order: order++, decls, file, line,
+        });
+      }
+      return;
+    }
+    if (ps.mode === 'mixed') {
+      errors.push({ file, line, message: `selector list mixes pseudo-element and plain selectors: "${ctx.sel}"`, hint: 'split it into two rules — one for the pseudo-element, one for the rest' });
+      return;
+    }
     rules.push({
       id: ruleId++, sel: ctx.sel, media: ctx.media, signals: ctx.signals,
       containers: ctx.containers, layer: ctx.layer, order: order++,
@@ -895,6 +953,48 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
 function combine(parent, child) {
   if (child.includes('&')) return child.split('&').join(parent);
   return parent + ' ' + child;
+}
+
+/* v0.5.0 — where does a selector carry a pseudo-element?
+ *   'none'  — plain selector, inline-style path
+ *   'all'   — every comma-part has one: { parts: [{ el, pseudo }] } → shadow CSS
+ *   'mixed' — some parts have one, some don't → loud error (split the list)
+ * The `::` scan is string- and paren-aware so [data-x="::a"] can't false-hit. */
+function analyzePseudo(sel) {
+  // top-level comma split
+  const parts = [];
+  let depth = 0, q = null, cur = '';
+  for (const ch of sel) {
+    if (q) { cur += ch; if (ch === q) q = null; continue; }
+    if (ch === '"' || ch === "'") { q = ch; cur += ch; continue; }
+    if (ch === '(' || ch === '[') depth++;
+    else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0) { parts.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  parts.push(cur);
+
+  const splits = [];
+  let withPseudo = 0;
+  for (const part of parts) {
+    let idx = -1; depth = 0; q = null;
+    for (let i = 0; i < part.length - 1; i++) {
+      const ch = part[i];
+      if (q) { if (ch === q && part[i - 1] !== '\\') q = null; continue; }
+      if (ch === '"' || ch === "'") { q = ch; continue; }
+      if (ch === '(' || ch === '[') depth++;
+      else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1);
+      else if (depth === 0 && ch === ':' && part[i + 1] === ':') { idx = i; break; }
+    }
+    if (idx === -1) { splits.push(null); continue; }
+    withPseudo++;
+    const el = part.slice(0, idx).trim();
+    const pseudo = part.slice(idx + 2).trim();
+    splits.push(el && pseudo ? { el, pseudo } : null);
+  }
+  if (withPseudo === 0) return { mode: 'none' };
+  if (withPseudo !== parts.length || splits.some(s => !s)) return { mode: 'mixed', parts: splits };
+  return { mode: 'all', parts: splits };
 }
 
 const STATE_SCAN = /:(hover|focus-visible|focus|active|disabled|checked|empty|target|invalid|valid|required|open|closed|read-only|read-write|placeholder-shown|first-child|last-child|only-child|seen)\b/g;

@@ -12,6 +12,24 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.5.0",
+    date: "growth phase · the trap closes",
+    title: "Pseudo-elements work everywhere — and animate learns to loop",
+    why: "an external review scored DSSL 7.5/10 and named the bump condition: fix the trap, earn the 8",
+    kind: "add",
+    body:
+      "The review found the one wart this language could not afford: a top-level .card::before { } compiled ok: true and then matched nothing. Inline styles can never reach a pseudo-element, and the compiler said fine when it meant dead rule — twenty minutes lost, in a language whose whole pitch is loud errors. The fix lives in the flattener: any full selector carrying :: is split into element + pseudo halves and routed down the same shadow-CSS pipeline the nested form always used, so .card::before, .card { ::before } and .card { &::before } are one spelling of one rule, with states, @media, @container and @signal composing as everywhere else. The loud errors stayed loud: an unknown pseudo-element name, :seen combined with a pseudo, or a selector list mixing pseudo and plain parts each fail at compile time with a did-you-mean hint — a rule can no longer be dead on arrival. The review's other gripes rode along: animate accepts infinite (loop forever) and alternate (ping-pong direction) through the Web Animations API; font names are now treated as proper nouns, so font-family: JetBrains Mono, monospace and font tokens pass bare without quotes; and hyphens: manual stopped being rejected. The docs gained the pseudo-elements section the trap proved was missing, with a live demo styled entirely by full-selector pseudo rules — if the accent square renders, the fix is on.",
+    code: `// three spellings, one rule:
+.card::before { content: "" }
+.card { ::before { content: "" } }
+.card { &::before { content: "" } }
+
+// the sharp-edge sweep:
+.dot { animate: pe-pulse 1200 infinite alternate }
+.card { font-family: JetBrains Mono, monospace }
+.prose { hyphens: manual }`,
+  },
+  {
     version: "v0.4.2",
     date: "growth phase · distribution",
     title: "Themed scrollbars — vendor pseudo-elements join the grammar",

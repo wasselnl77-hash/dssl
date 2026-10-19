@@ -625,6 +625,8 @@ export class DsslEngine {
         const anim = el.animate(frames, {
           duration: spec.duration, easing: spec.easing,
           delay: spec.delay || 0, fill: spec.fill,
+          iterations: spec.iterations || 1,        // v0.5.0 — `infinite`
+          direction: spec.direction || 'normal',   // v0.5.0 — `alternate`
         });
         anims.set(spec.key, anim);
       } catch { /* WAAPI unsupported property — skip */ }

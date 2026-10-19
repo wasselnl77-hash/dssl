@@ -106,6 +106,7 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
               <button type="button" className="btn btn-ghost" onClick={() => go("playground")}>
                 <PlayIcon /> Try the playground
               </button>
+              <a href="#get" className="btn btn-ghost">Get the engine</a>
             </div>
             <div className="hero-meta" aria-label="Engine facts">
               <span>~20 kB engine</span>
@@ -323,6 +324,79 @@ DSSL.signal('demo', null)   // off`} />
                 <strong>@signal demo == on</strong>
                 <span>This card is styled by a signal-conditional rule. Flip the signal and the engine recomputes it — inspect the html element to see the mirror attribute.</span>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------ get the engine */}
+      <section className="section" id="get">
+        <div className="wrap">
+          <div className="kicker">get the engine</div>
+          <h2 className="section-title">One line, any platform</h2>
+          <p className="section-sub">
+            The whole engine is a folder of plain JavaScript files. No package
+            manager, no build step, nothing installed globally. Pick your
+            platform, paste the line, and a <code>dssl-engine</code> folder
+            appears with the engine, a starter token set, an example stylesheet
+            and the usage guide.
+          </p>
+          <div className="get-grid sect-gap">
+            <div className="card card-hover get-card">
+              <span className="get-os">macos · linux · bsd</span>
+              <CodeBlock plain file="terminal" code="curl -fsSL https://dssl-sable.vercel.app/install.sh | sh" />
+              <p className="get-note">
+                Runs on plain sh — dash, ash and busybox included, bash not
+                required. Downloads with curl or wget, whichever you have, and
+                unpacks with tar, which every distro and macOS ship by default.
+                No tar? It falls back to unzip, then python3.
+              </p>
+            </div>
+            <div className="card card-hover get-card">
+              <span className="get-os">windows</span>
+              <CodeBlock plain file="powershell" code="irm https://dssl-sable.vercel.app/install.ps1 | iex" />
+              <p className="get-note">
+                PowerShell 5.1 or newer, no admin rights needed. Unpacks with
+                Expand-Archive into your current folder.
+              </p>
+            </div>
+            <div className="card card-hover get-card">
+              <span className="get-os">any os, no terminal</span>
+              <div className="get-downloads">
+                <a className="btn btn-ghost btn-sm" href="/dssl-engine.zip" download>dssl-engine.zip</a>
+                <a className="btn btn-ghost btn-sm" href="/dssl-engine.tar.gz" download>dssl-engine.tar.gz</a>
+              </div>
+              <p className="get-note">
+                The exact package the one-liners fetch, straight from the
+                browser. Unzip anywhere and follow USAGE.md inside.
+              </p>
+            </div>
+          </div>
+
+          <div className="get-wire">
+            <div className="get-wire-code">
+              <CodeBlock
+                file="your page"
+                code={`<script type="module" src="/dssl/boot.js"></script>
+<link rel="stylesheet/dssl" href="/styles/tokens.dssl">
+<link rel="stylesheet/dssl" href="/styles/hello.dssl">`}
+              />
+            </div>
+            <div className="get-wire-copy">
+              <h3>That is the whole install</h3>
+              <p>
+                Drop the <code>dssl/</code> folder where your page can serve
+                it, load <code>boot.js</code> as a module, and list your{" "}
+                <code>.dssl</code> files as links. The engine fetches them,
+                walks your DOM, and keeps restyling live as elements come and
+                go. Inline rules work too, via{" "}
+                <code>&lt;style type="text/dssl"&gt;</code>. The full tour
+                lives in the docs, and USAGE.md in the package covers the same
+                ground in two minutes.
+              </p>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => go("docs")}>
+                Read the docs <ArrowIcon />
+              </button>
             </div>
           </div>
         </div>
