@@ -48,7 +48,7 @@ Design tokens are built in (`color.paper`, `space.4`, and the `/92` at the end i
 
 This repo eats its own cooking. Everything you see on the website is styled by the engine in `public/dssl/` running the files in `public/styles/`. If the engine breaks, the site shows up naked. That is a feature.
 
-## What works today (v0.4.1)
+## What works today (v0.4.2)
 
 - flexbox layout
 - behaviors and `use`
@@ -56,6 +56,7 @@ This repo eats its own cooking. Everything you see on the website is styled by t
 - seen states and stagger delays
 - per-property transitions
 - visually-hidden
+- themed native scrollbars (vendor pseudo-elements, the shadow CSS exception grown wider)
 - pseudo elements (the one exception: they compile to shadow CSS, because the DOM gives you no other way to reach them)
 
 ## Try it
@@ -101,7 +102,7 @@ Clone this repo if you want to read the engine. Everything runs in the browser.
 
 ## Status
 
-v0.4.1, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite.
+v0.4.2, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite.
 
 ## License
 

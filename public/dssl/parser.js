@@ -26,6 +26,12 @@ const PSEUDO_ELEMENTS = new Set([
   'first-line', 'first-letter', 'backdrop', 'file-selector-button',
 ]);
 
+// v0.4.2 — vendor pseudo-elements pass through verbatim (::-webkit-scrollbar
+// and friends). The DOM gives you no other way to reach native scrollbars,
+// so they ride the same shadow-CSS exception as ::before/::after. The name
+// may carry trailing state (::hover, :horizontal) — it is emitted as-is.
+const VENDOR_PSEUDO = /^-(webkit|moz|ms)-/;
+
 /** find index of first top-level occurrence of `ch` (skips strings + parens) */
 function scanFor(str, ch, from = 0) {
   let depth = 0, q = null;
@@ -111,8 +117,8 @@ export function parse(source, file = 'inline.dssl') {
     }
     if (h.startsWith('::')) {
       const name = h.slice(2).split(/[\s(]/)[0];
-      if (!PSEUDO_ELEMENTS.has(name)) {
-        err(line, `unknown pseudo-element "::${name}"`, 'try ::before, ::after, ::placeholder, ::selection');
+      if (!PSEUDO_ELEMENTS.has(name) && !VENDOR_PSEUDO.test(name)) {
+        err(line, `unknown pseudo-element "::${name}"`, 'try ::before, ::after, ::selection, or a vendor one like ::-webkit-scrollbar-thumb');
         return { kind: 'bogus' };
       }
       return { kind: 'pseudo', name };

@@ -483,6 +483,41 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
   row: gap 12 center wrap
 }
 
+// ------------------------------------------------- scrollbars (v0.4.2)
+// Native scrollbars were the last thing on this page wearing browser
+// defaults. There is no DOM handle on them — they are pseudo-elements, so
+// they ride the shadow-CSS exception. The parser grew vendor names
+// (::-webkit-scrollbar and friends) for exactly this.
+
+::-webkit-scrollbar {
+  width: 12
+  height: 12
+}
+
+::-webkit-scrollbar-track {
+  background: color.paper
+}
+
+::-webkit-scrollbar-thumb {
+  background: color.ink/25
+  border: 3 solid transparent
+  radius: 999
+  background-clip: padding-box
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color.ink/45
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent
+}
+
+// text selection gets the same ink treatment — accent at a whisper
+::selection {
+  background: color.accent/25
+}
+
 // -------------------------------------------------------------- utilities
 
 @layer utilities {

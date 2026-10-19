@@ -12,6 +12,26 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.4.2",
+    date: "growth phase · distribution",
+    title: "Themed scrollbars — vendor pseudo-elements join the grammar",
+    why: "native scrollbars were the last thing on this page wearing browser defaults",
+    kind: "add",
+    body:
+      "Styling a native scrollbar takes ::-webkit-scrollbar-thumb and friends — vendor pseudo-elements the parser refused by name; the curated list ended at ::selection. There is no DOM handle on a scrollbar, so they were the one styling job this language literally could not say. The rule grew the honest way: any ::-webkit-*, ::-moz-* or ::-ms-* name now passes through to the shadow-CSS exception verbatim, trailing states included, which is what makes the hover state on the thumb expressible. The scrollbars themselves are an ink pill floating on the paper track (transparent border + padding-box clip), waking to full attention on hover, with a rounded corner and an accent-tinted ::selection to match. Firefox keeps its native bars on purpose: standard scrollbar-color would be easy to add, but one non-auto value disables the webkit customization in Chromium, and the custom look wins.",
+    code: `::-webkit-scrollbar { width: 12 }
+::-webkit-scrollbar-thumb {
+  background: color.ink/25
+  border: 3 solid transparent
+  radius: 999
+  background-clip: padding-box
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color.ink/45     // states work on vendor pseudos
+}`,
+  },
+  {
     version: "v0.4.1",
     date: "growth phase · stability",
     title: "The steady hand — idempotent styling, twitch eliminated",
