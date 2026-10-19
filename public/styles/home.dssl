@@ -45,6 +45,7 @@
 
 .hero-copy {
   max-width: 560
+  min-width: 0
 }
 
 .hero-title {
@@ -70,11 +71,11 @@
 }
 
 .hero-ctas {
-  row: gap 12 center
+  row: gap 12 center wrap
 }
 
 .hero-meta {
-  row: gap 14 center
+  row: gap 14 center wrap
   margin-top: space.5
   color: color.muted
   font-size: 13
@@ -97,6 +98,7 @@
 .demo {
   width: 100%
   max-width: 480
+  min-width: 0
 }
 
 .demo-tabs {
@@ -326,6 +328,7 @@ motion rise-in {
 
 .compare-col {
   column: gap 10
+  min-width: 0
 }
 
 .compare-tag {
@@ -385,6 +388,102 @@ motion rise-in {
   font-size: 13.5
   line-height: 1.6
   color: color.muted
+}
+
+// ------------------------------------------------- get the engine (v0.4.1)
+// The install section: three platform cards and the two-tag wiring snippet.
+// Same reveal choreography as the grids above, because consistency is style.
+
+.get-grid {
+  display: grid
+  grid-template-columns: repeat(3, 1fr)
+  gap: space.4
+}
+
+@media (width <= 980) {
+  .get-grid {
+    grid-template-columns: 1fr
+  }
+}
+
+.get-card {
+  column: gap space.4
+  padding: space.5
+  min-width: 0
+}
+
+// grid children default to min-width auto: without this the long install
+// one-liners push their card (and the whole grid) past the viewport instead
+// of scrolling inside the code block
+.get-wire-code {
+  min-width: 0
+}
+
+.get-card .code {
+  font-size: 12.5
+}
+
+.get-os {
+  font-family: font.mono
+  font-size: 11.5
+  font-weight: 700
+  letter-spacing: 0.09em
+  text-transform: uppercase
+  color: color.accent
+}
+
+.get-note {
+  margin: 0
+  font-size: 13
+  line-height: 1.6
+  color: color.muted
+}
+
+.get-downloads {
+  row: gap space.3
+}
+
+.get-wire {
+  display: grid
+  grid-template-columns: 3fr 2fr
+  gap: space.5
+  margin-top: space.6
+  align-items: center
+}
+
+@media (width <= 980) {
+  .get-wire {
+    grid-template-columns: 1fr
+    margin-top: space.5
+  }
+}
+
+.get-wire-copy {
+  column: gap space.3
+}
+
+.get-wire-copy h3 {
+  font-family: font.serif
+  font-size: 22
+  font-weight: 650
+  margin: 0
+}
+
+.get-wire-copy p {
+  margin: 0
+  font-size: 14
+  line-height: 1.7
+  color: color.muted
+}
+
+.get-grid {
+  stagger: 60
+}
+
+.get-card {
+  seen {
+    animate: rise-in 480 snap
+  }
 }
 
 // ------------------------------------------------------------------- cta
