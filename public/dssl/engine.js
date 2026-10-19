@@ -37,6 +37,60 @@ const ALIGN_PROPS = new Set([
 ]);
 const HAS_CONTEXT_RE = /^(flex|inline-flex|grid|inline-grid)$/;
 
+/* v0.4.1 — shorthand/longhand coexistence cannot survive inline.
+ *
+ * A var()-pending shorthand (`border: 1px solid var(--c)`) and an overriding
+ * longhand of the same family (`border-color: color-mix(... var(--i) ...)`)
+ * cannot coexist in one inline declaration block: the CSSOM silently expands
+ * the shorthand into EMPTY longhands and the border vanishes. The old
+ * wipe-and-rewrite engine masked this by restoring the shorthand on every
+ * recompute (and flickering the border on every hover — part of the twitch);
+ * the diffing engine exposed it permanently (veto badges lost their border).
+ *
+ * The language's answer is a merge, at the CSSOM boundary: when a winning
+ * set holds a family shorthand AND one of its longhands, the longhand's
+ * value is folded into the shorthand's grammar slot (border) or the
+ * shorthand is expanded positionally (padding/margin/gap), and the longhand
+ * is dropped — the block never holds both. Unhandled pairs fail LOUDLY. */
+const BORDER_STYLES = new Set(['none', 'hidden', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset']);
+const BORDER_WIDTH_RE = /^(0|[\d.]+(?:px|em|rem|%|pt|ch|vw|vh)|thin|medium|thick)$/i;
+
+function foldIntoBorder(shVal, lhVal) {
+  const parts = String(shVal).trim().split(/\s+/);
+  const width = [];
+  const style = [];
+  const color = [];
+  for (const t of parts) {
+    if (!width.length && BORDER_WIDTH_RE.test(t)) width.push(t);
+    else if (!style.length && BORDER_STYLES.has(t.toLowerCase())) style.push(t);
+    else color.push(t);
+  }
+  if (color.length) color[0] = lhVal;      // replace the color slot (later cascade wins)
+  else color.push(lhVal);                  // shorthand had no color slot — append
+  return [...width, ...style, ...color].join(' ');
+}
+
+const POSITIONAL_FAMILIES = {
+  'padding': ['padding-top', 'padding-right', 'padding-bottom', 'padding-left'],
+  'margin': ['margin-top', 'margin-right', 'margin-bottom', 'margin-left'],
+  'gap': ['row-gap', 'column-gap'],
+};
+
+function expandPositional(shVal, longhands) {
+  const parts = String(shVal).trim().split(/\s+/);
+  let vals;
+  if (longhands.length === 2) {
+    vals = parts.length > 1 ? [parts[0], parts[1]] : [parts[0], parts[0]];
+  } else {
+    const [a, b = parts[0], c = parts[0], d = parts[1]] = parts.length === 1 ? [parts[0]] : parts;
+    vals = parts.length === 1 ? [parts[0], parts[0], parts[0], parts[0]]
+         : parts.length === 2 ? [a, b, a, b]
+         : parts.length === 3 ? [a, b, c, b]
+         : [a, b, c, d];
+  }
+  return longhands.map((p, i) => [p, vals[i]]);
+}
+
 // state pseudo-classes that may appear inside a rule selector. Used to strip
 // them back OFF when collecting recompute candidates (see stateEvent).
 const STATE_PSEUDO_RE = /:(hover|focus|focus-visible|active|focus-within|visited|target|disabled|enabled|checked|placeholder-shown|read-only|read-write|open|closed|empty|required|invalid|valid|link|indeterminate|seen)\b/g;
@@ -74,6 +128,7 @@ export class DsslEngine {
     this.seenSet = new WeakSet();          // v0.4.0 — elements that entered the viewport
     this.staggerEls = new Map();           // v0.4.0 — element → stagger delay (ms)
     this.io = null;                        // IntersectionObserver backing `seen`
+    this.naturalDisplay = new WeakMap();   // v0.4.1 — element → display without our promotion
   }
 
   /* ------------------------------------------------------------ *
@@ -202,7 +257,7 @@ export class DsslEngine {
       const m = origMql(query);
       if (!m._dsslWired) {
         m._dsslWired = true;
-        try { m.addEventListener('change', () => this.computeAll()); } catch { /* old browsers */ }
+        try { m.addEventListener('change', () => this.scheduleComputeAll()); } catch { /* old browsers */ }
       }
       return m;
     };
@@ -210,7 +265,7 @@ export class DsslEngine {
     // --- reduced motion ---
     try {
       const rm = window.matchMedia('(prefers-reduced-motion: reduce)');
-      rm.addEventListener('change', () => this.computeAll());
+      rm.addEventListener('change', () => this.scheduleComputeAll());
       this.reducedMotion = rm;
     } catch { this.reducedMotion = { matches: false }; }
 
@@ -231,7 +286,13 @@ export class DsslEngine {
     // element as seen — content must never be trapped invisible by a missing API.
 
     // --- container tracking via ResizeObserver ---
-    this.ro = new ResizeObserver(() => this.computeAll());
+    // v0.4.1: the callback goes through the coalescing scheduler, and — more
+    // importantly — computeElement now skips no-op style writes. The old
+    // wipe-and-rewrite could change an observed container's size mid-cycle,
+    // which re-fired this observer, which recomputed and rewrote again… a
+    // feedback loop the user experienced as the whole UI "twitching". An
+    // idempotent drain cannot move anything, so the loop dies here.
+    this.ro = new ResizeObserver(() => this.scheduleComputeAll());
   }
 
   stateEvent(state, target) {
@@ -280,6 +341,16 @@ export class DsslEngine {
       this._applying = false;
       this.applyStagger();
     });
+  }
+
+  /* v0.4.1 — coalesced full recompute for ambient triggers (ResizeObserver,
+   * media flips, signals, reduced-motion). Several triggers can land in the
+   * same frame; each one used to run its own computeAll synchronously. One
+   * compute per microtask burst is always enough — the drain is idempotent. */
+  scheduleComputeAll() {
+    if (this._allQueued) return;
+    this._allQueued = true;
+    queueMicrotask(() => { this._allQueued = false; this.computeAll(); });
   }
 
   matches(el, sel) {
@@ -370,54 +441,132 @@ export class DsslEngine {
       (LAYER_RANK[a.layer] ?? 2) - (LAYER_RANK[b.layer] ?? 2) || a.order - b.order
     );
 
-    // wipe what we owned before
-    const owned = this.ownMap.get(el) || [];
-    for (const p of owned) { try { el.style.removeProperty(p); } catch { } }
+    /* v0.4.1 — diff-based writes. The engine used to WIPE every property it
+     * owned and rewrite them all on every single recompute, even when nothing
+     * had changed. Under pointer boundary storms that meant hundreds of no-op
+     * style mutations per second, a resize-observer feedback loop (the write
+     * moved an observed container, RO re-fired, the write ran again…), and a
+     * visible "twitch" while the browser kept relayouting identical styles.
+     *
+     * The language's promise is that a recompute is a pure function of (DOM,
+     * rules, state) — so a recompute that resolves to the same declarations
+     * must touch the DOM zero times. Build the new ownership map, diff it
+     * against what we own, and write ONLY the difference. */
 
-    const newOwned = [];
+    const owned = this.ownMap.get(el) || new Map();  // prop -> {value, imp}
+    const newOwned = new Map();                      // prop -> {value, imp}
     const animSpecs = [];
     let cancelAnims = false;
     let stack = false;
     let staggerMs;                         // v0.4.0 — @stagger value, if any
 
-    // flatten matched decls in cascade order (the promotion below may prepend)
+    // flatten matched decls in cascade order (last decl of a prop wins, exactly
+    // like sequential setProperty calls did)
     const flat = [];
     for (const rule of matched) {
       const imp = rule.layer === 'pin' ? 'important' : '';
       for (const d of rule.decls) flat.push({ d, imp, rule });
     }
-
-    // v0.3.4: alignment implies a formatting context — see ALIGN_PROPS above.
-    // Read AFTER the wipe so the natural (parent-blockified) display decides;
-    // none/contents are never promoted (promoting would unhide or boxify them).
-    if (flat.some(x => ALIGN_PROPS.has(x.d.prop))) {
-      let disp = '';
-      try { disp = getComputedStyle(el).display; } catch { }
-      if (disp && !HAS_CONTEXT_RE.test(disp) && disp !== 'none' && disp !== 'contents') {
-        const inlineCtx = disp === 'inline' || disp.startsWith('inline-');
-        flat.unshift({ imp: '', d: { prop: 'display', value: inlineCtx ? 'inline-grid' : 'grid' } });
+    for (const { d, imp } of flat) {
+      if (d.prop === '@animate') {
+        if (d.value === null) { cancelAnims = true; continue; }
+        animSpecs.push({ ...d.value, key: /* filled below */ null });
+        continue;
+      }
+      if (d.prop === '@stack') { stack = true; continue; }
+      if (d.prop === '@stagger') { staggerMs = d.value; continue; }
+      newOwned.set(d.prop, { value: d.value, imp });
+    }
+    // anim keys need rule identity — rebuild them from matched order
+    {
+      let i = 0;
+      for (const rule of matched) {
+        for (const d of rule.decls) {
+          if (d.prop !== '@animate' || d.value === null) continue;
+          const spec = animSpecs[i++];
+          if (spec) spec.key = rule.id + '|' + rule.media.join('&') + '|' + rule.signals.map(s => s.name + s.op + s.value).join('&');
+        }
       }
     }
 
-    for (const { d, imp, rule } of flat) {
-        if (d.prop === '@animate') {
-          if (d.value === null) { cancelAnims = true; continue; }
-          animSpecs.push({ ...d.value, key: rule.id + '|' + rule.media.join('&') + '|' + rule.signals.map(s => s.name + s.op + s.value).join('&') });
-          continue;
-        }
-        if (d.prop === '@stack') { stack = true; continue; }
-        if (d.prop === '@stagger') { staggerMs = d.value; continue; }
-        try {
-          el.style.setProperty(d.prop, d.value, imp);
-          newOwned.push(d.prop);
-        } catch (why) {
-          // v0.3.2: the language promises loud errors — if the browser rejects
-          // a value we resolved, say so instead of failing silently. This is
-          // how the repeat(4px, 1fr) grid collapse would have been caught.
-          const msg = `[DSSL] browser rejected "${d.prop}: ${d.value}" — ${why && why.message || 'invalid value'}`;
-          if (!this._warned) this._warned = new Set();
-          if (!this._warned.has(msg)) { this._warned.add(msg); console.warn(msg); }
-        }
+    // v0.4.1 — resolve shorthand/longhand coexistence BEFORE any write, so the
+    // inline block never holds a family shorthand and one of its longhands.
+    for (const fam of ['border']) {
+      const sh = newOwned.get(fam);
+      if (!sh) continue;
+      for (const lhName of ['border-color', 'border-width', 'border-style']) {
+        const lh = newOwned.get(lhName);
+        if (!lh) continue;
+        if (lhName === 'border-color') newOwned.set(fam, { value: foldIntoBorder(sh.value, lh.value), imp: sh.imp });
+        else newOwned.set(fam, { value: sh.value, imp: sh.imp }); // non-color longhand: shorthand wins width/style only when it has that slot — keep shorthand, drop longhand
+        newOwned.delete(lhName);
+        if (!this._warned) this._warned = new Set();
+        const wmsg = `[DSSL] folded ${lhName} into ${fam} on <${el.tagName.toLowerCase()}${el.className ? ' .' + String(el.className).split(' ')[0] : ''}> — inline style cannot hold a var() shorthand and its longhand together`;
+        if (!this._warned.has(wmsg)) { this._warned.add(wmsg); console.info(wmsg); }
+      }
+    }
+    for (const [fam, longhands] of Object.entries(POSITIONAL_FAMILIES)) {
+      const sh = newOwned.get(fam);
+      if (!sh) continue;
+      const clash = longhands.filter(p => newOwned.has(p));
+      if (!clash.length) continue;
+      const imp = sh.imp;
+      newOwned.delete(fam);
+      for (const [p, v] of expandPositional(sh.value, longhands)) {
+        const prevL = newOwned.get(p);
+        if (!prevL) newOwned.set(p, { value: v, imp });
+      }
+    }
+
+    // REMOVE pass — properties we owned but the new cascade no longer sets.
+    // This runs BEFORE the promotion read below, so getComputedStyle sees the
+    // element's natural display, not a leftover promotion from last time.
+    // v0.4.1: the bookkeeping map must forget them too — the SET pass diffs
+    // against `owned`, and a prop deleted from the element but still in the
+    // map would look "unchanged" and never be rewritten (that is how the
+    // alignment promotion's display used to vanish on the second recompute).
+    for (const p of [...owned.keys()]) {
+      if (!newOwned.has(p)) {
+        try { el.style.removeProperty(p); } catch { }
+        owned.delete(p);
+      }
+    }
+
+    // v0.3.4: alignment implies a formatting context — see ALIGN_PROPS above.
+    // The element's NATURAL display (without our previous promotion) decides.
+    // v0.4.1: when we own a display we are about to drop, getComputedStyle can
+    // race the removal — so the natural value is cached per element the first
+    // time we see it without owning a display. none/contents are never
+    // promoted (promoting would unhide or boxify them).
+    if (flat.some(x => ALIGN_PROPS.has(x.d.prop)) && !newOwned.has('display')) {
+      let disp = '';
+      if (owned.has('display')) {
+        disp = this.naturalDisplay.get(el) || '';
+        if (!disp) { try { disp = getComputedStyle(el).display; } catch { } }
+      } else {
+        try { disp = getComputedStyle(el).display; } catch { }
+        if (disp) this.naturalDisplay.set(el, disp);
+      }
+      if (disp && !HAS_CONTEXT_RE.test(disp) && disp !== 'none' && disp !== 'contents') {
+        const inlineCtx = disp === 'inline' || disp.startsWith('inline-');
+        newOwned.set('display', { value: inlineCtx ? 'inline-grid' : 'grid', imp: '' });
+      }
+    }
+
+    // SET pass — only what is new or actually changed.
+    for (const [prop, next] of newOwned) {
+      const prev = owned.get(prop);
+      if (prev && prev.value === next.value && prev.imp === next.imp) continue;
+      try {
+        el.style.setProperty(prop, next.value, next.imp);
+      } catch (why) {
+        // v0.3.2: the language promises loud errors — if the browser rejects
+        // a value we resolved, say so instead of failing silently. This is
+        // how the repeat(4px, 1fr) grid collapse would have been caught.
+        const msg = `[DSSL] browser rejected "${prop}: ${next.value}" — ${why && why.message || 'invalid value'}`;
+        if (!this._warned) this._warned = new Set();
+        if (!this._warned.has(msg)) { this._warned.add(msg); console.warn(msg); }
+      }
     }
 
     this.ownMap.set(el, newOwned);
@@ -433,7 +582,7 @@ export class DsslEngine {
     }
 
     // container registration
-    if (newOwned.includes('container-type')) {
+    if (newOwned.has('container-type')) {
       if (!this.containerEls.has(el)) { this.containerEls.add(el); try { this.ro.observe(el); } catch { } }
     } else if (this.containerEls.has(el)) {
       this.containerEls.delete(el);
@@ -444,7 +593,11 @@ export class DsslEngine {
     const prevStack = this.stackPrev.get(el) || [];
     if (stack) {
       for (const child of el.children) {
-        if (child.nodeType === 1) { try { child.style.gridArea = '1 / 1'; } catch { } }
+        // v0.4.1: idempotent — children get recomputed on every drain, but
+        // rewriting grid-area every time churned the style attribute for free.
+        if (child.nodeType === 1 && child.style.gridArea !== '1 / 1') {
+          try { child.style.gridArea = '1 / 1'; } catch { }
+        }
       }
       this.stackPrev.set(el, [...el.children]);
     } else if (prevStack.length) {
@@ -508,7 +661,11 @@ export class DsslEngine {
         const anims = this.animMap.get(kid);
         if (!anims || !anims.size) continue;
         anims.forEach(a => {
-          try { if (a.effect && a.effect.updateTiming) a.effect.updateTiming({ delay: i * ms }); } catch { }
+          try {
+            // v0.4.1: only touch timing when the slot actually changed
+            const cur = a.effect && a.effect.getTiming ? a.effect.getTiming().delay : null;
+            if (cur !== i * ms && a.effect && a.effect.updateTiming) a.effect.updateTiming({ delay: i * ms });
+          } catch { }
         });
       }
     }
@@ -539,7 +696,7 @@ export class DsslEngine {
       if (value === null || value === undefined) document.documentElement.removeAttribute('data-dssl-signal-' + name);
       else document.documentElement.setAttribute('data-dssl-signal-' + name, String(value));
     } catch { }
-    this.computeAll();
+    this.scheduleComputeAll();
   }
 
   getSignal(name) { return this.signalStore.get(name); }

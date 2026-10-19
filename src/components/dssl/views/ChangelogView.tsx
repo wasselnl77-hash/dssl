@@ -12,6 +12,21 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.4.1",
+    date: "growth phase · stability",
+    title: "The steady hand — idempotent styling, twitch eliminated",
+    why: "the UI kept twitching under hover and resize storms",
+    kind: "add",
+    body:
+      "A recompute is a pure function of (DOM, rules, state) — so this release makes the engine keep that promise literally. computeElement used to wipe every property it owned and rewrite them all on every recompute, even when nothing had changed: hundreds of no-op style mutations per second under pointer boundary storms, plus a nastier feedback loop — a rewrite could move a container being watched for @container queries, the ResizeObserver re-fired, the engine recomputed and rewrote again, forever. That churn was the twitch. Now the engine builds the winning declaration set first, diffs it against what it already owns, and writes only the difference: an identical recompute touches the DOM zero times. Ambient triggers (resize, media flips, signals, reduced-motion) are also coalesced into one compute per microtask burst, stack children's grid-area and stagger delays are only rewritten when their slot actually changes. Zero behavior change — every style lands exactly where it did before; it just stops being written when it already is.",
+    code: `// the fix, in one sentence:
+//   recompute(el) resolves the same decls twice
+//     → second run performs ZERO style writes
+//
+// before:  removeProperty × 22, setProperty × 22   (every hover, every tick)
+// after:   removeProperty × 0,  setProperty × 0    (when nothing changed)`,
+  },
+  {
     version: "v0.4.0",
     date: "growth phase · power tools",
     title: "Reveal, choreograph, re-scope — the power tools release",
