@@ -1,3 +1,7 @@
+---
+license: mit
+---
+
 # DSSL
 
 DSSL is a style language for the web. It replaces CSS.

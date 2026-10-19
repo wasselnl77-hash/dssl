@@ -55,3 +55,6 @@ server.log
 db/
 dev.log
 server.log
+
+.env
+mini-services/
