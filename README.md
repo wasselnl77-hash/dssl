@@ -58,14 +58,11 @@ This repo eats its own cooking. Everything you see on the website is styled by t
 - visually-hidden
 - pseudo elements (the one exception: they compile to shadow CSS, because the DOM gives you no other way to reach them)
 
-## Run it
+## Try it
 
-```bash
-npm install
-npm run dev
-```
+The site is live. No setup, no build, nothing to install: https://dssl-sable.vercel.app
 
-Then open http://localhost:3000.
+Clone this repo if you want to read the engine or run it yourself. Everything runs in the browser.
 
 ## Repo layout
 
