@@ -18,7 +18,7 @@ import { parse } from './parser.js';
 import { resolve, DEFAULT_TOKENS } from './resolver.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.5.0';
+export const VERSION = '0.7.0';
 
 let counter = 0;
 const engines = new Map();
@@ -54,6 +54,19 @@ function reportErrors(errors, file) {
   } catch { /* very old browsers */ }
 }
 
+// v0.7.0 — warnings compile fine but are probably not what you meant.
+// Non-fatal by contract (ok stays ok), loud by promise.
+function reportWarnings(warnings, file) {
+  if (!warnings || !warnings.length) return;
+  try {
+    console.groupCollapsed(`%c[DSSL] ${warnings.length} warning(s) in ${file}`, 'color:#8a6d1a;font-weight:bold');
+    for (const w of warnings) {
+      console.warn(`${w.file || ''}${w.file ? ':' : ''}${w.line ?? ''} — ${w.message}${w.hint ? `\n    ${w.hint}` : ''}`);
+    }
+    console.groupEnd();
+  } catch { /* very old browsers */ }
+}
+
 /** Parse + resolve without touching the DOM. */
 export function compile(source, file = 'inline.dssl') {
   const { ast, errors: parseErrors } = parse(source, file);
@@ -62,12 +75,14 @@ export function compile(source, file = 'inline.dssl') {
   return {
     ok: errors.length === 0,
     errors,
+    warnings: doc.warnings || [],
     stats: {
       rules: doc.rules.length,
       shadowRules: doc.shadowRules.length,
       motions: Object.keys(doc.motions).length,
       tokens: Object.keys(doc.tokens).length,
       mediaQueries: doc.mediaQueries.length,
+      warnings: (doc.warnings || []).length,
     },
     tokens: doc.tokens,
     doc,
@@ -85,6 +100,7 @@ export function apply(source, opts = {}) {
     if (tokenRegistry.get(k) !== v) { tokenRegistry.set(k, v); registryDirty = true; }
   }
   if (!opts.keepErrors) reportErrors(result.errors, file);
+  if (!opts.keepErrors) reportWarnings(result.warnings, file);
   if (result.ok || result.doc.rules.length || result.doc.shadowRules.length) {
     const engine = getEngine(opts);
     if (!opts.scope) {
@@ -134,8 +150,51 @@ export function replay(selector) { for (const e of engines.values()) e.replay(se
 export function errors() { return lastErrors; }
 export function version() { return VERSION; }
 
+// v0.7.0 — freeze()/unfreeze() every engine: the whole page stops reacting
+// (observers, media, state events, overlap heartbeat) and keeps its resolved
+// look for free. Explicit API calls still drain. Returns combined stats.
+export function freeze() {
+  const stats = [];
+  for (const e of engines.values()) stats.push(e.freeze());
+  return stats.length === 1 ? stats[0] : stats;
+}
+export function unfreeze() {
+  const stats = [];
+  for (const e of engines.values()) stats.push(e.unfreeze());
+  return stats.length === 1 ? stats[0] : stats;
+}
+
+// v0.7.0 — explain(el): matched rules, source file/line, winning declaration
+// per property, and the pseudo-element rules touching the element. Prints a
+// readable group to the console (quiet: true for pure data) and returns it.
+export function explain(el, opts = {}) {
+  const eng = opts.scope !== undefined ? getEngine(opts) : engines.get('global');
+  if (!eng) return null;
+  const rep = eng.explain(el);
+  if (!rep) return null;
+  if (opts.quiet !== true) {
+    try {
+      const elDesc = el.tagName ? el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : '') : 'element';
+      console.groupCollapsed(`%c[DSSL] explain <${elDesc}> — ${rep.matched.length} rule(s) matched`, 'color:#2d5a3d;font-weight:bold');
+      for (const m of rep.matched) {
+        console.log(`#${m.id} ${m.sel}  (${m.layer})  ${m.file || 'inline'}:${m.line}${m.states.length ? '  states: ' + m.states.join(',') : ''}`);
+      }
+      for (const w of rep.wins) {
+        console.log(`%c${w.prop}: ${w.value}${w.imp ? ' !important' : ''}%c  ← ${w.by.sel} (${w.by.file || 'inline'}:${w.by.line})`, 'color:inherit', 'color:gray');
+      }
+      for (const p of rep.pseudo) {
+        console.log(`::${p.pseudo}  ${p.sel}  (${p.layer})  ${p.file || 'inline'}:${p.line}`);
+      }
+      if (rep.frozen) console.log('(engine is frozen)');
+      console.groupEnd();
+    } catch { /* console quirks */ }
+  }
+  return rep;
+}
+
 export const DSSL = {
   version: VERSION, compile, apply, load, signal, getSignal, refresh, replay, errors,
+  freeze, unfreeze, explain,
   __debug: { engines },
 };
 

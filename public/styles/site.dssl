@@ -11,6 +11,9 @@ html {
 body {
   background: color.paper
   color: color.ink
+  // v0.5.0 — the site-wide overlap policy: nothing below 100% opacity may
+  // overlap anything. Intentional overlays opt out with `overlap: allow`.
+  overlap: auto
 }
 
 ::selection {

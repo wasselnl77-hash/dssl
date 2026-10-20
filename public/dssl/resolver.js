@@ -17,7 +17,7 @@
  * rules (→ generated "shadow" CSS, the only thing inline styles can't reach).
  * ========================================================================= */
 
-import { levenshtein, didYouMean } from './utils.js';
+import { levenshtein, didYouMean, composeDeform } from './utils.js';
 // v0.5.0 — the resolver validates the `::name` half of full selectors so a
 // typo like .card::befor is a LOUD error, never a silently dead rule.
 import { PSEUDO_ELEMENTS, VENDOR_PSEUDO } from './parser.js';
@@ -275,6 +275,23 @@ function resolveValue(raw, ctx) {
   return out;
 }
 
+/** paren-aware split on the `->` arrow — gradient stops use it as a separator */
+function splitArrow(s) {
+  const out = [];
+  let cur = '', depth = 0, q = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) { cur += c; if (c === q && s[i - 1] !== '\\') q = null; continue; }
+    if (c === '"' || c === "'") { q = c; cur += c; continue; }
+    if (c === '(' || c === '[') depth++;
+    else if (c === ')' || c === ']') depth = Math.max(0, depth - 1);
+    if (depth === 0 && c === '-' && s[i + 1] === '>') { out.push(cur); cur = ''; i++; continue; }
+    cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
 /** split on a top-level separator (parens-aware) — commas inside fn() survive */
 function topSplit(str, sep) {
   const out = [];
@@ -309,6 +326,145 @@ function findToken(tokens, ident) {
 const len = (raw, ctx) => resolveValue(raw, { ...ctx, unitless: false });
 const num = (raw, ctx) => resolveValue(raw, { ...ctx, unitless: true });
 
+// v0.6.0 — the deform family speaks degrees, not lengths: bare numbers are
+// angles and `20deg` is accepted for people with CSS muscle memory.
+const degNum = (raw, what, ctx) => {
+  const t = String(raw).trim();
+  const m = t.match(/^(-?\d*\.?\d+)(deg)?$/i);
+  if (!m) {
+    ctx.errors.push({
+      file: ctx.file, line: ctx.line,
+      message: `${what} takes a bare number of degrees`,
+      hint: `try  ${what}: 20  or  ${what}: -12  — bare numbers are degrees here`,
+    });
+    return null;
+  }
+  return parseFloat(m[1]);
+};
+
+/** v0.6.0 — shared grammar for gradient / gradient-text: kind · prefix · stops.
+ *  Stops may be arrow-joined (`a -> b -> c`) or comma-joined (`linear 135, a, b`);
+ *  the prefix is whatever the grammar calls direction/shape — everything else is a stop. */
+// Stops are colors by construction, so a bare word that is not a color name is
+// a typo the browser would only mutter about at apply time. Say it NOW instead.
+const COLOR_WORDS = new Set(('black,silver,gray,white,maroon,red,purple,fuchsia,green,lime,olive,yellow,navy,blue,teal,aqua,' +
+  'orange,gold,pink,brown,violet,cyan,magenta,indigo,crimson,coral,tomato,goldenrod,khaki,' +
+  'slategray,slategrey,dimgray,dimgrey,lightgray,lightgrey,darkgray,darkgrey,gainsboro,whitesmoke,' +
+  'ghostwhite,ivory,beige,linen,seashell,snow,honeydew,mintcream,azure,aliceblue,lavender,' +
+  'canvas,canvastext,linktext,visitedtext,activetext,buttonface,buttontext,buttonborder,field,fieldtext,highlight,highlighttext,' +
+  'currentcolor,transparent').split(','));
+
+function buildGradient(v, ctx) {
+  const t = String(v).trim();
+  const m = t.match(/^(linear|radial|conic)\b([\s\S]*)$/i);
+  if (!m) {
+    ctx.errors.push({
+      file: ctx.file, line: ctx.line,
+      message: `gradient needs a kind: "linear", "radial" or "conic"`,
+      hint: 'try  gradient: linear 135, color.accent -> color.ok',
+    });
+    return null;
+  }
+  const kind = m[1].toLowerCase();
+  const rest = m[2].trim();
+  const DIR_RE = /^to\s+(top|bottom|left|right)(\s+(top|bottom|left|right))?$/i;
+  const isPrefixShaped = (seg) => {
+    const s = seg.toLowerCase();
+    if (kind === 'linear') return /^-?\d+(\.\d+)?(deg)?$/.test(s) || DIR_RE.test(s);
+    if (kind === 'conic') return /^from\s+-?\d+(\.\d+)?(deg)?(\s+at\s+.+)?$/.test(s) || /^at\s+.+$/.test(s);
+    // radial: every atom is shape/size/position vocabulary (possibly around `at`)
+    return s.split(/\s+/).every(a => a === 'at' ||
+      /^(circle|ellipse|center|top|bottom|left|right|closest-side|farthest-side|closest-corner|farthest-corner|-?\d+(\.\d+)?(%|px|em|rem)?)$/.test(a));
+  };
+  let head = '';
+  let stopStrs = [];
+  const arrowParts = splitArrow(rest).map(s => s.trim()).filter(Boolean);
+  if (arrowParts.length >= 2) {
+    head = arrowParts[0];
+    stopStrs = arrowParts.slice(1);
+    // mixed styles like `linear 135, a -> b`: the comma belongs to the stop list
+    const hc = topSplit(head, ',').map(s => s.trim()).filter(Boolean);
+    if (hc.length > 1) { head = hc[0]; stopStrs = [...hc.slice(1), ...stopStrs]; }
+  } else {
+    const segs = topSplit(rest, ',').map(s => s.trim()).filter(Boolean);
+    while (segs.length > 1 && isPrefixShaped(segs[0])) head = head ? head + ' ' + segs.shift() : segs.shift();
+    stopStrs = segs;
+  }
+  if (stopStrs.length < 2) {
+    ctx.errors.push({
+      file: ctx.file, line: ctx.line,
+      message: `gradient needs at least two stops`,
+      hint: 'try  gradient: linear 135, #ff0055 -> #00d4ff  — commas work too: linear 135, #ff0055, #00d4ff',
+    });
+    return null;
+  }
+  let lead = '';
+  const POS_ATOM = /^(center|top|bottom|left|right|closest-side|farthest-side|closest-corner|farthest-corner|-?\d+(?:\.\d+)?(%|px|em|rem)?)$/i;
+  if (kind === 'linear') {
+    if (!head) lead = '180deg';
+    else if (/^-?\d+(\.\d+)?$/.test(head)) lead = head + 'deg';
+    else if (/^-?\d+(\.\d+)?deg$/i.test(head)) lead = head.toLowerCase();
+    else if (DIR_RE.test(head)) lead = head.toLowerCase();
+    else {
+      ctx.errors.push({
+        file: ctx.file, line: ctx.line,
+        message: `"${head}" is not a linear gradient direction`,
+        hint: 'use an angle (linear 135, …) or words (linear to bottom right, …)',
+      });
+      return null;
+    }
+  } else if (kind === 'radial') {
+    if (head) {
+      for (const a of head.split(/\s+/)) {
+        if (a.toLowerCase() === 'at' || a.toLowerCase() === 'circle' || a.toLowerCase() === 'ellipse' || POS_ATOM.test(a)) continue;
+        ctx.errors.push({
+          file: ctx.file, line: ctx.line,
+          message: `"${a}" is not part of a radial gradient shape`,
+          hint: 'try  gradient: radial circle at center, #fff -> #000',
+        });
+        return null;
+      }
+      lead = head;
+    }
+  } else { // conic
+    if (head) {
+      const fm = head.match(/^from\s+(-?\d+(?:\.\d+)?)(deg)?(?:\s+(at\s+[\s\S]+))?$/i);
+      if (fm) lead = 'from ' + fm[1] + 'deg' + (fm[3] ? ' ' + fm[3].trim() : '');
+      else if (/^at\s+[\s\S]+$/i.test(head)) lead = head;
+      else {
+        ctx.errors.push({
+          file: ctx.file, line: ctx.line,
+          message: `"${head}" is not a conic gradient prefix`,
+          hint: 'use  from <angle>  and/or  at <position> — try conic from 45 at center, …',
+        });
+        return null;
+      }
+    }
+  }
+  const stops = [];
+  for (const s of stopStrs) {
+    let colorPart = s, pos = '';
+    const pm = s.match(/\s+(\d+(?:\.\d+)?)%$/);   // trailing per-stop position
+    if (pm) { pos = pm[1] + '%'; colorPart = s.slice(0, pm.index).trim(); }
+    if (!colorPart) {
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `a gradient stop is missing its color (got "${s}")` });
+      return null;
+    }
+    const val = resolveValue(colorPart, ctx);
+    if (/^[a-z-]+$/i.test(val) && !COLOR_WORDS.has(val.toLowerCase())) {
+      ctx.errors.push({
+        file: ctx.file, line: ctx.line,
+        message: `gradient stop "${s}" is not a color`,
+        hint: (didYouMean(val, [...COLOR_WORDS]) || 'colors, tokens (color.ink) and alpha mixes (ink/40) all work'),
+      });
+      return null;
+    }
+    stops.push(pos ? `${val} ${pos}` : val);
+  }
+  const fn = kind === 'linear' ? 'linear-gradient' : kind === 'radial' ? 'radial-gradient' : 'conic-gradient';
+  return `${fn}(${[lead, ...stops].filter(Boolean).join(', ')})`;
+}
+
 function parseFlexWords(value, ctx, dir) {
   const out = [{ prop: 'display', value: 'flex' }, { prop: 'flex-direction', value: dir }];
   const atoms = value.split(/\s+/).filter(Boolean);
@@ -333,6 +489,13 @@ function parseFlexWords(value, ctx, dir) {
   }
   return out;
 }
+
+// v0.6.0 — deform members all land in the transform channel, so asking for
+// `transition: 200 snap bend` should just work and mean transform.
+const DEFORM_TO_TRANSFORM = {
+  bend: 'transform', 'bend-y': 'transform', 'bend-up': 'transform',
+  fold: 'transform', stretch: 'transform',
+};
 
 const SEMANTIC = {
   size(v, ctx) {
@@ -511,9 +674,10 @@ const SEMANTIC = {
       }
       let prop = 'all';
       if (atoms.length > k) {
-        const p = atoms.slice(k).join(' ').toLowerCase();
+        const raw = atoms.slice(k).join(' ').toLowerCase();
+        const p = DEFORM_TO_TRANSFORM[raw] || raw;
         if (p !== 'all' && !KNOWN_PROPS.has(p)) {
-          ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown transition property "${p}"`, hint: didYouMean(p, [...KNOWN_PROPS]) });
+          ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown transition property "${raw}"`, hint: didYouMean(raw, [...KNOWN_PROPS, ...Object.keys(DEFORM_TO_TRANSFORM)]) });
           continue;
         }
         prop = p;
@@ -557,6 +721,122 @@ const SEMANTIC = {
     }
     const ms = t.endsWith('s') && !t.endsWith('ms') ? parseFloat(t) * 1000 : parseFloat(t);
     return [{ prop: '@stagger', value: ms }];
+  },
+  // v0.5.0 — overlap policy. CSS can stack transparent things all day and say
+  // nothing; DSSL refuses. `deny` makes the element always yield out of any
+  // overlap; `auto` yields only while the element sits below 100% opacity.
+  // Both inherit down the tree, so `body { overlap: auto }` is the site-wide
+  // "nothing transparent may overlap anything" switch. Intentional overlays
+  // (scrims, veils, translucent navs) opt out with `overlap: allow`.
+  overlap(v, ctx) {
+    const t = (v || '').trim().toLowerCase();
+    if (t === 'allow' || t === 'none') return [{ prop: '@overlap', value: 'allow' }];
+    if (t === 'deny') return [{ prop: '@overlap', value: 'deny' }];
+    if (t === 'auto') return [{ prop: '@overlap', value: 'auto' }];
+    ctx.errors.push({
+      file: ctx.file, line: ctx.line,
+      message: `unknown overlap policy "${(v || '').trim()}"`,
+      hint: 'overlap is allow (default) · deny (always yield out of overlaps) · auto (yield only while below 100% opacity)',
+    });
+    return [];
+  },
+
+  /* ---------------------------------------------------------------- *
+   * v0.6.0 — the deform family: bend, bend-y, bend-up, fold, stretch,
+   * bend-around. All are engine-native (@-props) that compose into the
+   * transform channel, so `transition: 200 snap transform` tweens them
+   * and `:active { bend: 14 }` makes a button visibly flex under the
+   * pointer. bend-around is the odd one out: it curves a CONTAINER's
+   * children along an arc instead of deforming the element itself.
+   * ---------------------------------------------------------------- */
+  bend(v, ctx) { const n = degNum(v, 'bend', ctx); return n === null ? [] : [{ prop: '@bend', value: n }]; },
+  'bend-y'(v, ctx) { const n = degNum(v, 'bend-y', ctx); return n === null ? [] : [{ prop: '@bend-y', value: n }]; },
+  'bend-up'(v, ctx) { const n = degNum(v, 'bend-up', ctx); return n === null ? [] : [{ prop: '@bend-up', value: n }]; },
+  fold(v, ctx) { const n = degNum(v, 'fold', ctx); return n === null ? [] : [{ prop: '@fold', value: n }]; },
+  'bend-around'(v, ctx) {
+    const n = degNum(v, 'bend-around', ctx);
+    if (n === null) return [];
+    if (Math.abs(n) > 170) {
+      ctx.errors.push({
+        file: ctx.file, line: ctx.line,
+        message: `bend-around caps at ±170° — past that the arc folds back on itself`,
+        hint: 'try 30..120 for a visible arc',
+      });
+      return [];
+    }
+    return [{ prop: '@bend-around', value: n }];
+  },
+  stretch(v, ctx) {
+    const t = String(v).trim();
+    const m = t.match(/^(\d*\.?\d+)(?:\s+(horizontal|vertical|x|y))?$/i);
+    if (!m) {
+      ctx.errors.push({
+        file: ctx.file, line: ctx.line,
+        message: `stretch needs a positive factor, like "stretch: 1.2" or "stretch: 1.4 vertical"`,
+        hint: '1 is neutral · the other axis shrinks so volume stays constant',
+      });
+      return [];
+    }
+    const f = parseFloat(m[1]);
+    if (f <= 0) {
+      ctx.errors.push({
+        file: ctx.file, line: ctx.line,
+        message: `stretch: ${m[1]} would flatten the element to nothing`,
+        hint: 'use a factor above 0 — 1.2 is a gentle pull, 2 is cartoonish',
+      });
+      return [];
+    }
+    const axisRaw = (m[2] || 'horizontal').toLowerCase();
+    const axis = axisRaw === 'y' ? 'vertical' : axisRaw === 'x' ? 'horizontal' : axisRaw;
+    return [{ prop: '@stretch', value: { factor: f, axis } }];
+  },
+
+  /* v0.6.0 — gradient tools. `gradient` replaces the CSS function soup with
+   * kind · prefix · stop -> stop; stops may be colors, tokens, alpha mixes
+   * (ink/40) and carry a trailing % position. gradient-text clips the same
+   * gradient into the glyphs. gradient-flow loops background-position so a
+   * gradient drifts forever — one line instead of keyframe folklore. */
+  gradient(v, ctx) {
+    const img = buildGradient(v, ctx);
+    return img ? [{ prop: 'background-image', value: img }] : [];
+  },
+  'gradient-text'(v, ctx) {
+    const img = buildGradient(v, ctx);
+    if (!img) return [];
+    return [
+      { prop: 'background-image', value: img },
+      { prop: 'background-clip', value: 'text' },
+      { prop: '-webkit-background-clip', value: 'text' },
+      { prop: 'color', value: 'transparent' },
+      { prop: '-webkit-text-fill-color', value: 'transparent' },
+    ];
+  },
+  'gradient-flow'(v, ctx) {
+    const t = (v || '').trim();
+    if (!t || t === 'none') return [{ prop: '@gradient-flow', value: null }];
+    const atoms = t.split(/\s+/);
+    const dur = atoms[0];
+    if (!/^\d+(\.\d+)?(ms|s)?$/.test(dur)) {
+      ctx.errors.push({
+        file: ctx.file, line: ctx.line,
+        message: `gradient-flow takes a duration like "6s" or "6000ms", or "none"`,
+        hint: 'gradient-flow loops the element\'s gradient sideways forever',
+      });
+      return [];
+    }
+    const ms = dur.endsWith('s') && !dur.endsWith('ms') ? parseFloat(dur) * 1000 : parseFloat(dur);
+    const spec = { duration: ms, easing: 'linear', direction: 'normal' };
+    for (let k = 1; k < atoms.length; k++) {
+      const a = atoms[k];
+      if (EASINGS[a]) { spec.easing = EASINGS[a]; continue; }
+      if (a === 'alternate' || a === 'alternate-reverse') { spec.direction = a; continue; }
+      ctx.errors.push({
+        file: ctx.file, line: ctx.line,
+        message: `unknown gradient-flow part "${a}"`,
+        hint: didYouMean(a, [...Object.keys(EASINGS), 'alternate', 'alternate-reverse']),
+      });
+    }
+    return [{ prop: '@gradient-flow', value: spec }];
   },
 };
 
@@ -646,6 +926,11 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   const shadowRules = [];
   const motions = {};
   const behaviors = {};
+  // v0.7.0 — compile-time warnings: things that compile and run but are
+  // probably not what the author meant. Separate from errors — ok stays ok —
+  // but the engine prints them loudly so nobody debugs cascade order by hand
+  // ever again.
+  const warnings = [];
   let tokenMap = new Map(Object.entries(baseTokens || DEFAULT_TOKENS));
   const tokenLines = new Map(); // for docs/debug
   let order = 0;
@@ -714,14 +999,32 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           continue;
         }
         const props = {};
+        const deform = {};   // v0.6.0 — bend/stretch/fold in keyframes compose into transform
+        const DEFORM_KEY = { '@bend': 'bend', '@bend-y': 'bendY', '@fold': 'fold', '@bend-up': 'bendUp' };
         for (const d of child.children) {
           if (d.kind !== 'decl') continue;
           const resolved = resolveDecl(d.prop, d.value, { ...ctxBase, line: d.line });
           for (const r of resolved) {
-            if (r.prop.startsWith('@') || r.prop.startsWith('--')) continue;
+            if (r.prop.startsWith('--')) continue;
+            if (r.prop.startsWith('@')) {
+              if (r.prop === '@stretch' && r.value) {
+                deform.stretch = typeof r.value === 'object' ? Number(r.value.factor) : parseFloat(r.value);
+                deform.stretchAxis = (r.value && r.value.axis) || 'horizontal';
+              } else if (DEFORM_KEY[r.prop]) deform[DEFORM_KEY[r.prop]] = Number(r.value) || 0;
+              continue;
+            }
             const camel = r.prop.replace(/-([a-z])/g, (_, ch) => ch.toUpperCase());
             props[camel] = r.value;
           }
+        }
+        if (deform.bend !== undefined || deform.bendY !== undefined || deform.stretch !== undefined ||
+            deform.fold !== undefined || deform.bendUp !== undefined) {
+          // no box exists at resolve time, so edge-pinned members ride a
+          // transformOrigin keyframe property instead of baked translates.
+          // Presence (not truthiness) — `bend: 0` in a frame is a real reset.
+          const c = composeDeform(deform, props.transform || '', null);
+          props.transform = c.transform;
+          if (c.origin) props.transformOrigin = c.origin;
         }
         node._parsed.frames.push({ offset, props });
       }
@@ -776,7 +1079,13 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
             break;
           }
           const resolved = resolveDecl(node.prop, node.value, { file, line: node.line, errors, tokens: tokenMap, tokenNames: tokenNames(), prop: node.prop, unitless: false });
-          for (const r of resolved) ctxRule.decls.push({ ...r, line: node.line });
+          for (const r of resolved) {
+            // v0.7.0 — remember WHICH source property wrote a display value,
+            // so the ordering linter can tell an explicit "display:" from a
+            // shorthand that expanded into one (column: → display: flex).
+            if (r.prop === 'display' && node.prop !== 'display') r.via = node.prop;
+            ctxRule.decls.push({ ...r, line: node.line });
+          }
           break;
         }
         case 'selector': {
@@ -838,7 +1147,17 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
             if (d.kind !== 'decl') { errors.push({ file, line: d.line, message: 'only declarations may appear inside a pseudo-element block (v0.2)' }); continue; }
             if (d.prop === 'content' && d.value === '') { srule.decls.push({ prop: 'content', value: '""', line: d.line }); continue; }
             const resolved = resolveDecl(d.prop, d.value, { file, line: d.line, errors, tokens: tokenMap, tokenNames: tokenNames(), prop: d.prop, unitless: false });
-            srule.decls.push(...resolved.map(r => ({ ...r, line: d.line })));
+            // v0.5.0 — engine-native properties have no pseudo-element story:
+            // there is no DOM handle to nudge, animate, stack or stagger. They
+            // used to leak into the shadow sheet as junk CSS the browser
+            // silently dropped — exactly the silence this language refuses.
+            for (const r of resolved) {
+              if (r.prop.startsWith('@')) {
+                errors.push({ file, line: d.line, message: `"${d.prop}" is engine-native and has no meaning on ::${node.name} — a pseudo-element has no DOM handle`, hint: 'put it on the element itself, not inside the pseudo block' });
+                continue;
+              }
+              srule.decls.push({ ...r, line: d.line });
+            }
           }
           if (srule.decls.length) shadowRules.push(srule);
           break;
@@ -877,7 +1196,16 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
     const ps = analyzePseudo(ctx.sel);
     if (ps.mode === 'all') {
       // parity with the nested path: bare `content:` becomes content: ""
-      const decls = sub.decls.map(d => d.prop === 'content' && d.value === '' ? { ...d, value: '""' } : d);
+      // v0.5.0 — and engine-native properties fail loud here too (see the
+      // nested pseudo path): no DOM handle means no nudge, animate or stack.
+      const decls = [];
+      for (const d of sub.decls) {
+        if (d.prop && d.prop.startsWith('@')) {
+          errors.push({ file, line, message: `"${d.prop}" is engine-native and has no meaning on ::${ps.parts[0].pseudo.split(/[\s:(]/)[0]} — a pseudo-element has no DOM handle`, hint: 'put it on the element itself, not inside the pseudo rule' });
+          continue;
+        }
+        decls.push(d.prop === 'content' && d.value === '' ? { ...d, value: '""' } : d);
+      }
       for (const { el, pseudo } of ps.parts) {
         const name = pseudo.split(/[\s:(]/)[0];
         if (!PSEUDO_ELEMENTS.has(name) && !VENDOR_PSEUDO.test(name)) {
@@ -896,6 +1224,10 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           });
           continue;
         }
+        // v0.5.0 — parity with the nested path: if every declaration was
+        // rejected (engine-native props, bad values), emit NOTHING rather
+        // than an empty ghost rule that matches and styles zero things.
+        if (!decls.length) continue;
         shadowRules.push({
           id: ruleId++, sel: el, pseudo,
           media: ctx.media, signals: ctx.signals, containers: ctx.containers,
@@ -908,12 +1240,37 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       errors.push({ file, line, message: `selector list mixes pseudo-element and plain selectors: "${ctx.sel}"`, hint: 'split it into two rules — one for the pseudo-element, one for the rest' });
       return;
     }
+    warnDisplayClash(sub.decls);
     rules.push({
       id: ruleId++, sel: ctx.sel, media: ctx.media, signals: ctx.signals,
       containers: ctx.containers, layer: ctx.layer, order: order++,
       decls: sub.decls, file, line, pseudo: null,
       states: scanStates(ctx.sel),
     });
+  }
+
+  /* v0.7.0 — the ordering linter. Within one rule, later wins; that is the
+   * whole cascade model. But "column: gap 2" quietly expanding into
+   * display: flex after an explicit "display: none" reads like a menu
+   * toggle and behaves like a bug report — a real reviewer lost an evening
+   * to exactly this ("their own source comments warn about this, but it
+   * should be a compiler warning, not a comment"). Agreed. When a
+   * shorthand's expansion clobbers an explicit display written earlier in
+   * the SAME rule, say so at compile time. Cross-rule overrides are the
+   * documented cascade at work, not an accident — no warning there. */
+  function warnDisplayClash(decls) {
+    let explicit = null;
+    for (const d of decls) {
+      if (d.prop !== 'display') continue;
+      if (!d.via) { explicit = d; continue; }
+      if (explicit && explicit.value !== d.value && warnings.length < 400) {
+        warnings.push({
+          file, line: d.line,
+          message: `"${d.via}:" expands to display: ${d.value}, which overrides the earlier "display: ${explicit.value}" (line ${explicit.line}) in the same rule — later wins, so the earlier one is dead`,
+          hint: `if the override is intended, delete the dead line; otherwise put "${d.via}:" first, or move the display you want to win AFTER it`,
+        });
+      }
+    }
   }
 
   /* ---- go ---- */
@@ -946,7 +1303,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   const mediaQueries = new Set();
   for (const r of [...rules, ...shadowRules]) r.media.forEach(q => mediaQueries.add(q));
 
-  return { rules, shadowRules, motions, errors, mediaQueries: [...mediaQueries], tokens: Object.fromEntries(tokenMap), registryRule };
+  return { rules, shadowRules, motions, errors, warnings, mediaQueries: [...mediaQueries], tokens: Object.fromEntries(tokenMap), registryRule };
 }
 
 /** naive `&` substitution + descendant join */

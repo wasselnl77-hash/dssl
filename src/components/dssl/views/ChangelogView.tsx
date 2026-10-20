@@ -12,13 +12,72 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.7.0",
+    date: "growth phase · the engine gets a handbrake",
+    title: "Freeze, explain, and a compiler that warns before you debug",
+    why: "the second outside review: a real day lost to display: none vs column:, class spam because :nth-child seemed missing, DevTools archaeology on inline styles, and one blunt line — the js engine lowk slow asf, build a way to be faster",
+    kind: "add",
+    body:
+      "The speed answer is freeze, not a compile step. DSSL.freeze() detaches every observer and listener — MutationObserver, ResizeObserver, IntersectionObserver, media listeners, state events, the overlap heartbeat — and leaves the resolved inline styles exactly where they are: the page keeps its look at zero engine cost, which is what makes ten-thousand-node pages viable, and unfreeze() re-arms the whole surface and recomputes once. Explicit calls still drain on a frozen engine (apply, signal, refresh, replay), because a developer action is not ambient churn. The matcher got cheaper too: every rule now passes through a conservative gate — classes, id and tag extracted from the selector's rightmost compound — so a recompute skips the obvious non-matches instead of asking the browser rule by rule, and the gate only ever says no, bailing to unfiltered on anything it does not fully understand. The class-spam complaint dissolved on inspection: :nth-child, :not, :is, :where and :has always rode native matching — they compile, they match, they nest — so the docs now say so out loud with a :has example instead of letting anyone else lose an evening to an assumption. The shorthand trap became a compiler warning: column: quietly expanding into display: flex over an earlier display: none is the exact bug a reviewer lost a day to, and now the resolver tags every implicit display write and warns with both line numbers and which order wins — ok stays true, the console gets loud. Token keys can be numbers now (tokens { space { 9: 96 } }, referenced as space.9), because the built-in scale stopping at 8 is not a reason to reject a spacing scale; outside a tokens block the error finally explains where numbers ARE legal. And the architectural cost of inline styles got a tool: DSSL.explain(element) returns every matched rule with its source file and line, every state/media/signal condition attached, the winning declaration per property with the rule that won it, and the pseudo-element shadow rules touching the element — the cascade, handed back as data. The docs also say the quiet part loudly: any script that measures layout must wait for dssl-ready, not DOMContentLoaded, or it reads a half-styled world.",
+    code: `// the speed escape hatch
+DSSL.load(['/styles/app.dssl']).then(() => {
+  DSSL.freeze()   // { frozen: true, elements: 10432, rules: 311 }
+})                // page keeps its look, engine costs nothing
+
+// the DevTools panel the inline-style model owes you
+DSSL.explain(document.querySelector('.doc-card'))
+// → matched: [{ sel, layer, file, line, states, media }]
+// → wins:    [{ prop, value, by: { sel, file, line } }]
+
+// the compiler now catches the ordering footgun
+.nav-links {
+  display: none
+  column: gap 2   // ⚠ expands to display: flex — the menu stays open
+}
+
+// numbers are token keys now
+tokens { space { 9: 96 } }
+.hero { padding: space.9 }`,
+  },
+  {
+    version: "v0.6.0",
+    date: "growth phase · the box gets a body",
+    title: "Bend, stretch, fold — and gradients that actually read like sentences",
+    why: "one user message: add bend and stretch — which does exactly what you think it does — then better gradient tools, and the little sibling that stops overlays eating text selection",
+    kind: "add",
+    body:
+      "The deform family gives a box give. bend bows an element in 3D (positive tips the top away, negative leans toward you), bend-y bows it sideways, bend-up rocks it back on its planted bottom edge like a drawbridge, and fold swings it up over its top edge like a page closing — the concept that arrived with an unprintable working name and shipped renamed. stretch is cartoon squash and stretch that keeps volume: stretched 1.2 wide, the element honestly shrinks to 1/1.2 tall. Every member composes into the one transform channel alongside whatever you already wrote there, so a single transition tweens it, states fire it (press a button, it bends), and motion keyframes carry it — bend and stretch inside from/to blocks compose into real transform frames, with edge-pinned pivots riding transformOrigin where no box exists yet. bend-around is the odd sibling: instead of deforming one element it curves a container's children along a circular arc, positive degrees wrapping the row around an invisible ball, negative opening it into a smile — the engine measures the container's real width, plants a pivot per child, and children keep their own hover bends because their transforms run inside the arc rotation. Gradients stopped being function soup: gradient is a sentence — kind, optional direction or shape, then stops joined by arrows or commas — where a stop can be a hex, a color name, a token, an alpha mix like color.ink/40, and may carry a trailing % position; a stop that is not a color fails at compile time with a did-you-mean, not as a silently missing background. gradient-text clips the same grammar into glyphs, and gradient-flow loops background-position through WAAPI so a gradient drifts forever (and holds still under reduced-motion). The sibling feature rode along: a decorative overlay parked on top of text eats clicks and selection, so the docs' overlap chapter now pairs overlap: allow with pointer-events: none — the veil keeps rendering while the pointer falls through. Everything fails loud: stretch: 0 would flatten the element to nothing, bend-around caps at ±170°, bend speaks degrees not pixels.",
+    code: `// the button that bends when you click it
+.btn {
+  transition: 200 snap transform
+  hover  { bend: 5 }
+  active { bend: 16; stretch: 0.94 }
+}
+
+// the rest of the family
+.flag   { bend-y: -18 }              // sideways bow
+.mini   { hover { bend-up: 14 } }    // drawbridge, bottom planted
+.sheet  { hover { fold: 14 } }       // page fold, top planted
+.pills  { bend-around: -22 }         // children on a smile arc
+
+// gradients as sentences, and one that flows
+.banner {
+  gradient: linear 135, color.accent -> color.ok
+  gradient-flow: 6s alternate
+}
+.head { gradient-text: linear to right, color.accent, color.ink }
+
+// the sibling: overlays stop eating text selection
+.veil { pointer-events: none; overlap: allow }`,
+  },
+  {
     version: "v0.5.0",
     date: "growth phase · the trap closes",
     title: "Pseudo-elements work everywhere — and animate learns to loop",
     why: "an external review scored DSSL 7.5/10 and named the bump condition: fix the trap, earn the 8",
     kind: "add",
     body:
-      "The review found the one wart this language could not afford: a top-level .card::before { } compiled ok: true and then matched nothing. Inline styles can never reach a pseudo-element, and the compiler said fine when it meant dead rule — twenty minutes lost, in a language whose whole pitch is loud errors. The fix lives in the flattener: any full selector carrying :: is split into element + pseudo halves and routed down the same shadow-CSS pipeline the nested form always used, so .card::before, .card { ::before } and .card { &::before } are one spelling of one rule, with states, @media, @container and @signal composing as everywhere else. The loud errors stayed loud: an unknown pseudo-element name, :seen combined with a pseudo, or a selector list mixing pseudo and plain parts each fail at compile time with a did-you-mean hint — a rule can no longer be dead on arrival. The review's other gripes rode along: animate accepts infinite (loop forever) and alternate (ping-pong direction) through the Web Animations API; font names are now treated as proper nouns, so font-family: JetBrains Mono, monospace and font tokens pass bare without quotes; and hyphens: manual stopped being rejected. The docs gained the pseudo-elements section the trap proved was missing, with a live demo styled entirely by full-selector pseudo rules — if the accent square renders, the fix is on.",
+      "The review found the one wart this language could not afford: a top-level .card::before { } compiled ok: true and then matched nothing. Inline styles can never reach a pseudo-element, and the compiler said fine when it meant dead rule — twenty minutes lost, in a language whose whole pitch is loud errors. The fix lives in the flattener: any full selector carrying :: is split into element + pseudo halves and routed down the same shadow-CSS pipeline the nested form always used, so .card::before, .card { ::before } and .card { &::before } are one spelling of one rule, with states, @media, @container and @signal composing as everywhere else. The loud errors stayed loud: an unknown pseudo-element name, :seen combined with a pseudo, or a selector list mixing pseudo and plain parts each fail at compile time with a did-you-mean hint — a rule can no longer be dead on arrival. The review's other gripes rode along: animate accepts infinite (loop forever) and alternate (ping-pong direction) through the Web Animations API; font names are now treated as proper nouns, so font-family: JetBrains Mono, monospace and font tokens pass bare without quotes; and hyphens: manual stopped being rejected. The docs gained the pseudo-elements section the trap proved was missing, with a live demo styled entirely by full-selector pseudo rules — if the accent square renders, the fix is on. And one feature boarded after the review, from actual use: overlap, a policy the engine enforces with real geometry. CSS will happily stack a 45%-opacity decoration on top of content and say nothing; DSSL now measures the boxes after layout and shoves the transparent side out along the shortest escape axis, through the translate channel so transforms and animations never fight it. body { overlap: auto } is the site-wide nothing-below-100%-opacity-overlaps switch; deny always yields; allow is the opt-out scrims and translucent navs use. The docs' overlap section runs it live — a ghost badge the policy genuinely shoves, with a toggle that exempts it and watches it glide back.",
     code: `// three spellings, one rule:
 .card::before { content: "" }
 .card { ::before { content: "" } }
@@ -27,7 +86,11 @@ const ENTRIES: {
 // the sharp-edge sweep:
 .dot { animate: pe-pulse 1200 infinite alternate }
 .card { font-family: JetBrains Mono, monospace }
-.prose { hyphens: manual }`,
+.prose { hyphens: manual }
+
+// the late boarder — geometry the engine enforces:
+body { overlap: auto }        // nothing transparent overlaps anything
+.veil { overlap: allow }      // scrims and navs opt out`,
   },
   {
     version: "v0.4.2",

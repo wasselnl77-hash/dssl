@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import CodeBlock from "../CodeBlock";
 import { PlayIcon } from "../icons";
 
@@ -15,13 +16,18 @@ const SIDE = [
   { head: null, id: "cascade", label: "Cascade & layers" },
   { head: "reference", id: "semantic", label: "Semantic properties" },
   { head: null, id: "behaviors", label: "Behaviors" },
+  { head: null, id: "overlap", label: "Overlap" },
   { head: null, id: "motion", label: "Motion" },
+  { head: null, id: "deform", label: "Deform — bend & stretch" },
+  { head: null, id: "gradients", label: "Gradient tools" },
   { head: null, id: "errors", label: "Errors" },
   { head: null, id: "api", label: "JS API" },
+  { head: null, id: "performance", label: "Performance — freeze & explain" },
   { head: null, id: "interop", label: "Interop (React & co.)" },
 ];
 
 export default function DocsView() {
+  const [ovOff, setOvOff] = useState(false);
   const toggleDocSignal = (hot: boolean) => {
     window.DSSL?.signal("docdemo", hot ? "hot" : null);
   };
@@ -169,6 +175,14 @@ background:                     // values can continue
               <code>tokens</code> block.
             </p>
             <p className="doc-lead" style={{ marginTop: 14 }}>
+              <b>v0.7 — numeric token keys.</b> The built-in spacing scale stops at 8,
+              but big pages need more room, so token keys can be numbers now: define{" "}
+              <code>tokens {'{ space { 9: 96 } }'}</code> and reference it as{" "}
+              <code>space.9</code> like any other token. Outside a <code>tokens</code>{" "}
+              block a numeric property name is still an error — but the error now says
+              exactly that instead of a shrug.
+            </p>
+            <p className="doc-lead" style={{ marginTop: 14 }}>
               <b>v0.4 — tokens can be re-declared per element.</b> Assign to a dotted
               token inside any rule and the custom property lands on that element;
               since custom properties inherit, every <code>var()</code> in the subtree
@@ -210,12 +224,20 @@ background:                     // values can continue
               structural pseudo-classes. Nesting is native: a nested selector is a
               descendant; <code>&amp;</code> substitutes the parent explicitly.
             </p>
+            <p className="doc-lead">
+              The structural set rides native matching, so it all just works:{" "}
+              <code>:nth-child()</code>, <code>:nth-of-type()</code>, <code>:not()</code>,{" "}
+              <code>:is()</code>, <code>:where()</code> and <code>:has()</code>. You do
+              not need a class per list item — stop at the container and let the
+              structure do the counting.
+            </p>
             <CodeBlock file="selectors.dssl" code={`.gallery {
   gap: space.4
 
   .tile { shadow: sm }              // .gallery .tile
   &.featured { border-color: color.accent }   // .gallery.featured
   > .tile:nth-child(2n) { translate: 0 -2 }
+  > .tile:has(img) { shadow: lg }   // relational: tiles that contain an image
 
   hover {                            // states nest too (next section)
     .tile { shadow: lg }
@@ -452,6 +474,79 @@ button { use focus-ring }
 // reused by @media and @signal — define once, apply twice`} />
           </section>
 
+          <section className="doc-block" id="overlap">
+            <h2 className="section-title">Overlap</h2>
+            <p className="doc-lead">
+              CSS will stack any two boxes on top of each other and say nothing — even when
+              one of them sits at 45% opacity and the blend underneath turns to mud. DSSL
+              refuses. The <code>overlap</code> property is a policy, not a paint
+              instruction: after layout, the engine measures real boxes and, when a
+              transparent element lands on something, it escapes along the shortest axis.
+              The nudge travels through the separate <code>translate</code> channel — the
+              one property <code>transform</code> never touches — so your transforms and
+              animations never notice a fight, and a <code>transition</code> on
+              <code> translate</code> makes the escape glide.
+            </p>
+            <CodeBlock file="overlap.dssl" code={`// one line, site-wide: nothing below 100% opacity may overlap anything
+body { overlap: auto }
+
+// or per element: this box always yields, opaque or not
+.badge { overlap: deny }
+
+// the deliberate exceptions — scrims, veils, translucent navs — opt out
+.veil { overlap: allow }`} />
+            <p className="doc-lead">
+              The policy inherits like <code>font-family</code>: set it once on
+              <code> body</code> and every descendant carries it until something overrides.
+              <code> auto</code> means <b>yield only while your computed opacity is below
+              100%</b> — an opaque element is never touched, and an element whose animation
+              pulses opacity in and out becomes a candidate exactly while it is translucent.
+              Bigger boxes anchor first, so decorations yield to content, and an element is
+              never counted as an obstacle to its own subtree (that is containment, not
+              collision). Unknown policies fail loud, like everything else:
+              <code> overlap: never</code> → <i>unknown overlap policy “never”</i>.
+            </p>
+            <p className="doc-lead">
+              <b>The sibling feature:</b> a decorative overlay parked on top of text
+              also eats clicks and text selection — the pointer hits the veil, not the
+              words underneath. <code>pointer-events: none</code> is the one-liner: the
+              overlay keeps rendering, but the pointer falls through, so selection and
+              buttons work again. Pair it with <code>overlap: allow</code> when the veil
+              is intentional — the geometry stays honest while hit-testing gets out of
+              the way.
+            </p>
+            <CodeBlock file="veil.dssl" code={`.veil {
+  position: absolute
+  inset: 0
+  gradient: linear to bottom, color.ink/20 -> transparent
+  pointer-events: none     // look, don't touch — selection passes through
+  overlap: allow           // it is SUPPOSED to sit there
+}`} />
+            <div className="demo-box">
+              <div className="ov-stage" data-ov-off={ovOff ? "" : undefined}>
+                <div className="ov-card">
+                  <span className="ov-card-title">opaque card — it never moves</span>
+                  <span className="ov-card-sub">
+                    the ghost badge is opacity: 0.45, parked on top of this text. Under
+                    the site-wide policy it is not allowed to stay there.
+                  </span>
+                </div>
+                <span className="ov-ghost">ghost · opacity: 0.45</span>
+              </div>
+              <button type="button" className="doc-btn" onClick={() => setOvOff(!ovOff)}>
+                {ovOff ? "re-arm the policy — remove the opt-out" : "exempt the ghost · overlap: allow"}
+              </button>
+              <p className="doc-lead fine-print">
+                This is the site&apos;s real policy working, not a picture: this page loads
+                <code> body </code>with <code>{"{ overlap: auto }"}</code>, the ghost is a
+                genuine 45%-opacity element, and the shove you see is the engine&apos;s
+                shortest-escape math running after layout. Flip the switch and the ghost
+                gets its own <code>overlap: allow</code> — the same opt-out a scrim or a
+                translucent nav uses — and glides right back on top.
+              </p>
+            </div>
+          </section>
+
           <section className="doc-block" id="motion">
             <h2 className="section-title">Motion</h2>
             <p className="doc-lead">
@@ -526,6 +621,120 @@ button { use focus-ring }
             </div>
           </section>
 
+          <section className="doc-block" id="deform">
+            <h2 className="section-title">Deform — bend, stretch, fold</h2>
+            <p className="doc-lead">
+              The deform family gives a box give. <code>bend</code> bows the element in
+              3D — positive tips the top away from you, negative leans it forward — and{" "}
+              <code>bend-y</code> bows it sideways. <code>bend-up</code> rocks it back on
+              its bottom edge like a drawbridge, <code>fold</code> swings it up over its
+              top edge like a page closing, and <code>stretch</code> is cartoon squash
+              and stretch that keeps volume: stretched 1.2 wide, it honestly shrinks to
+              1/1.2 tall. Every member composes into the one <code>transform</code>{" "}
+              channel — alongside anything you wrote there — so a single{" "}
+              <code>transition</code> tweens them and states fire them for free.
+            </p>
+            <CodeBlock file="deform.dssl" code={`.btn {
+  transition: 200 snap transform
+
+  hover  { bend: 5 }                    // a gentle lean
+  active { bend: 16; stretch: 0.94 }    // flex under the pointer
+}
+
+.flag { bend-y: -18 }                   // sideways bow
+.card { hover { bend-up: 14 } }         // drawbridge — bottom edge planted
+.sheet { hover { fold: 14 } }           // folds over its top edge
+
+motion wobble {
+  from { bend: 0; stretch: 1 }
+  to   { bend: 24; stretch: 1.12 }      // deform works in keyframes too
+}
+.bouncy { animate: wobble 900 infinite alternate }`} />
+            <p className="doc-lead">
+              And <code>bend-around</code> curves a container&apos;s children along an arc
+              instead of deforming one element: positive degrees wrap the row around an
+              invisible ball (a dome), negative opens it into a smile. The engine reads
+              the container&apos;s real width, plants a pivot per child and rotates each
+              one into place — hover states and bends on the children keep working,
+              because their own transforms run inside the arc rotation. Unknown values
+              fail loud like everywhere else: <code>stretch: 0</code> →{" "}
+              <i>would flatten the element to nothing</i>, <code>bend-around: 200</code>{" "}
+              → <i>caps at ±170°</i>.
+            </p>
+            <div className="demo-box">
+              <div className="df-row">
+                <button type="button" className="df-btn">press and hold — I bend</button>
+                <div className="df-mini df-up">hover · bend-up</div>
+                <div className="df-mini df-fold">hover · fold</div>
+              </div>
+              <div className="df-arc">
+                {["alpha", "beta", "gamma", "delta", "epsilon"].map((w) => (
+                  <span key={w} className="df-chip">{w}</span>
+                ))}
+              </div>
+              <p className="doc-lead fine-print">
+                All of it is live. The button flexes under <code>:active</code> because
+                its cascade owns a <code>transition</code> on <code>transform</code> —
+                the deform family lands in that same channel. The chip row is a real{" "}
+                <code>bend-around: -22</code> container; resize the page and the engine
+                re-lays the arc from the measured width. The mini cards bend up and fold
+                over on hover — <code>bend-up</code> plants the bottom edge,{" "}
+                <code>fold</code> plants the top one, and both pivots are baked into the
+                transform, so your own <code>transform-origin</code> is never touched.
+              </p>
+            </div>
+          </section>
+
+          <section className="doc-block" id="gradients">
+            <h2 className="section-title">Gradient tools</h2>
+            <p className="doc-lead">
+              <code>gradient</code> replaces the function soup with a sentence: a kind —{" "}
+              <code>linear</code>, <code>radial</code> or <code>conic</code> — an optional
+              direction or shape, then color stops. Join stops with <code>-&gt;</code>{" "}
+              arrows, or just commas; both read the same. A stop can be a hex, a color
+              name, a token, an alpha mix like <code>color.ink/40</code>, and may carry a
+              trailing <code>%</code> position. And because a stop is a color by
+              definition, one that is not fails loud at compile time instead of becoming
+              a silently missing background.
+            </p>
+            <CodeBlock file="gradient.dssl" code={`.banner {
+  gradient: linear 135, color.accent -> color.ok
+  gradient-flow: 6s alternate    // the gradient drifts, forever
+}
+
+.headline {
+  gradient-text: linear to right, color.accent, color.ink
+}
+
+.glow { gradient: radial circle at 30% 20%, color.card -> transparent }
+.pie  { gradient: conic from 45, color.accent, color.line, color.card, color.accent }`} />
+            <p className="doc-lead">
+              <code>gradient-text</code> clips the same grammar into the glyphs (standard
+              and <code>-webkit</code> plumbing included). <code>gradient-flow</code> loops{" "}
+              <code>background-position</code> through the Web Animations API so the
+              gradient drifts endlessly — duration, an optional easing, and{" "}
+              <code>alternate</code> to ping-pong — and it holds still under
+              reduced-motion, like every other motion here. If the element has no
+              background to flow, the engine says so instead of animating nothing.
+            </p>
+            <div className="demo-box">
+              <div className="gd-banner">this banner flows — gradient-flow: 7s alternate</div>
+              <div className="gd-headline">gradient text, one line of DSSL</div>
+              <div className="gd-sw-row">
+                <div className="gd-sw gd-lin" />
+                <div className="gd-sw gd-rad" />
+                <div className="gd-sw gd-con" />
+              </div>
+              <p className="doc-lead fine-print">
+                The banner is a real <code>gradient-flow</code> loop, the headline is{" "}
+                <code>gradient-text</code>, and the three swatches are the kinds in one
+                line each: linear with an angle, radial with a shape and position, conic
+                with a start angle. The engine sized the banner&apos;s background to 200%
+                automatically — a gradient at 100% has nowhere to slide.
+              </p>
+            </div>
+          </section>
+
           <section className="doc-block" id="errors">
             <h2 className="section-title">Errors that talk back</h2>
             <p className="doc-lead">
@@ -548,6 +757,28 @@ button { use focus-ring }
               friends are your business — the loud checks protect the design vocabulary,
               not the pressure valve.
             </div>
+            <p className="doc-lead" style={{ marginTop: 14 }}>
+              <b>v0.7 — compiler warnings.</b> Some things compile, run, and are still
+              probably not what you meant. Those are warnings: <code>ok</code> stays{" "}
+              <code>true</code>, but the console says it out loud. The first one: inside
+              a single rule, a layout shorthand that expands to <code>display</code>{" "}
+              (<code>column:</code>, <code>row:</code>, <code>grid:</code>,{" "}
+              <code>stack:</code>) silently overriding an explicit{" "}
+              <code>display:</code> written earlier in the same rule — later wins, so
+              your <code>display: none</code> is dead and the menu stays open. The
+              warning names both lines and tells you which order wins.
+            </p>
+            <CodeBlock file="warning.dssl" code={`.nav-links {
+  display: none      // ✗ warning: "column:" expands to display: flex,
+  column: gap 2      //   overrides the earlier "display: none" (line 2)
+                     //   — the menu stays open
+}
+
+// fixed: shorthand first, or the display you mean to win last
+.nav-links {
+  column: gap 2
+  display: none      // intentional, and now warning-free
+}`} />
           </section>
 
           <section className="doc-block" id="api">
@@ -569,6 +800,8 @@ button { use focus-ring }
                 <tr><td><code>DSSL.replay(sel?)</code></td><td>re-run animations on matching elements</td></tr>
                 <tr><td><code>DSSL.refresh()</code></td><td>full re-compute (rarely needed — the engine watches the DOM)</td></tr>
                 <tr><td><code>DSSL.errors()</code></td><td>structured errors from the last apply</td></tr>
+                <tr><td><code>DSSL.freeze() / unfreeze()</code></td><td>stop (or resume) all ambient restyling — see <a href="#performance"><b>Performance</b></a></td></tr>
+                <tr><td><code>DSSL.explain(el, opts?)</code></td><td>matched rules, file/line, winning declarations for one element — see <a href="#performance"><b>Performance</b></a></td></tr>
               </tbody>
             </table>
             <p className="tbl-note">
@@ -576,6 +809,88 @@ button { use focus-ring }
               <code>style[type=&quot;text/dssl&quot;]</code>, then fires{" "}
               <code>dssl-ready</code> on <code>window</code>.{" "}
               <code>&lt;html data-dssl-reset&gt;</code> enables the small built-in reset.
+            </p>
+          </section>
+
+          <section className="doc-block" id="performance">
+            <h2 className="section-title">Performance — freeze, explain &amp; the cost of live</h2>
+            <p className="doc-lead">
+              DSSL is a runtime: it walks the DOM, matches rules, and writes inline
+              styles. That buys you live tokens, live signals and live layout — and it
+              costs more than a static stylesheet, by design. Here is the honest ledger
+              and the two tools that tip it back.
+            </p>
+
+            <h3 className="doc-h3">Wait for <code>dssl-ready</code> — not DOMContentLoaded</h3>
+            <p className="doc-lead">
+              The engine styles the DOM <i>after</i> the parser resolves, which lands
+              after <code>DOMContentLoaded</code>. Code that measures layout too early
+              will read a half-styled world — <code>padding: 0</code>,{" "}
+              <code>border-radius: 0</code>, a default border — and then watch it
+              resolve a moment later. If your script measures, animates, or mounts on
+              top of styled geometry, wait for the engine:
+            </p>
+            <CodeBlock file="settle.js" code={`// wrong: reads geometry before the engine's first pass
+window.addEventListener('DOMContentLoaded', measure)
+
+// right: the engine announces readiness (with its version)
+window.addEventListener('dssl-ready', (e) => {
+  measure()   // styles are fully applied — measure whatever you like
+})`} />
+
+            <h3 className="doc-h3"><code>DSSL.freeze()</code> — keep the look, drop the cost</h3>
+            <p className="doc-lead">
+              A page that does not need <i>live</i> restyling should not keep paying
+              for it. <code>freeze()</code> detaches every observer and listener — the
+              MutationObserver, ResizeObserver, IntersectionObserver, media listeners,
+              state events, the overlap heartbeat — and leaves the resolved inline
+              styles exactly where they are. The page keeps its look at zero engine
+              cost, which is what makes ten-thousand-node pages viable. Explicit calls
+              still work: <code>apply()</code>, <code>signal()</code>,{" "}
+              <code>refresh()</code> and <code>replay()</code> each drain synchronously,
+              and <code>unfreeze()</code> re-arms everything and recomputes once.
+            </p>
+            <CodeBlock file="freeze.js" code={`// render the whole product grid, then stop reacting
+DSSL.load(['/styles/app.dssl']).then(() => {
+  const stats = DSSL.freeze()
+  // → { frozen: true, engine: 'global', elements: 10432, rules: 311, shadowRules: 4 }
+})
+
+// months later, a modal needs styling:
+DSSL.apply(modalStyles)        // explicit calls still drain
+DSSL.unfreeze()                // …or go fully live again`} />
+            <div className="note">
+              <b>Frozen means frozen.</b> While frozen, the page is a snapshot: hover
+              styles, <code>seen</code> reveals, media flips and overlap nudges all
+              sleep. If your page lives on interaction states, freeze is not for it —
+              use it on the rendered-out pages that are just sitting there being read.
+            </div>
+
+            <h3 className="doc-h3"><code>DSSL.explain(el)</code> — the DevTools panel</h3>
+            <p className="doc-lead">
+              Inline styles trade the cascade for a style attribute, and "which rule
+              wrote this one declaration?" is the honest cost. <code>explain()</code>{" "}
+              hands the cascade back as data: every rule that matched, with its source
+              file and line, every state/media/signal condition attached, the winning
+              declaration per property — and the rule that beat the others for it.
+            </p>
+            <CodeBlock file="explain.js" code={`const rep = DSSL.explain(document.querySelector('.doc-card'))
+// rep.matched — [{ id, sel, layer, file, line, states, media, signals, decls }]
+// rep.wins    — [{ prop, value, by: { sel, file, line } }]  the final cascade
+// rep.pseudo  — ::before / ::after shadow rules touching this element
+// + a readable group printed to the console (pass { quiet: true } for data only)`} />
+
+            <h3 className="doc-h3">The honest ledger</h3>
+            <p className="doc-lead">
+              For creative sites, prototypes, docs and design-system playgrounds, the
+              live model is the point — iteration speed beats parse speed. For a
+              ten-thousand-node application page, combine the tools: keep stylesheets
+              small, prefer structural selectors over class spam, freeze after the
+              first paint when the page goes static, and use <code>explain()</code>{" "}
+              instead of console archaeology when something looks off. The engine also
+              pre-filters every rule through a cheap class/tag/id gate before native
+              matching, so a full recompute skips the obvious non-matches instead of
+              asking the browser rule by rule.
             </p>
           </section>
 

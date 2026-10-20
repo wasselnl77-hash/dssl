@@ -173,6 +173,32 @@ tokens {
 }                             // descendants re-resolve automatically`} />
         </div>
 
+        {/* ---------------------------------------------- deform & gradients */}
+        <div className="cheat-card">
+          <span className="cheat-k">deform &amp; gradients</span>
+          <CodeBlock plain code={`.btn {
+  transition: 180 snap transform
+  active { bend: 16; stretch: 0.94 }   // flex under the pointer
+}
+.flag     { bend-y: -18 }              // sideways bow
+.mini     { hover { bend-up: 14 } }    // drawbridge
+.page     { hover { fold: 14 } }       // folds over the top edge
+.pill-row { bend-around: -22 }         // children on a smile arc
+
+.banner {
+  gradient: linear 135, color.accent -> color.ok
+  gradient-flow: 6s alternate         // the gradient drifts forever
+}
+.head { gradient-text: linear to right, color.accent, color.ink }`} />
+          <p className="cheat-p">
+            Deform composes into <code>transform</code>, so one <code>transition</code>{" "}
+            tweens it and it works in <code>motion</code> keyframes too.{" "}
+            <code>stretch</code> keeps volume; <code>gradient</code> stops take tokens,
+            alpha (<code>color.ink/40</code>) and <code>%</code> positions — a stop that
+            is not a color fails loud.
+          </p>
+        </div>
+
         {/* ---------------------------------------------- api */}
         <div className="cheat-card">
           <span className="cheat-k">js api</span>

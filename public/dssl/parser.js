@@ -189,10 +189,25 @@ export function parse(source, file = 'inline.dssl') {
       const prop = part.slice(0, colon).trim().toLowerCase();
       const value = part.slice(colon + 1).trim();
       if (!prop) { err(line, 'declaration is missing a property name'); continue; }
+      // v0.7.0 — numeric token keys. `tokens { space { 9: 96 } }` is legal:
+      // the built-in spacing scale stops at 8, and real pages need 9, 10, 12…
+      // Numbers are keys ONLY inside a tokens subtree — anywhere else a bare
+      // numeric property is a typo, and the error now says exactly that
+      // instead of the old "not a valid property name" shrug.
+      if (/^[0-9]+(\.[0-9]+)?$/.test(prop)) {
+        if (stack.some(n => n.kind === 'tokens')) {
+          stack[stack.length - 1].children.push({ kind: 'decl', prop, value, line });
+          continue;
+        }
+        err(line, `"${prop}" is not a valid property name`,
+          'numeric names are token keys only inside tokens { } — e.g. tokens { space { 9: 96 } } — and then referenced as space.9; property names must start with a letter');
+        continue;
+      }
       // v0.4.0: dotted custom properties are legal — `--color.accent: …` is
       // scoped-token sugar (resolver maps it to the engine's token variable)
       if (!/^(-{1,2}[a-z][a-z0-9.-]*|[a-z][a-z0-9-]*)$/i.test(prop)) {
-        err(line, `"${prop}" is not a valid property name`);
+        err(line, `"${prop}" is not a valid property name`,
+          'property names are lower-case words with dashes (my-prop), or dotted tokens (color.accent)');
         continue;
       }
       stack[stack.length - 1].children.push({ kind: 'decl', prop, value, line });

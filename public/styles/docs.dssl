@@ -541,3 +541,183 @@ motion pe-pulse {
   font: 12 color.muted
   font-style: italic
 }
+
+// =========================================================================
+// v0.5 — the overlap section's live demo. The ghost is a real 45%-opacity
+// element; the site-wide `body { overlap: auto }` policy shoves it out of
+// the card after layout. The toggle grants the ghost its own
+// `overlap: allow` — the same opt-out a scrim or translucent nav uses.
+// The ghost's transition sits on the translate channel, the same channel
+// the engine's nudge writes, so the escape glides instead of teleporting.
+// =========================================================================
+
+.ov-stage {
+  position: relative
+  width: 100%
+  min-height: 250
+}
+
+.ov-card {
+  width: min(430, 74%)
+  display: grid
+  gap: 8
+  padding: space.4
+  background: color.card
+  border: 1 solid color.line
+  radius: md
+  shadow: sm
+}
+
+.ov-card-title {
+  font-weight: 700
+  font-size: 14
+}
+
+.ov-card-sub {
+  font: 12.5 color.muted
+  line-height: 1.5
+}
+
+.ov-ghost {
+  position: absolute
+  left: 30%
+  top: 30%
+  padding: 5 11
+  radius: 999
+  background: color.accent/30
+  border: 1 solid color.accent
+  color: color.ink
+  font: 11.5 font.mono
+  white-space: nowrap
+  opacity: 0.45
+  transition: 340 snap translate
+}
+
+// the documented opt-out: the ghost's own policy beats the body's
+.ov-stage[data-ov-off] .ov-ghost {
+  overlap: allow
+}
+
+// =========================================================================
+// v0.6.0 — the deform section's live demos. The button genuinely flexes
+// under the pointer (:active bend + stretch riding the transform channel),
+// the chip row is a real bend-around container re-laid on resize, and the
+// two mini cards bend-up / fold on hover with edge pivots baked into the
+// transform. One transform string carries all of it.
+// =========================================================================
+
+.df-row {
+  row: gap 14 center wrap
+}
+
+.df-btn {
+  padding: 12 22
+  radius: md
+  background: color.accent
+  color: color.accent-ink
+  font-weight: 700
+  font-size: 14
+  cursor: pointer
+  border: 0
+  shadow: sm
+  transition: 200 snap transform
+  hover {
+    bend: 5
+    shadow: md
+  }
+  active {
+    bend: 16
+    stretch: 0.94
+  }
+}
+
+.df-mini {
+  width: 128
+  padding: 14
+  display: grid
+  place: center
+  background: color.card
+  border: 1 solid color.line
+  radius: md
+  font: 12.5 color.muted
+  font-family: font.mono
+  text-align: center
+  transition: 260 snap transform
+}
+
+.df-up { hover { bend-up: 14 } }
+
+.df-fold { hover { fold: 14 } }
+
+// narrow screens scroll the arc horizontally instead of stretching the page
+// (max-width tames the grid-item minimum size, overflow-x does the scrolling)
+.df-arc {
+  row: gap 20 center
+  padding: 28 space.5 space.4
+  background: color.card
+  border: 1 solid color.line
+  radius: sm
+  bend-around: -22
+  max-width: 100%
+  overflow-x: auto
+}
+
+.df-chip {
+  padding: 6 14
+  radius: full
+  background: color.ink/6
+  border: 1 solid color.line
+  font: 12.5 font.mono color.muted
+}
+
+// =========================================================================
+// v0.6.0 — the gradient section's live demos. The banner flows forever
+// (gradient-flow loops background-position through WAAPI and sizes the
+// background to 200% itself), the headline clips a gradient into the
+// glyphs, and the swatches are the three kinds, one line each.
+// =========================================================================
+
+.gd-banner {
+  padding: space.5
+  radius: md
+  gradient: linear 120, color.accent -> color.ok -> color.accent
+  gradient-flow: 7s alternate
+  color: white
+  font-weight: 700
+  font-size: 15
+  shadow: sm
+}
+
+.gd-headline {
+  gradient-text: linear to right, color.accent, color.ink
+  font-size: 26
+  font-weight: 800
+  letter-spacing: -0.5
+}
+
+.gd-sw-row {
+  row: gap 14 wrap
+}
+
+.gd-sw {
+  size: 72
+  radius: md
+  border: 1 solid color.line
+  shadow: sm
+}
+
+.gd-lin { gradient: linear 135, color.accent -> color.ok }
+
+.gd-rad { gradient: radial circle at 30% 20%, color.card -> color.ink }
+
+.gd-con { gradient: conic from 45, color.accent, color.line, color.card, color.accent }
+
+// v0.7 — performance chapter sub-heads (dssl-ready / freeze / explain)
+.doc-h3 {
+  font-family: font.serif
+  font-weight: 650
+  font-size: 18
+  letter-spacing: -0.01em
+  margin: space.4 0 space.1
+  scroll-margin-top: 92
+}
