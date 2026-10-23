@@ -49,4 +49,4 @@ Wait for the `dssl-ready` event on `window` before measuring layout: the engine 
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. Install `dssl-vscode/dssl-vscode-0.7.2.vsix` from the repo files; older vsix packages (0.7.1 and below) were packaged before the review-driven fixes and carry the old compiler. Source lives in `dssl-vscode/` in the repo.

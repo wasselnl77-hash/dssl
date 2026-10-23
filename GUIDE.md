@@ -211,7 +211,7 @@ for liveness. `unfreeze()` re-arms everything.
 
 Three ways to get it:
 
-1. Download `dssl-vscode/dssl-vscode-0.7.1.vsix` from the repo files, then
+1. Download `dssl-vscode/dssl-vscode-0.7.2.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. Works in VS Code and VSCodium.
 2. Build it: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 3. Registry listing: staged for Open VSX (the registry VSCodium searches).
