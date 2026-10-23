@@ -7,6 +7,11 @@ the same errors the browser console prints, did-you-mean included.
 Works in **VS Code** and **VSCodium** (same extension API; install the `.vsix` in either
 via Extensions panel → ⋯ → *Install from VSIX*).
 
+Extension id: **`ehs-studio.dssl-vscode`**. An Open VSX listing (the registry VSCodium's
+Extensions tab searches) is staged: one Open VSX token from the user and
+`scripts/publish-openvsx.sh` puts it in the tab, searchable. See PUBLISHING.md for both
+that flow and the Microsoft Marketplace flow.
+
 ## Features
 
 - **Real-compiler diagnostics.** Errors AND warnings (the v0.7 warnings channel included:
