@@ -12,7 +12,7 @@
  * resolution happens in resolver.js.
  * ========================================================================= */
 
-const STATE_WORDS = new Set([
+export const STATE_WORDS = new Set([
   'hover', 'focus', 'focus-visible', 'active', 'disabled', 'checked',
   'empty', 'target', 'required', 'invalid', 'valid', 'open', 'closed',
   'placeholder-shown', 'read-only', 'read-write', 'enabled',
@@ -28,6 +28,11 @@ const STATE_WORDS = new Set([
 export const PSEUDO_ELEMENTS = new Set([
   'before', 'after', 'placeholder', 'selection', 'marker',
   'first-line', 'first-letter', 'backdrop', 'file-selector-button',
+  // v0.7.2 — ::part() rides the shadow-CSS pipeline (a document stylesheet
+  // CAN style shadow parts of custom elements). ::slotted() is accepted by
+  // the parser but rejected by the resolver with a loud explanation: it only
+  // exists inside a shadow tree, which is not a place DSSL styles.
+  'part', 'slotted',
 ]);
 
 // v0.4.2 — vendor pseudo-elements pass through verbatim (::-webkit-scrollbar
@@ -50,6 +55,20 @@ function scanFor(str, ch, from = 0) {
   return -1;
 }
 
+/** find index of LAST top-level occurrence of `ch` (skips strings + parens) */
+function scanForLast(str, ch) {
+  let depth = 0, q = null, found = -1;
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (q) { if (c === q && str[i - 1] !== '\\') q = null; continue; }
+    if (c === '"' || c === "'") { q = c; continue; }
+    if (c === '(' || c === '[') { depth++; continue; }
+    if (c === ')' || c === ']') { depth = Math.max(0, depth - 1); continue; }
+    if (depth === 0 && c === ch) found = i;
+  }
+  return found;
+}
+
 /** split a string on a top-level separator */
 function splitTop(str, sep) {
   const out = [];
@@ -65,6 +84,20 @@ function splitTop(str, sep) {
   }
   out.push(cur);
   return out;
+}
+
+/** find index of the matching close brace for the '{' just before `from`
+ * (string-aware). Returns -1 when the block is never closed. */
+function matchBrace(str, from) {
+  let depth = 1, q = null;
+  for (let i = from; i < str.length; i++) {
+    const c = str[i];
+    if (q) { if (c === q && str[i - 1] !== '\\') q = null; continue; }
+    if (c === '"' || c === "'") { q = c; continue; }
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (depth === 0) return i; }
+  }
+  return -1;
 }
 
 /** strip comments (respecting strings), newlines preserved so lines survive */
@@ -115,6 +148,7 @@ export function parse(source, file = 'inline.dssl') {
     const h = header.trim();
     if (h === 'tokens') return { kind: 'tokens' };
     if (h === 'pin') return { kind: 'pin' };
+    if (h === 'raw' || h === '@css') return { kind: 'raw' };
     if (h.startsWith('behavior ')) return { kind: 'behavior', name: h.slice(9).trim() };
     if (h.startsWith('motion ')) return { kind: 'motion', name: h.slice(7).trim() };
     if (h.startsWith('@layer ')) return { kind: 'layer', name: h.slice(7).trim() };
@@ -122,7 +156,13 @@ export function parse(source, file = 'inline.dssl') {
     if (h.startsWith('@container')) return { kind: 'container', query: h.slice(10).trim() };
     if (h.startsWith('@signal ')) return { kind: 'signal', expr: h.slice(8).trim() };
     if (h.startsWith('@')) {
-      err(line, `unknown at-rule "${h.split(' ')[0]}"`, 'try @media, @container, @signal or @layer');
+      // v0.8.0 — unknown at-rules are skipped WHOLE (balanced braces). They
+      // used to error and then keep parsing inside their block, so the inner
+      // rules leaked out unconditionally: `@supports (display:grid) { .a { … } }
+      // applied .a everywhere. The block is now dropped in its entirety —
+      // and raw { } is the documented escape hatch for CSS DSSL has no sugar
+      // for yet (@font-face, @keyframes, @supports, @import…).
+      err(line, `unknown at-rule "${h.split(' ')[0]}"`, 'the whole block is skipped — for verbatim CSS like @font-face / @keyframes / @supports, wrap it in raw { }');
       return { kind: 'bogus' };
     }
     if (h.startsWith('::')) {
@@ -158,18 +198,97 @@ export function parse(source, file = 'inline.dssl') {
 
       if (open !== -1) {
         const header = rest.slice(0, open).trim();
+        // v0.7.2 — declarations and a nested block sharing one line:
+        // `.card { background: red; hover { ... } }`. Everything before the
+        // header used to be swallowed whole into it, so `background: red`
+        // silently became part of a selector named "background: red; hover"
+        // and vanished. Declarations before the LAST top-level ';' are now
+        // processed as declarations; the header is what follows them.
+        if (header) {
+          const semi = scanForLast(header, ';');
+          if (semi !== -1) {
+            processContent(header.slice(0, semi), line);
+            const realHeader = header.slice(semi + 1).trim();
+            if (!realHeader) { err(line, 'block is missing a header before "{"'); rest = rest.slice(open + 1); continue; }
+            const meta = classify(realHeader, line);
+            const node = { ...meta, line, children: [] };
+            stack[stack.length - 1].children.push(node);
+            const after = openBlock(meta, node, rest, open, line);
+            if (after === null) { rest = rest.slice(open + 1); if (meta.kind !== 'bogus') stack.push(node); continue; }
+            rest = after;
+            continue;
+          }
+        }
         if (!header) { err(line, 'block is missing a header before "{"'); rest = rest.slice(open + 1); continue; }
         const meta = classify(header, line);
         const node = { ...meta, line, children: [] };
         stack[stack.length - 1].children.push(node);
-        if (meta.kind !== 'bogus') stack.push(node);
-        rest = rest.slice(open + 1);
+        const after = openBlock(meta, node, rest, open, line);
+        if (after === null) { rest = rest.slice(open + 1); if (meta.kind !== 'bogus') stack.push(node); continue; }
+        rest = after;
         continue;
       }
 
       processContent(rest, line);
       return;
     }
+  };
+
+  /** v0.8.0 — what happens right after a block header opens.
+   *  - raw { } (top level): capture the block body VERBATIM as node.css and
+   *    return the remainder of the chunk — or enter multi-line capture mode
+   *    (returns '' with rawCapture armed).
+   *  - bogus (unknown at-rule / pseudo-element): skip the whole balanced
+   *    block so its content can never leak into the parent.
+   *  - anything else: return null so the caller pushes the node and keeps
+   *    parsing normally. */
+  let rawCapture = null; // { node, depth } while a multi-line raw { } is open
+  const openBlock = (meta, node, rest, open, line) => {
+    if (meta.kind === 'raw') {
+      if (stack.length > 1) {
+        err(line, 'raw { } must be top-level — it drops verbatim CSS into the page stylesheet', 'move it out of the enclosing block');
+        const close = matchBrace(rest, open + 1);
+        return close === -1 ? '' : rest.slice(close + 1);
+      }
+      const close = matchBrace(rest, open + 1);
+      if (close !== -1) {
+        node.css = rest.slice(open + 1, close);
+        return rest.slice(close + 1);
+      }
+      rawCapture = { node, depth: 1 };
+      return '';
+    }
+    if (meta.kind === 'bogus') {
+      const close = matchBrace(rest, open + 1);
+      if (close === -1) {
+        err(line, `the "${(meta.sel || '').slice(0, 30) || 'block'}" block was never closed with "}"`, 'every "{" needs a matching "}"');
+        return '';
+      }
+      return rest.slice(close + 1);
+    }
+    return null;
+  };
+
+  /** consume one source line while a multi-line raw { } is being captured */
+  const feedRawCapture = (raw, line) => {
+    let q = null;
+    for (let i = 0; i < raw.length; i++) {
+      const c = raw[i];
+      if (q) { if (c === q && raw[i - 1] !== '\\') q = null; continue; }
+      if (c === '"' || c === "'") { q = c; continue; }
+      if (c === '{') rawCapture.depth++;
+      else if (c === '}') {
+        rawCapture.depth--;
+        if (rawCapture.depth === 0) {
+          rawCapture.node.css += raw.slice(0, i);
+          const rest = raw.slice(i + 1);
+          rawCapture = null;
+          if (rest.trim()) processChunk(rest, line);
+          return;
+        }
+      }
+    }
+    rawCapture.node.css += raw + '\n';
   };
 
   const processContent = (content, line) => {
@@ -245,7 +364,8 @@ export function parse(source, file = 'inline.dssl') {
   lines.forEach((raw, idx) => {
     const line = idx + 1;
     const trimmed = raw.trim();
-    if (!trimmed) return; // blank lines never split a pending chunk
+    if (!trimmed) { if (rawCapture) rawCapture.node.css += raw + '\n'; return; } // blank lines never split a pending chunk
+    if (rawCapture) { feedRawCapture(raw, line); return; }
     const candidate = buf ? buf + ' ' + trimmed : raw;
     if (buf && needsMore(candidate)) { buf = candidate; return; }
     if (buf) { processChunk(candidate, bufLine || line); buf = ''; return; }
@@ -253,6 +373,9 @@ export function parse(source, file = 'inline.dssl') {
     processChunk(candidate, line);
   });
   if (buf.trim()) processChunk(buf, bufLine);
+  if (rawCapture) {
+    err(lines.length, 'the raw { } block was never closed with "}"', 'every "{" needs a matching "}" — the CSS captured so far is discarded');
+  }
 
   if (stack.length > 1) {
     err(lines.length, `${stack.length - 1} block(s) were never closed with "}"`, 'every "{" needs a matching "}"');

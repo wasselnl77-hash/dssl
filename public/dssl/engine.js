@@ -173,15 +173,19 @@ export class DsslEngine {
   rebuild() {
     const rules = [];
     const shadowRules = [];
+    const raws = [];
     const bundles = [...this.bundles.values()].sort((a, b) => a.seq - b.seq);
     for (const b of bundles) {
       for (const r of b.rules) {
         rules.push(r); // scoped engines map :root rules onto the scope element
       }
       shadowRules.push(...b.shadowRules);
+      // v0.8.0 — raw { } verbatim CSS rides the same document stylesheet
+      if (b.raws) raws.push(...b.raws);
     }
     this.rules = rules;
     this.shadowRules = shadowRules;
+    this.raws = raws;
 
     // unique media queries → MediaQueryList cache
     for (const r of rules) for (const q of r.media) this.mql(q);
@@ -1310,6 +1314,12 @@ export class DsslEngine {
     };
 
     let css = this.shadowRules.map(cssFor).join('\n\n');
+
+    // v0.8.0 — raw { } blocks: verbatim CSS (@font-face, @keyframes,
+    // @supports, @import…), appended after the pseudo-element rules
+    if (this.raws && this.raws.length) {
+      css += '\n\n' + this.raws.map(r => r.css).join('\n\n');
+    }
 
     if (this.reset) {
       css += `

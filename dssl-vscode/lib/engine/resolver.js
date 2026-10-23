@@ -20,7 +20,7 @@
 import { levenshtein, didYouMean, composeDeform } from './utils.js';
 // v0.5.0 — the resolver validates the `::name` half of full selectors so a
 // typo like .card::befor is a LOUD error, never a silently dead rule.
-import { PSEUDO_ELEMENTS, VENDOR_PSEUDO } from './parser.js';
+import { PSEUDO_ELEMENTS, VENDOR_PSEUDO, STATE_WORDS } from './parser.js';
 
 /* ------------------------------------------------------------------ *
  * Vocabulary
@@ -45,6 +45,10 @@ export const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,
   'serif,sans-serif,monospace,cursive,fantasy,system-ui,ui-sans-serif,ui-monospace,ui-serif,ui-rounded,' +
   'system-ui,-apple-system,Roboto,Helvetica,Arial,Menlo,Consolas,SFMono-Regular,Liberation-Mono,Inter,Noto-Sans,Ubuntu,Cantarell,Oxygen,Fira-Sans,Droid-Sans,' +
   'border-box,content-box,padding-box,fill-box,stroke-box,view-box,' +
+  // v0.8.0 — the background repeat/attachment words the url() fix exposed:
+  // `background: url(a.png) no-repeat` was a false error because "no-repeat"
+  // was missing while "repeat" existed
+  'no-repeat,repeat-x,repeat-y,space,round,scroll,local,' +
   'contain,cover,fill,fit-content,min-content,max-content,minmax,repeat,clamp,calc,var,url,env,attr,' +
   'auto-fill,auto-fit,subgrid,dense,stretch,span,' +
   'scaleX,scaleY,translateX,translateY,translate,rotate,skew,skewX,skewY,matrix,' +
@@ -68,9 +72,21 @@ const UNITLESS_PROPS = new Set([
   'opacity', 'line-height', 'z-index', 'font-weight', 'flex-grow', 'flex-shrink',
   'flex', 'order', 'scale', 'widows', 'orphans', 'column-count', 'aspect-ratio',
   'animation-iteration-count', 'flood-opacity', 'fill-opacity', 'stop-opacity',
-  'shape-image-threshold', 'animation-delay', 'transition-delay',
+  'shape-image-threshold',
   // grid line placement takes integers, not lengths:  grid-column: span 2
   'grid-row', 'grid-column', 'grid-area',
+]);
+
+// v0.7.2 — time properties: a bare number is milliseconds, never px, and
+// never unitless (both used to emit values the browser silently rejected).
+// transition-delay/animation-delay used to sit in UNITLESS_PROPS, which is
+// why `transition-delay: 200` shipped as invalid unitless 200.
+const TIME_PROPS = new Set([
+  'transition-delay', 'transition-duration', 'animation-delay', 'animation-duration',
+  // v0.8.0 — the animation shorthand takes bare numbers as ms too:
+  // `animation: spin 1s infinite` is fine, but `animation: ghost 400` used
+  // to become "ghost 400px" (invalid). 400 → 400ms, matching animate:.
+  'animation',
 ]);
 
 // A practical whitelist of standard CSS properties (loud errors beat silent ones)
@@ -82,8 +98,8 @@ const KNOWN_PROPS = new Set(('all,appearance,accent-color,align-content,align-it
   'border-inline,border-inline-color,border-inline-end,border-inline-end-color,border-inline-end-style,border-inline-end-width,border-inline-start,border-inline-start-color,border-inline-start-style,border-inline-start-width,border-inline-style,border-inline-width,' +
   'border-left,border-left-color,border-left-style,border-left-width,border-radius,border-right,border-right-color,border-right-style,border-right-width,' +
   'border-spacing,border-start-end-radius,border-start-start-radius,border-style,border-top,border-top-color,border-top-left-radius,border-top-right-radius,border-top-style,border-top-width,border-width,' +
-  'bottom,box-decoration-break,box-shadow,box-sizing,break-after,break-before,break-inside,caret-color,caret-shape,clear,clip,clip-path,color,color-scheme,column-count,column-fill,column-gap,column-rule,column-rule-color,column-rule-style,column-rule-width,column-span,column-width,columns,contain,contain-intrinsic-size,container,container-name,container-type,content,cursor,caret,display,empty-cells,filter,flex,flex-basis,flex-direction,flex-flow,flex-grow,flex-shrink,flex-wrap,float,font,font-family,font-feature-settings,font-kerning,font-language-override,font-optical-sizing,font-palette,font-size,font-size-adjust,font-stretch,font-style,font-synthesis,font-variant,font-variant-caps,font-variant-east-asian,font-variant-ligatures,font-variant-numeric,font-variant-position,font-variation-settings,font-weight,forced-color-adjust,gap,grid,grid-area,grid-auto-columns,grid-auto-flow,grid-auto-rows,grid-column,grid-column-end,grid-column-gap,grid-column-start,grid-gap,grid-row,grid-row-end,grid-row-gap,grid-row-start,grid-template,grid-template-areas,grid-template-columns,grid-template-rows,' +
-  'hanging-punctuation,height,hyphenate-character,hyphenate-limit-chars,hyphens,image-orientation,image-rendering,inline-size,inset,inset-block,inset-block-end,inset-block-start,inset-inline,inset-inline-end,inset-inline-start,isolation,justify-content,justify-items,justify-self,justify-tracks,left,letter-spacing,line-break,line-height,list-style,list-style-image,list-style-position,list-style-type,margin,margin-block,margin-block-end,margin-block-start,margin-bottom,margin-inline,margin-inline-end,margin-inline-start,margin-left,margin-right,margin-top,margin-trim,mask,mask-border,mask-border-mode,mask-border-outset,mask-border-repeat,mask-border-slice,mask-border-source,mask-border-width,mask-clip,mask-composite,mask-image,mask-mode,mask-origin,mask-position,mask-repeat,mask-size,max-height,max-inline-size,max-width,min-block-size,min-height,min-inline-size,min-width,mix-blend-mode,object-fit,object-position,offset,offset-anchor,offset-distance,offset-path,offset-rotate,opacity,order,outline,outline-color,outline-offset,outline-style,outline-width,overflow,overflow-anchor,overflow-clip-margin,overflow-wrap,overflow-x,overflow-y,overscroll-behavior,overscroll-behavior-block,overscroll-behavior-inline,overscroll-behavior-x,overscroll-behavior-y,padding,padding-block,padding-block-end,padding-block-start,padding-bottom,padding-inline,padding-inline-end,padding-inline-start,padding-left,padding-right,padding-top,page-break-after,page-break-before,page-break-inside,paint-order,perspective,perspective-origin,place-content,place-items,place-self,pointer-events,position,print-color-adjust,quotes,resize,right,rotate,row-gap,ruby-align,ruby-merge,scale,scroll-behavior,scroll-margin,scroll-margin-block,scroll-margin-block-end,scroll-margin-block-start,scroll-margin-bottom,scroll-margin-inline,scroll-margin-inline-end,scroll-margin-inline-start,scroll-margin-left,scroll-margin-right,scroll-margin-top,scroll-padding,scroll-padding-block,scroll-padding-bottom,scroll-padding-inline,scroll-padding-left,scroll-padding-right,scroll-padding-top,scroll-snap-align,scroll-snap-stop,scroll-snap-type,scrollbar-color,scrollbar-gutter,scrollbar-width,shape-image-threshold,shape-margin,shape-outside,tab-size,table-layout,text-align,text-align-last,text-combine-upright,text-decoration,text-decoration-color,text-decoration-line,text-decoration-skip-ink,text-decoration-style,text-decoration-thickness,text-emphasis,text-emphasis-color,text-emphasis-position,text-emphasis-style,text-indent,text-justify,text-orientation,text-overflow,text-rendering,text-shadow,text-transform,text-underline-offset,text-underline-position,top,touch-action,transform,transform-box,transform-origin,transform-style,transition,transition-behavior,transition-delay,transition-duration,transition-property,transition-timing-function,translate,unicode-bidi,user-select,vertical-align,visibility,white-space,white-space-collapse,width,will-change,word-break,word-spacing,word-wrap,writing-mode,z-index,zoom,' +
+  'bottom,box-decoration-break,box-shadow,box-sizing,break-after,break-before,break-inside,caret-color,caret-shape,clear,clip,clip-path,color,color-scheme,column-count,column-fill,column-gap,column-rule,column-rule-color,column-rule-style,column-rule-width,column-span,column-width,columns,contain,contain-intrinsic-size,container,container-name,container-type,content,content-visibility,cursor,caret,display,empty-cells,filter,flex,flex-basis,flex-direction,flex-flow,flex-grow,flex-shrink,flex-wrap,float,fill,fill-rule,fill-opacity,stroke,stroke-dasharray,stroke-dashoffset,stroke-linecap,stroke-linejoin,stroke-opacity,stroke-width,font,font-family,font-feature-settings,font-kerning,font-language-override,font-optical-sizing,font-palette,font-size,font-size-adjust,font-stretch,font-style,font-synthesis,font-variant,font-variant-caps,font-variant-east-asian,font-variant-ligatures,font-variant-numeric,font-variant-position,font-variation-settings,font-weight,forced-color-adjust,gap,grid,grid-area,grid-auto-columns,grid-auto-flow,grid-auto-rows,grid-column,grid-column-end,grid-column-gap,grid-column-start,grid-gap,grid-row,grid-row-end,grid-row-gap,grid-row-start,grid-template,grid-template-areas,grid-template-columns,grid-template-rows,' +
+  'hanging-punctuation,height,hyphenate-character,hyphenate-limit-chars,hyphens,image-orientation,image-rendering,inline-size,inset,inset-block,inset-block-end,inset-block-start,inset-inline,inset-inline-end,inset-inline-start,isolation,justify-content,justify-items,justify-self,justify-tracks,left,letter-spacing,line-break,line-height,list-style,list-style-image,list-style-position,list-style-type,margin,margin-block,margin-block-end,margin-block-start,margin-bottom,margin-inline,margin-inline-end,margin-inline-start,margin-left,margin-right,margin-top,margin-trim,mask,mask-border,mask-border-mode,mask-border-outset,mask-border-repeat,mask-border-slice,mask-border-source,mask-border-width,mask-clip,mask-composite,mask-image,mask-mode,mask-origin,mask-position,mask-repeat,mask-size,max-height,max-inline-size,max-width,min-block-size,min-height,min-inline-size,min-width,mix-blend-mode,object-fit,object-position,offset,offset-anchor,offset-distance,offset-path,offset-rotate,opacity,order,outline,outline-color,outline-offset,outline-style,outline-width,overflow,overflow-anchor,overflow-clip-margin,overflow-wrap,overflow-x,overflow-y,overscroll-behavior,overscroll-behavior-block,overscroll-behavior-inline,overscroll-behavior-x,overscroll-behavior-y,padding,padding-block,padding-block-end,padding-block-start,padding-bottom,padding-inline,padding-inline-end,padding-inline-start,padding-left,padding-right,padding-top,page-break-after,page-break-before,page-break-inside,paint-order,perspective,perspective-origin,place-content,place-items,place-self,pointer-events,position,print-color-adjust,quotes,resize,right,rotate,row-gap,ruby-align,ruby-merge,scale,scroll-behavior,scroll-margin,scroll-margin-block,scroll-margin-block-end,scroll-margin-block-start,scroll-margin-bottom,scroll-margin-inline,scroll-margin-inline-end,scroll-margin-inline-start,scroll-margin-left,scroll-margin-right,scroll-margin-top,scroll-padding,scroll-padding-block,scroll-padding-bottom,scroll-padding-inline,scroll-padding-left,scroll-padding-right,scroll-padding-top,scroll-snap-align,scroll-snap-stop,scroll-snap-type,scrollbar-color,scrollbar-gutter,scrollbar-width,shape-image-threshold,shape-margin,shape-outside,tab-size,table-layout,text-align,text-align-last,text-combine-upright,text-decoration,text-decoration-color,text-decoration-line,text-decoration-skip-ink,text-decoration-style,text-decoration-thickness,text-emphasis,text-emphasis-color,text-emphasis-position,text-emphasis-style,text-indent,text-justify,text-orientation,text-overflow,text-rendering,text-shadow,text-transform,text-underline-offset,text-underline-position,text-wrap,top,touch-action,transform,transform-box,transform-origin,transform-style,transition,transition-behavior,transition-delay,transition-duration,transition-property,transition-timing-function,translate,unicode-bidi,user-select,vertical-align,visibility,white-space,white-space-collapse,width,will-change,word-break,word-spacing,word-wrap,writing-mode,z-index,zoom,' +
   'animation,animation-composition,animation-delay,animation-direction,animation-duration,animation-fill-mode,animation-iteration-count,animation-name,animation-play-state,animation-range,animation-timeline,animation-timing-function,' +
   'view-transition-name,interpolate-size,text-box,text-box-edge,text-box-trim,dynamic-range-limit,field-sizing,anchor-name,position-anchor,position-area,scroll-timeline,scroll-timeline-axis,scroll-timeline-name,timeline-scope,view-timeline,view-timeline-axis,view-timeline-name,' +
   '-webkit-background-clip,-webkit-text-fill-color,-webkit-box-orient,-webkit-line-clamp,-webkit-tap-highlight-color,-webkit-font-smoothing,-moz-osx-font-smoothing,-webkit-box-shadow,-webkit-text-stroke').split(','));
@@ -182,7 +198,7 @@ function resolveValue(raw, ctx) {
         unit = raw.slice(j, k).toLowerCase();
         j = k;
       }
-      out += num + (unit ? unit : (ctx.unitless ? '' : 'px'));
+      out += num + (unit ? unit : (ctx.unitless ? '' : TIME_PROPS.has(ctx.prop) ? 'ms' : 'px'));
       i = j;
       continue;
     }
@@ -208,6 +224,15 @@ function resolveValue(raw, ctx) {
         }
         const inner = raw.slice(i + 1, j - 1);
         const fname = ident.toLowerCase();
+        // v0.8.0 — url() is atomic. The validator used to tokenize INSIDE it,
+        // so `url(a.png)` raised "unknown value a.png" (quoted urls worked
+        // only because strings were already consumed whole). CSS allows the
+        // unquoted form; DSSL passes it through untouched now.
+        if (fname === 'url') {
+          out += 'url(' + inner.trim() + ')';
+          i = j;
+          continue;
+        }
         // v0.3.2 fix: repeat(COUNT, tracks) — the leading count is an integer,
         // never a length. `repeat(4, 1fr)` used to become `repeat(4px, 1fr)`,
         // which the browser rejected and the whole grid silently collapsed.
@@ -267,8 +292,18 @@ function resolveValue(raw, ctx) {
     if (c === '#') { // hex color
       let j = i + 1;
       while (j < n && /[0-9a-fA-F]/.test(raw[j])) j++;
-      out += raw.slice(i, j);
+      const hex = raw.slice(i, j);
+      out += hex;
       i = j;
+      // v0.7.2 — alpha on a raw hex color: #ff0000/50 used to become
+      // #ff0000/50px (the bare number got the generic px treatment) — invalid
+      // CSS, silently dropped by the browser. Tokens always had /NN via
+      // color-mix; raw hex now gets the same treatment.
+      const am = raw.slice(i).match(/^\s*\/\s*([0-9.]+)\s*%?/);
+      if (am) {
+        out = out.slice(0, out.length - hex.length) + `color-mix(in oklab, ${hex} ${am[1]}%, transparent)`;
+        i += am[0].length;
+      }
       continue;
     }
     out += c;
@@ -469,7 +504,21 @@ function buildGradient(v, ctx) {
 
 function parseFlexWords(value, ctx, dir) {
   const out = [{ prop: 'display', value: 'flex' }, { prop: 'flex-direction', value: dir }];
+  // v0.8.0 — axis roles. Every place word used to write BOTH axes, so
+  // `row: gap 8 between center` (the guide's own example) compiled to
+  // justify-content: space-between followed by justify-content: center —
+  // and center won, bunching everything in the middle. Words now declare
+  // the axis they are actually about: distribution words (between/around/
+  // evenly) own the main axis, stretch/baseline own the cross axis, and
+  // center/start/end fill whichever axes are still free. A word whose axes
+  // are all taken is a loud warning instead of a silent overwrite.
+  const FLEX_AXIS = {
+    between: 'main', around: 'main', evenly: 'main',
+    stretch: 'cross', baseline: 'cross',
+    center: 'both', start: 'both', end: 'both',
+  };
   const atoms = value.split(/\s+/).filter(Boolean);
+  let mainSet = null, crossSet = null;
   for (let k = 0; k < atoms.length; k++) {
     const a = atoms[k];
     if (a === 'gap') {
@@ -482,9 +531,36 @@ function parseFlexWords(value, ctx, dir) {
     if (a === 'nowrap') { out.push({ prop: 'flex-wrap', value: 'nowrap' }); continue; }
     if (a === 'reverse') { out[1].value = dir + '-reverse'; continue; }
     if (a === 'inline') { out[0].value = 'inline-flex'; continue; }
-    if (PLACE_WORDS[a]) {
-      out.push({ prop: 'align-items', value: PLACE_WORDS[a][0] });
-      out.push({ prop: 'justify-content', value: PLACE_WORDS[a][1] });
+    if (FLEX_AXIS[a]) {
+      const role = FLEX_AXIS[a];
+      const pc = PLACE_WORDS[a]; // [cross, main]
+      const axisWarn = (prop, prev) => {
+        ctx.warnings = ctx.warnings || [];
+        ctx.warnings.push(prev === a
+          ? { file: ctx.file, line: ctx.line, message: `"${a}" is written twice in ${dir} — the second copy wins`, hint: `drop the duplicate; one distribution word + one alignment word is the whole grammar` }
+          : { file: ctx.file, line: ctx.line, message: `two words in ${dir} write ${prop}: "${a}" overrides "${prev}"`, hint: `later words win — drop one, or reorder so the distribution word comes first` });
+      };
+      let wrote = false;
+      if (role === 'main' || (role === 'both' && !mainSet)) {
+        if (mainSet) axisWarn('justify-content', mainSet);
+        out.push({ prop: 'justify-content', value: pc[1] });
+        mainSet = a; wrote = true;
+      }
+      if (role === 'cross' || (role === 'both' && !crossSet)) {
+        if (crossSet) axisWarn('align-items', crossSet);
+        out.push({ prop: 'align-items', value: pc[0] });
+        crossSet = a; wrote = true;
+      }
+      if (!wrote) {
+        ctx.warnings = ctx.warnings || [];
+        ctx.warnings.push({
+          file: ctx.file, line: ctx.line,
+          message: mainSet === a || crossSet === a
+            ? `"${a}" is written twice in ${dir} — both axes already came from it`
+            : `"${a}" has nowhere to go: justify-content came from "${mainSet}", align-items came from "${crossSet}"`,
+          hint: 'one distribution word + one alignment word is the whole grammar — the extra word is dropped',
+        });
+      }
       continue;
     }
     ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown word "${a}" in ${dir}`, hint: didYouMean(a, ['gap', 'center', 'start', 'end', 'between', 'around', 'evenly', 'stretch', 'baseline', 'wrap', 'nowrap', 'reverse', 'inline']) });
@@ -510,15 +586,31 @@ const SEMANTIC = {
   column: (v, ctx) => parseFlexWords(v, ctx, 'column'),
   grid(v, ctx) {
     const atoms = v.split(/\s+/).filter(Boolean);
-    let cols;
-    if (atoms.length === 1 && /^[0-9]+$/.test(atoms[0])) {
-      cols = `repeat(${atoms[0]}, 1fr)`;
-    } else if ((atoms[0] === 'auto-fill' || atoms[0] === 'auto-fit') && atoms[1]) {
-      cols = `repeat(${atoms[0]}, minmax(${len(atoms[1], ctx)}, 1fr))`;
-    } else {
-      cols = atoms.map(a => len(a, ctx)).join(' ');
+    // v0.7.2 — `grid: 3 gap 12` (the documented form) used to die: the gap
+    // atoms were fed into grid-template-columns → "3px gap 12px", invalid.
+    // gap and rows are now first-class words of the shorthand.
+    let gap = null, rows = null;
+    const rest = [];
+    for (let i = 0; i < atoms.length; i++) {
+      if (atoms[i] === 'gap' && atoms[i + 1]) { gap = atoms[++i]; continue; }
+      if (atoms[i] === 'rows' && atoms[i + 1]) { rows = atoms[++i]; continue; }
+      rest.push(atoms[i]);
     }
-    return [{ prop: 'display', value: 'grid' }, { prop: 'grid-template-columns', value: cols }];
+    let cols;
+    if (!rest.length) {
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: 'grid needs columns', hint: 'grid: 3 · grid: auto-fill 200 · grid: 200px 1fr — optionally with gap N and rows N' });
+      cols = 'none';
+    } else if (rest.length === 1 && /^[0-9]+$/.test(rest[0])) {
+      cols = `repeat(${rest[0]}, 1fr)`;
+    } else if ((rest[0] === 'auto-fill' || rest[0] === 'auto-fit') && rest[1]) {
+      cols = `repeat(${rest[0]}, minmax(${len(rest[1], ctx)}, 1fr))`;
+    } else {
+      cols = rest.map(a => len(a, ctx)).join(' ');
+    }
+    const out = [{ prop: 'display', value: 'grid' }, { prop: 'grid-template-columns', value: cols }];
+    if (gap) out.push({ prop: 'gap', value: len(gap, ctx) });
+    if (rows) out.push({ prop: 'grid-template-rows', value: /^[0-9]+$/.test(rows) ? `repeat(${rows}, 1fr)` : len(rows, ctx) });
+    return out;
   },
   stack(v, ctx) {
     const word = (v || 'center').trim();
@@ -579,17 +671,7 @@ const SEMANTIC = {
     return out;
   },
   fluid(v, ctx) {
-    const parts = v.split(',').map(s => s.trim());
-    const px = (s) => {
-      const m = String(s).match(/^([0-9.]+)\s*(px|rem|em|%)?$/);
-      if (!m) { ctx.errors.push({ file: ctx.file, line: ctx.line, message: `fluid: "${s}" is not a size` }); return '0px'; }
-      return m[2] ? `${m[1]}${m[2]}` : `${m[1]}px`;
-    };
-    const min = px(parts[0]); const max = px(parts[1]);
-    const vmin = px(parts[2] || '360'); const vmax = px(parts[3] || '1200');
-    const mv = parseFloat(min), xv = parseFloat(max);
-    const slope = ((xv - mv) / (parseFloat(vmax) - parseFloat(vmin))) * 100;
-    return [{ prop: 'font-size', value: `clamp(${min}, calc(${min} + ${slope.toFixed(3)}vw), ${max})` }];
+    return buildFluidParts(v.split(',').map(s => s.trim()).filter(Boolean), ctx);
   },
   shadow(v, ctx) {
     const t = v.trim();
@@ -663,6 +745,22 @@ const SEMANTIC = {
       const atoms = part.split(/\s+/);
       const dur = atoms[0];
       if (!/^\d*\.?\d+(ms|s)?$/.test(dur)) {
+        // v0.8.0 — the CSS habit is property-first (`transition: color .2s
+        // ease`). That used to be a generic "not a time" error and the part
+        // silently dropped. The error now REWRITES the value into the DSSL
+        // order (time · easing · property) so the fix is a copy-paste.
+        const timeAtom = atoms.find(a => /^\d*\.?\d+(ms|s)?$/.test(a));
+        const easeAtom = atoms.find(a => EASINGS[a]);
+        const propAtom = atoms.find(a => a !== timeAtom && a !== easeAtom && (KNOWN_PROPS.has(a) || DEFORM_TO_TRANSFORM[a]));
+        if (timeAtom) {
+          const msOut = /^\d+$/.test(timeAtom) ? timeAtom : /ms$/.test(timeAtom) ? timeAtom.replace(/ms$/, '') : String(parseFloat(timeAtom) * 1000);
+          ctx.errors.push({
+            file: ctx.file, line: ctx.line,
+            message: `transition: the CSS form (property first) is not DSSL`,
+            hint: `write  transition: ${msOut}${easeAtom ? ' ' + easeAtom : ''}${propAtom ? ' ' + propAtom : ''}  — time first, easing, property last`,
+          });
+          continue;
+        }
         ctx.errors.push({ file: ctx.file, line: ctx.line, message: `transition duration "${dur}" is not a time`, hint: 'order is duration · easing · property — try 200 or 0.2s' });
         continue;
       }
@@ -842,13 +940,51 @@ const SEMANTIC = {
   },
 };
 
+/* v0.8.0 — fluid sizing sugar. `fluid: 16, 24` keeps working (font-size),
+ * and now any length-ish property takes it inline: `font-size: fluid 16 24`.
+ * Both compile to a clamp() that scales linearly between the viewport bounds
+ * (360px and 1200px by default) — the formula everyone writes by hand and
+ * gets wrong. */
+const FLUID_PROPS = new Set(('font-size,width,height,inline-size,block-size,min-width,max-width,min-height,max-height,' +
+  'gap,row-gap,column-gap,padding,margin,inset,top,right,bottom,left').split(','));
+
+function buildFluidParts(parts, ctx, prop = 'font-size') {
+  const px = (s) => {
+    const m = String(s).match(/^([0-9.]+)\s*(px|rem|em|%)?$/);
+    if (!m) {
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `fluid: "${s}" is not a size`, hint: 'fluid takes two sizes and optionally the viewport bounds — fluid 16 24, or fluid 16 24 360 1200' });
+      return '0px';
+    }
+    return m[2] ? `${m[1]}${m[2]}` : `${m[1]}px`;
+  };
+  const min = px(parts[0]); const max = px(parts[1]);
+  const vmin = px(parts[2] || '360'); const vmax = px(parts[3] || '1200');
+  const mv = parseFloat(min), xv = parseFloat(max);
+  const slope = ((xv - mv) / (parseFloat(vmax) - parseFloat(vmin))) * 100;
+  return [{ prop, value: `clamp(${min}, calc(${min} + ${slope.toFixed(3)}vw), ${max})` }];
+}
+
 /* ------------------------------------------------------------------ *
  * resolveDecl — one declaration → zero or more engine decls
  * ------------------------------------------------------------------ */
 
 function resolveDecl(prop, value, ctx) {
   const errors = ctx.errors;
-  const ctx2 = { ...ctx, prop, errors };
+  const ctx2 = { ...ctx, prop, errors, warnings: ctx.warnings };
+
+  // v0.8.0 — !important does not exist in DSSL. It used to fall through as a
+  // value: the compiler said "unknown value important" AND still emitted
+  // `red !important`, which the browser then silently dropped as an invalid
+  // inline value. Now: one loud error, nothing emitted, and the pin { }
+  // answer to the actual question.
+  if (hasImportant(value)) {
+    errors.push({
+      file: ctx.file, line: ctx.line,
+      message: `!important does not exist in DSSL — "${prop}: ${String(value).replace(/\s*!\s*important\s*/i, '')}" was NOT applied`,
+      hint: 'the cascade is (layer, order) and later wins — put the rule in pin { } when it genuinely must win',
+    });
+    return [];
+  }
 
   if (prop.startsWith('--')) {
     // v0.4.0 — scoped tokens. Dotted names are token re-declarations:
@@ -865,6 +1001,22 @@ function resolveDecl(prop, value, ctx) {
   const sem = SEMANTIC[prop];
   if (sem) return sem(value, ctx2);
 
+  // v0.8.0 — the animation shorthand passes through (it is legal CSS), but
+  // bare motion names must not pay the generic unknown-value tax: "spin"
+  // used to error with the surreal suggestion "did you mean span?". Motion
+  // names pass silently here and a dedicated warning in the final loop says
+  // the DSSL way (motion + animate) when the name matches nothing.
+  if (prop === 'animation' || prop === 'animation-name') {
+    return [{ prop, value: resolveValue(value, { ...ctx2, unitless: UNITLESS_PROPS.has(prop), bareIdents: true }) }];
+  }
+
+  // v0.8.0 — inline fluid sugar on any length-ish property:
+  // font-size: fluid 16 24  →  clamp(16px, calc(16px + 0.952vw), 24px)
+  const fluidM = /^fluid\s+([\s\S]+)$/.exec(String(value).trim());
+  if (fluidM && FLUID_PROPS.has(prop)) {
+    return buildFluidParts(fluidM[1].split(/[\s,]+/).filter(Boolean), ctx2, prop);
+  }
+
   if (!KNOWN_PROPS.has(prop)) {
     errors.push({
       file: ctx.file, line: ctx.line,
@@ -874,6 +1026,19 @@ function resolveDecl(prop, value, ctx) {
     return [];
   }
   return [{ prop, value: resolveValue(value, { ...ctx2, unitless: UNITLESS_PROPS.has(prop), bareIdents: prop === 'font-family' }) }];
+}
+
+/** string-aware !important scan — quoted content: "!important" must not trip it */
+function hasImportant(v) {
+  const s = String(v);
+  let q = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) { if (c === q && s[i - 1] !== '\\') q = null; continue; }
+    if (c === '"' || c === "'") { q = c; continue; }
+    if (c === '!' && /\s*important/i.test(s.slice(i + 1))) return true;
+  }
+  return false;
 }
 
 /* ------------------------------------------------------------------ *
@@ -926,6 +1091,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   const errors = [];
   const rules = [];
   const shadowRules = [];
+  const raws = []; // v0.8.0 — raw { } / @css { } verbatim passthrough blocks
   const motions = {};
   const behaviors = {};
   // v0.7.0 — compile-time warnings: things that compile and run but are
@@ -965,7 +1131,10 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       } else if (node.kind === 'motion') {
         motions[node.name] = node;
       } else {
-        for (const child of node.children) if (child.kind !== 'decl') prepass([child]);
+        // v0.8.0 — defensive `|| []`: a malformed tree can throw from here
+        // and take the whole stylesheet down (the @font-face crash report).
+        // The parser now skips unknown at-rules whole, but the guard stays.
+        for (const child of (node.children || [])) if (child.kind !== 'decl') prepass([child]);
       }
     }
   };
@@ -984,7 +1153,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       const m = label.match(/^at\s+([0-9.]+)\s*%?$/);
       return m ? parseFloat(m[1]) : null;
     };
-    const ctxBase = { file, line: node.line, errors, tokens: tokenMap, tokenNames: [...tokenMap.keys()], prop: 'motion', unitless: false };
+    const ctxBase = { file, line: node.line, errors, warnings, tokens: tokenMap, tokenNames: [...tokenMap.keys()], prop: 'motion', unitless: false };
     for (const child of node.children) {
       if (child.kind === 'decl' && child.prop === 'essential') {
         node._parsed.essential = child.value === '' || child.value === 'true';
@@ -1041,7 +1210,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
 
   const resolveTokenDecls = (keys, conds) => {
     const decls = [];
-    const ctxBase = { file, line: 0, errors, tokens: tokenMap, tokenNames: tokenNames(), prop: 'token', unitless: false };
+    const ctxBase = { file, line: 0, errors, warnings, tokens: tokenMap, tokenNames: tokenNames(), prop: 'token', unitless: false };
     for (const key of keys) {
       const raw = tokenMap.get(key);
       const prop = '--dssl-' + key.replace(/\./g, '-');
@@ -1064,6 +1233,22 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   /* ---- main recursive walk ---- */
 
   const walk = (children, ctx, ctxRule) => {
+    // v0.7.2 — parent-first flush. Two real bugs lived here. (1) A nested
+    // block (hover { }, @media, a nested selector) was emitted BEFORE the
+    // parent's own declarations got their cascade order, so `background: red`
+    // on the parent always beat `hover { background: red }` nested inside it
+    // — the exact pattern the docs taught, and the external review's headline
+    // finding. (2) media/container/signal/layer blocks flushed with the
+    // PARENT context, dropping the condition or layer entirely: a nested
+    // `@media dark` was silently unconditional AND sorted before base.
+    // Nested blocks now flush everything the parent has said so far first,
+    // and every block flushes with the context it was actually walked with.
+    const flushPending = (line) => {
+      if (ctxRule && ctxRule.decls.length && ctx.sel) {
+        flush(ctxRule, ctx, line);
+        ctxRule.decls = [];
+      }
+    };
     for (const node of children) {
       switch (node.kind) {
         case 'decl': {
@@ -1080,7 +1265,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
             bh._active = false;
             break;
           }
-          const resolved = resolveDecl(node.prop, node.value, { file, line: node.line, errors, tokens: tokenMap, tokenNames: tokenNames(), prop: node.prop, unitless: false });
+          const resolved = resolveDecl(node.prop, node.value, { file, line: node.line, errors, warnings, tokens: tokenMap, tokenNames: tokenNames(), prop: node.prop, unitless: false });
           for (const r of resolved) {
             // v0.7.0 — remember WHICH source property wrote a display value,
             // so the ordering linter can tell an explicit "display:" from a
@@ -1091,6 +1276,11 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           break;
         }
         case 'selector': {
+          if (/^[a-zA-Z][a-zA-Z0-9-]*$/.test(node.sel) && ctx.sel) {
+            const near = didYouMean(node.sel.toLowerCase(), [...STATE_WORDS]);
+            if (near) warnings.push({ file, line: node.line, message: `"${node.sel}" compiled as a descendant selector ("${combine(ctx.sel, node.sel)}")`, hint: `if you meant the state, it is spelled "${near}" — this block currently styles descendants called <${node.sel}>` });
+          }
+          flushPending(node.line);
           const sel = ctx.sel === '' ? node.sel : combine(ctx.sel, node.sel);
           const childCtx = { ...ctx, sel };
           const sub = { decls: [] };
@@ -1103,7 +1293,19 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
             errors.push({ file, line: node.line, message: `"${node.name}" needs a selector around it` });
             break;
           }
+          flushPending(node.line);
           const childCtx = { ...ctx, sel: ctx.sel + ':' + node.name };
+          // v0.7.2 — the arrow is motion/gradient-stop syntax; inside a seen
+          // block it compiled into an inline style the browser rejects, so the
+          // element just sat at its base style forever. Say so, loudly, and
+          // point at the two real patterns (final value, or a motion).
+          if (node.name === 'seen') {
+            for (const d of node.children) {
+              if (d.kind === 'decl' && typeof d.value === 'string' && d.value.includes('->')) {
+                errors.push({ file, line: d.line, message: `"${d.prop}: ${d.value}" — the -> arrow is motion syntax and does nothing inside seen { }`, hint: 'write the final style (seen { opacity: 1 }) or attach a motion (seen { animate: rise-in 400 })' });
+              }
+            }
+          }
           const sub = { decls: [] };
           walk(node.children, childCtx, sub);
           flush(sub, childCtx, node.line);
@@ -1111,31 +1313,39 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
         }
         case 'media': {
           const q = normalizeMedia(node.query, { errors, file, line: node.line }, node.line);
+          flushPending(node.line);
+          const childCtx = { ...ctx, media: [...ctx.media, q] };
           const sub = { decls: [] };
-          walk(node.children, { ...ctx, media: [...ctx.media, q] }, sub);
-          flush(sub, ctx, node.line);
+          walk(node.children, childCtx, sub);
+          flush(sub, childCtx, node.line);
           break;
         }
         case 'container': {
           const q = normalizeMedia(node.query || '(min-width: 0)', { errors, file, line: node.line }, node.line);
+          flushPending(node.line);
+          const childCtx = { ...ctx, containers: [...ctx.containers, q] };
           const sub = { decls: [] };
-          walk(node.children, { ...ctx, containers: [...ctx.containers, q] }, sub);
-          flush(sub, ctx, node.line);
+          walk(node.children, childCtx, sub);
+          flush(sub, childCtx, node.line);
           break;
         }
         case 'signal': {
           const sig = parseSignal(node.expr, { errors, file, line: node.line }, node.line);
+          flushPending(node.line);
+          const childCtx = { ...ctx, signals: [...ctx.signals, sig] };
           const sub = { decls: [] };
-          walk(node.children, { ...ctx, signals: [...ctx.signals, sig] }, sub);
-          flush(sub, ctx, node.line);
+          walk(node.children, childCtx, sub);
+          flush(sub, childCtx, node.line);
           break;
         }
         case 'layer':
         case 'pin': {
           const layer = node.kind === 'pin' ? 'pin' : (['tokens', 'base', 'components', 'utilities', 'pin'].includes(node.name) ? node.name : 'components');
+          flushPending(node.line);
+          const childCtx = { ...ctx, layer };
           const sub = { decls: [] };
-          walk(node.children, { ...ctx, layer }, sub);
-          flush(sub, ctx, node.line);
+          walk(node.children, childCtx, sub);
+          flush(sub, childCtx, node.line);
           break;
         }
         case 'pseudo': {
@@ -1148,7 +1358,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           for (const d of node.children) {
             if (d.kind !== 'decl') { errors.push({ file, line: d.line, message: 'only declarations may appear inside a pseudo-element block (v0.2)' }); continue; }
             if (d.prop === 'content' && d.value === '') { srule.decls.push({ prop: 'content', value: '""', line: d.line }); continue; }
-            const resolved = resolveDecl(d.prop, d.value, { file, line: d.line, errors, tokens: tokenMap, tokenNames: tokenNames(), prop: d.prop, unitless: false });
+            const resolved = resolveDecl(d.prop, d.value, { file, line: d.line, errors, warnings, tokens: tokenMap, tokenNames: tokenNames(), prop: d.prop, unitless: false });
             // v0.5.0 — engine-native properties have no pseudo-element story:
             // there is no DOM handle to nudge, animate, stack or stagger. They
             // used to leak into the shadow sheet as junk CSS the browser
@@ -1172,6 +1382,14 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           collectTokens(node, '', ownKeys);
           const tr = ownKeys.length ? resolveTokenDecls(ownKeys, ctx) : null;
           if (tr) rules.push(tr);
+          break;
+        }
+        case 'raw': {
+          // v0.8.0 — verbatim CSS escape hatch (@font-face, @keyframes,
+          // @supports, @import, @property…). The parser captured the body
+          // untouched; it rides the same document stylesheet as the
+          // pseudo-element rules and survives `dssl build` verbatim.
+          if ((node.css || '').trim()) raws.push({ css: node.css.trim(), file, line: node.line, order: order++ });
           break;
         }
         case 'behavior':
@@ -1214,7 +1432,15 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           errors.push({
             file, line,
             message: `unknown pseudo-element "::${pseudo}"`,
-            hint: 'try ::before, ::after, ::selection, or a vendor one like ::-webkit-scrollbar-thumb',
+            hint: 'try ::before, ::after, ::selection, ::part(name), or a vendor one like ::-webkit-scrollbar-thumb',
+          });
+          continue;
+        }
+        if (name === 'slotted') {
+          errors.push({
+            file, line,
+            message: '::slotted() only exists inside a shadow tree, and DSSL styles the light DOM',
+            hint: 'style the slotted element itself with a normal selector — it IS reachable from the page',
           });
           continue;
         }
@@ -1283,7 +1509,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   flush(rootRule, topCtx, 0);
 
   // parse all motions that were referenced
-  for (const r of rules) {
+  for (const r of [...rules, ...shadowRules]) {
     for (const d of r.decls) {
       if (d.prop === '@animate' && d.value && d.value.motion) {
         const m = parseMotion(d.value.motion);
@@ -1291,7 +1517,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           errors.push({
             file, line: d.line,
             message: `unknown motion "${d.value.motion}"`,
-            hint: didYouMean(d.value.motion, Object.keys(motions)),
+            hint: didYouMean(d.value.motion, Object.keys(motions)) || `define it first:  motion ${d.value.motion} { from { } to { } }  — then "animate: ${d.value.motion} 400" runs it`,
           });
           d.value.broken = true;
         } else {
@@ -1299,13 +1525,36 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           d.value.essential = m.essential;
         }
       }
+      // v0.8.0 — the animation shorthand is CSS passthrough, so a motion
+      // name that matches nothing used to be a SILENT no-op (no @keyframes
+      // can exist in DSSL). Warn with the whole story; if the keyframes come
+      // from raw { } or another stylesheet, the warning says it can be ignored.
+      if ((d.prop === 'animation' || d.prop === 'animation-name') && typeof d.value === 'string') {
+        const words = d.value.split(/[\s,]+/).filter(w => /^[A-Za-z][\w-]*$/.test(w));
+        const named = words.find(w => motions[w]);
+        if (words.length && !named) {
+          warnings.push({
+            file, line: d.line,
+            message: `animation "${d.value}" references no motion defined in this sheet — it will not run`,
+            hint: `motions are defined with  motion name { from { } to { } }  and run with  animate: name 400  — @keyframes does not exist in DSSL; raw { } can carry verbatim keyframes`,
+          });
+        }
+      }
     }
+  }
+
+  // v0.8.0 — pre-parse EVERY motion (not just referenced ones) so the static
+  // emitter can turn the whole motion vocabulary into real @keyframes.
+  const motionFrames = {};
+  for (const name of Object.keys(motions)) {
+    const m = parseMotion(name);
+    if (m && m.frames.length) motionFrames[name] = m;
   }
 
   const mediaQueries = new Set();
   for (const r of [...rules, ...shadowRules]) r.media.forEach(q => mediaQueries.add(q));
 
-  return { rules, shadowRules, motions, errors, warnings, mediaQueries: [...mediaQueries], tokens: Object.fromEntries(tokenMap), registryRule };
+  return { rules, shadowRules, raws, motions, motionFrames, errors, warnings, mediaQueries: [...mediaQueries], tokens: Object.fromEntries(tokenMap), registryRule };
 }
 
 /** naive `&` substitution + descendant join */

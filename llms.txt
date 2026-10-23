@@ -1,28 +1,28 @@
 # DSSL
 
-> DSSL is a style language for the web. For JS-guaranteed pages it replaces writing CSS; it does not replace the CSS platform (the engine ends in inline styles the browser parses). You write `.dssl` files, the page loads a ~20 kB engine, and the engine walks the DOM in real time applying every matched rule as inline styles. Nothing compiles to CSS. Elements added later are styled the moment they appear; signals, states and motion share one grammar.
+> DSSL is a style language for the web. For JS-guaranteed pages it replaces writing CSS; it does not replace the CSS platform. You write `.dssl` files, the page loads a ~20 kB engine, and the engine walks the DOM in real time applying every matched rule as inline styles. Nothing compiles to CSS at runtime — but v0.8.0 adds the exit lane: `dssl build` compiles the static subset to a real .css file for no-JS, strict-CSP or size-critical pages. Elements added later are styled the moment they appear; signals, states and motion share one grammar.
 
 - Site (docs, playground, changelog, bench): https://dssl-sable.vercel.app
 - Repo + full docs in the README: https://huggingface.co/EHS-Studio/dssl
 - Install: `curl -fsSL https://dssl-sable.vercel.app/install.sh | sh` (or the zip: https://dssl-sable.vercel.app/dssl-engine.zip)
-- Version: 0.7.2 (engine), MIT license
+- Version: 0.8.0 (engine), MIT license
 - Feature matrix vs CSS: see PARITY.md in the repo
 - For agents working ON the codebase: see AGENTS.md in the repo
 
 ## The five things reviewers ask about
 
 1. No build step. Styles are source files linked with `<link rel="stylesheet/dssl">` or embedded in the page as `<style type="text/dssl">` / `<script type="text/dssl">` blocks (auto-booted in document order). The engine restyles the live DOM, including nodes added later.
-2. Honest trade: it is a JS runtime. If JavaScript is unavailable the page renders unstyled. For content pages that must not happen, use prerendering (snapshot the engine's first pass to static HTML; planned, tracked in PARITY.md) or choose another tool. The engine's own docs say this plainly.
+2. Honest trade: it is a JS runtime. If JavaScript is unavailable the page renders unstyled — unless you build the static subset: `dssl build styles.dssl -o styles.css` emits real CSS (tokens → custom properties, states → :hover, layers → @layer, motions → @keyframes, `raw { }` verbatim, `seen` applied as its no-JS final state) and the report counts what stays runtime-only (`@signal` rules, `animate:`). For content pages that must not flash, use the build output or choose another tool.
 3. Exit cost is zero. Abandoning DSSL leaves you a page of valid inline styles and one small shadow stylesheet for pseudo-elements. There is nothing to un-install from your markup.
 4. Speed has a handbrake. `DSSL.freeze()` detaches every observer and listener after first paint and leaves the resolved look at zero engine cost; `unfreeze()` re-arms. A gate prefilter skips obvious non-matches before native matching. The Bench page on the site measures 100 / 1,000 / 10,000 nodes on your machine: CSS `<style>` vs DSSL live vs DSSL frozen.
 5. The cascade is (layer, source order). No specificity, no !important. Nested state blocks sort after the parent rule's own declarations (v0.7.2 fix: they used to lose), and nested `@media`/`@signal`/`@layer` keep their condition. `pin { }` is the only must-win block. The compiler refuses to guess: unknown tokens, properties and values fail loudly with did-you-mean; `--*` custom properties pass through unvalidated on purpose.
 
-## Language surface (v0.7.2)
+## Language surface (v0.8.0)
 
 - Selectors: the full CSS surface rides native matching, including `:nth-child()`, `:not()`, `:is()`, `:where()`, `:has()`, combinators, attributes, nesting with `&`.
 - States as nested blocks: `hover`, `focus`, `focus-visible`, `active`, `disabled`, `checked`, `empty`, `target`, plus `seen` (fires once on first viewport entry, composes with `stagger:`).
 - Tokens built in: `color.*`, `space.1-8`, `radius.*`, `shadow.*`, `font.*`; custom `tokens { }` blocks with numeric keys (`space { 9: 96 }`), alpha suffixes (`color.ink/85`), per-subtree re-declaration (`--color.accent: color.err`).
-- Layout sugar: `row: gap space.4 between center`, `column:`, `grid: 3 gap 12`, `stack: center`, `center: both` (promotes a formatting context so alignment can never silently no-op), `size: 40 20`.
+- Layout sugar: `row: gap space.4 between center`, `column:`, `grid: 3 gap 12`, `stack: center`, `center: both` (promotes a formatting context so alignment can never silently no-op), `size: 40 20`. v0.8.0 axis roles: distribution words (`between`/`around`/`evenly`) own the main axis, `stretch`/`baseline` own the cross axis, `center`/`start`/`end` fill free axes, and a word with nowhere to go warns instead of overwriting silently.
 - Pseudo-elements (`::before`, `::after`, `::placeholder`, `::selection`, `::marker`, `::backdrop`, `::first-line`, `::first-letter`, vendor ones) compile to one real shadow stylesheet; unknown pseudo names are compile errors.
 - Conditions: `@media` (with `dark`, `light`, `reduced-motion` sugar and `<=` ranges), `@container`, `@signal menuOpen { }` bridged from `DSSL.signal()`, `@layer base|components|utilities`, `pin { }`.
 - Motion: `motion name { from { } to { } }` via WAAPI; `animate: pulse 1600 infinite alternate`; `stagger: 70`; reduced-motion respected unless a motion declares `essential`.
@@ -30,6 +30,9 @@
 - Gradients as sentences: `gradient: linear 135, color.accent -> color.ok`, `gradient-text:`, `gradient-flow: 6s alternate`. Non-color stops are compile errors.
 - Overlap policy: nothing below 100% opacity overlaps anything unless `overlap: allow`; `deny` is unconditional; pairs with `pointer-events: none` so veils stop eating clicks and text selection.
 - Behaviors: named rule groups applied with `use focus-ring`.
+- Verbatim escape hatch (v0.8.0): `raw { }` / `@css { }` drops real CSS (@font-face, @keyframes, @supports, @import, @property) into the page stylesheet untouched; unknown at-rules skip their whole block with one clean error.
+- Fluid sugar (v0.8.0): `font-size: fluid 16 24` (and any length-ish property) compiles to the linear clamp() between 360px and 1200px viewports; `fluid: 16, 24` still works.
+- v0.8.0 review-driven fixes, all regression-tested incl. headless-Chromium computed-style tests of the docs: row/column axis roles (the documented `between center` example laid out wrong before); @font-face no longer crashes the compiler (unknown at-rules skip balanced); @supports inner rules no longer leak unconditionally; `url(...)` is atomic (unquoted form no longer false-errors); `!important` is a loud error that emits nothing; the animation shorthand warns when its motion is undefined instead of suggesting "span"; CSS-order transition values get the exact DSSL conversion in the error hint.
 - v0.7.2 review-driven fixes, all regression-tested: gate prefilter runs before native matches(); hover state events scope candidate recomputation to the touched subtree plus ancestors (was page-wide); checkbox/details states listen to `change`/`toggle`; raw hex alpha (`#ff0000/50` -> color-mix); bare numbers on time properties are ms; `::part()` supported, `::slotted()` rejected with an explanation; SVG properties (`fill`, `stroke*`) and `text-wrap`/`content-visibility` in the vocabulary.
 - Warnings channel (v0.7): things that compile but are probably wrong, e.g. a layout shorthand expanding to `display` and clobbering an earlier explicit `display:` in the same rule.
 
@@ -39,14 +42,24 @@
 DSSL.load(['/styles/site.dssl'])   // fetch + apply, in order
 DSSL.apply(src, { scope, name })   // scoped engines for widgets
 DSSL.compile(src)                  // parse + resolve, no DOM (powers editors)
+DSSL.toCSS(src)                    // v0.8.0: the exit lane -> { css, report }
 DSSL.signal('menuOpen', true)      // the JS -> styles bridge
 DSSL.freeze() / DSSL.unfreeze()    // the speed handbrake
 DSSL.explain(el, { quiet: true })  // matched rules, file/line, winning decls per property
 DSSL.replay(sel) / DSSL.refresh() / DSSL.errors() / DSSL.version
 ```
 
+## CLI (v0.8.0)
+
+```sh
+node cli/dssl.mjs check styles.dssl --strict   # CI: exit 1 on errors, --json for machines
+node cli/dssl.mjs build styles.dssl -o styles.css  # the static subset as real CSS
+```
+
+`check` runs the real compiler with file:line diagnostics and did-you-mean hints. `build` compiles the static subset (tokens → custom properties, states → :hover, layers → @layer, motions → @keyframes, raw { } verbatim, pin → !important, seen → its no-JS final state) and prints a report of what was emitted and what stays runtime-only.
+
 Wait for the `dssl-ready` event on `window` before measuring layout: the engine styles the DOM after DOMContentLoaded, and scripts that measure earlier read a half-styled world.
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. Install `dssl-vscode/dssl-vscode-0.7.2.vsix` from the repo files; older vsix packages (0.7.1 and below) were packaged before the review-driven fixes and carry the old compiler. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. Install `dssl-vscode/dssl-vscode-0.8.0.vsix` from the repo files. Source lives in `dssl-vscode/` in the repo.

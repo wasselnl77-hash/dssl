@@ -16,9 +16,10 @@
 
 import { parse } from './parser.js';
 import { resolve, DEFAULT_TOKENS } from './resolver.js';
+import { toCSS as docToCSS } from './static.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.7.2';
+export const VERSION = '0.8.0';
 
 let counter = 0;
 const engines = new Map();
@@ -143,6 +144,18 @@ export async function load(urls, opts = {}) {
   return results;
 }
 
+/** v0.8.0 — the exit lane: compile a DSSL source string to a real CSS
+ *  stylesheet (tokens → custom properties, states → :hover, @media as-is,
+ *  layers → @layer, motions → @keyframes, raw { } verbatim). Returns
+ *  { css, report } — report counts what was emitted and what stays
+ *  engine-only (@signal rules, animate: and friends). */
+export function toCSS(source, opts = {}) {
+  const file = opts.file || 'inline.dssl';
+  const result = compile(source, file);
+  const built = docToCSS(result.doc, { file, banner: opts.banner });
+  return { ...built, ok: result.ok, errors: result.errors, warnings: result.warnings };
+}
+
 export function signal(name, value) { for (const e of engines.values()) e.signal(name, value); }
 export function getSignal(name) { return engines.get('global')?.getSignal(name); }
 export function refresh() { for (const e of engines.values()) e.computeAll(); }
@@ -193,7 +206,7 @@ export function explain(el, opts = {}) {
 }
 
 export const DSSL = {
-  version: VERSION, compile, apply, load, signal, getSignal, refresh, replay, errors,
+  version: VERSION, compile, apply, load, toCSS, signal, getSignal, refresh, replay, errors,
   freeze, unfreeze, explain,
   __debug: { engines },
 };

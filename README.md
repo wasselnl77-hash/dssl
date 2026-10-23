@@ -6,7 +6,7 @@ license: mit
 
 DSSL is a style language for the web. For the pages it fits, it replaces writing CSS entirely. It does not replace the CSS platform: the engine ends in inline styles that the browser parses, and it needs JavaScript. Where it wins is the authoring experience: tokens, words-as-layout, states and motion in one grammar, loud errors, zero build. PARITY.md keeps the honest feature ledger.
 
-Not a preprocessor that spits out stylesheets. Not a utility class graveyard. You write `.dssl` files, the page loads a small engine, and the engine walks your DOM in real time and applies every rule it matches straight onto the elements it finds. Nothing is compiled. There is no build step for styles.
+Not a preprocessor that spits out stylesheets. Not a utility class graveyard. You write `.dssl` files, the page loads a small engine, and the engine walks your DOM in real time and applies every rule it matches straight onto the elements it finds. Nothing compiles at runtime — and since v0.8.0 there is also an exit lane: `dssl build` compiles the static subset of the same source to a real `.css` file for pages that must work without JavaScript or sit behind a strict CSP. You choose per page: live engine, built CSS, or both.
 
 Elements that show up later get styled the moment they appear. Change a rule and the page updates on the next pass. The language is the runtime.
 
@@ -68,7 +68,7 @@ Both drop a `dssl-engine/` folder next to you: the engine, a starter token set, 
 
 Prefer to click: [dssl-engine.zip](https://dssl-sable.vercel.app/dssl-engine.zip) or [dssl-engine.tar.gz](https://dssl-sable.vercel.app/dssl-engine.tar.gz). Same package, straight from the browser.
 
-Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API): download `dssl-vscode/dssl-vscode-0.7.2.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. An Open VSX listing (so it appears in VSCodium's Extensions tab, searchable) is staged and publishes with one Open VSX token; see `dssl-vscode/PUBLISHING.md`.
+Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API): download `dssl-vscode/dssl-vscode-0.8.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. An Open VSX listing (so it appears in VSCodium's Extensions tab, searchable) is staged and publishes with one Open VSX token; see `dssl-vscode/PUBLISHING.md`.
 
 AI agents and machine reviewers: this repo ships `llms.txt` (dense, structured facts), `AGENTS.md` (how to work on the codebase) and `PARITY.md` (the honest feature matrix against CSS). The site serves the same `llms.txt` at https://dssl-sable.vercel.app/llms.txt
 
@@ -369,6 +369,28 @@ DSSL.version                           // '0.7.0'
 
 Auto-boot picks up every `link[rel="stylesheet/dssl"]` and `style[type="text/dssl"]`, applies them, and fires `dssl-ready` on `window`. `<html data-dssl-reset>` enables the small built-in reset.
 
+## The exit lane: dssl check + dssl build (v0.8.0)
+
+The same compiler that runs in your browser runs in your terminal:
+
+```sh
+node cli/dssl.mjs check styles.dssl --strict    # CI: exit 1 on errors, --json for machines
+node cli/dssl.mjs build styles.dssl -o styles.css
+```
+
+`build` emits real CSS from the static subset: tokens become custom properties,
+states become `:hover`, `@media`/`@container` pass through, layers become
+`@layer`, motions become `@keyframes`, `pin` becomes `!important`, `raw { }`
+passes through verbatim, and `seen` applies its final state (the graceful
+no-JS look). What genuinely needs the runtime (`@signal`, `animate:`, deform,
+overlap) stays out and gets counted in the report, so the boundary is explicit
+instead of folklore.
+
+Two more tools from v0.8.0: `raw { }` (alias `@css { }`) drops verbatim CSS
+like `@font-face` or `@keyframes` into the page stylesheet, and
+`font-size: fluid 16 24` compiles to the linear `clamp()` between 360 and
+1200px viewports.
+
 ## Performance: freeze, explain, and the cost of live
 
 DSSL is a runtime. It walks the DOM, matches rules, and writes inline styles. That buys live tokens, live signals and live layout, and it costs more than a static stylesheet by design. Three things tip the ledger back:
@@ -398,10 +420,10 @@ const rep = DSSL.explain(document.querySelector('.doc-card'))
 
 The matcher also pre-filters every rule through a cheap class/tag/id gate extracted from the selector's rightmost compound, so a recompute skips obvious non-matches instead of asking the browser rule by rule. The gate only ever says no; anything it does not fully understand falls back to native matching.
 
-## What works today (v0.7.1)
+## What works today (v0.8.0)
 
 - the full selector surface, including `:nth-child`, `:not`, `:is`, `:where`, `:has`
-- flexbox and grid with `row:` / `column:` / `grid:` / `stack:` / `center:` sugar
+- flexbox and grid with `row:` / `column:` / `grid:` / `stack:` / `center:` sugar — place words now own an axis (`between` is main-axis, `stretch` is cross-axis) and conflicts warn instead of silently overwriting
 - behaviors and `use`
 - design tokens, numeric keys included, scoped per file and per subtree
 - states, engine-native `seen`, `stagger` choreography
@@ -410,25 +432,30 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 - gradient sentences: `gradient`, `gradient-text`, `gradient-flow`
 - the overlap policy and `pointer-events` pass-through for veils
 - pseudo-elements in any spelling (shadow CSS), themed scrollbars included
-- compiler warnings for cascade-order footguns
-- `DSSL.freeze()` / `DSSL.unfreeze()` / `DSSL.explain()`
+- `raw { }` / `@css { }` for verbatim CSS (`@font-face`, `@keyframes`, `@supports`); unknown at-rules skip their whole block with one clean error
+- `fluid 16 24` sizing sugar on any length property
+- the CLI: `dssl check` (CI, --json) and `dssl build` (real CSS from the static subset)
+- compiler warnings for cascade-order footguns and duplicate axis words
+- `DSSL.freeze()` / `DSSL.unfreeze()` / `DSSL.explain()` / `DSSL.toCSS()`
 - bare font names, `hyphens: manual`, loud did-you-mean errors
 - honest line numbers: a v0.7.1 parser bug (every `//` comment shifted later lines +1, so diagnostics pointed one line late) is fixed and regression-tested
 - the editor extension bundles the real compiler, so editor squiggles and browser console agree
+- every guide example is asserted in headless Chromium (computed styles, real mouse hover, real IntersectionObserver), so docs examples cannot drift from the engine again
 
 ## Repo layout
 
-- `public/dssl/` the engine: parser, resolver, engine, boot
+- `public/dssl/` the engine: parser, resolver, engine, boot, and `static.js` (the build target)
 - `public/styles/` the styles that drive the site
+- `cli/dssl.mjs` the CLI: `check` + `build`, no dependencies
 - `package/` what ships in the download: engine, starter files, usage guide, installers
 - `src/` the Next.js site (docs, playground, changelog)
-- `scripts/` smoke tests for the engine
+- `scripts/` smoke tests, regression suites, and the headless-browser docs tests
 - `dssl-vscode/` the editor extension (VS Code + VSCodium, bundles the real parser/resolver)
-- `llms.txt`, `AGENTS.md`, `PARITY.md` for machine reviewers and contributors
+- `llms.txt`, `AGENTS.md`, `PARITY.md`, `GUIDE.md` for machine reviewers and contributors
 
 ## Status
 
-v0.7.1, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; if a page must work without JavaScript, a style runtime is not the right tool for it. Freeze makes big static pages viable; live interaction is what the engine is for.
+v0.8.0, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite — and the docs examples are rendered and asserted in a real browser, so the guide cannot lie. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; when a page must work without JavaScript, build the static subset with `dssl build` or pick another tool for that page. Freeze makes big static pages viable; live interaction is what the engine is for.
 
 ## License
 

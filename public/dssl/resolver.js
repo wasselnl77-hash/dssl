@@ -45,6 +45,10 @@ export const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,
   'serif,sans-serif,monospace,cursive,fantasy,system-ui,ui-sans-serif,ui-monospace,ui-serif,ui-rounded,' +
   'system-ui,-apple-system,Roboto,Helvetica,Arial,Menlo,Consolas,SFMono-Regular,Liberation-Mono,Inter,Noto-Sans,Ubuntu,Cantarell,Oxygen,Fira-Sans,Droid-Sans,' +
   'border-box,content-box,padding-box,fill-box,stroke-box,view-box,' +
+  // v0.8.0 — the background repeat/attachment words the url() fix exposed:
+  // `background: url(a.png) no-repeat` was a false error because "no-repeat"
+  // was missing while "repeat" existed
+  'no-repeat,repeat-x,repeat-y,space,round,scroll,local,' +
   'contain,cover,fill,fit-content,min-content,max-content,minmax,repeat,clamp,calc,var,url,env,attr,' +
   'auto-fill,auto-fit,subgrid,dense,stretch,span,' +
   'scaleX,scaleY,translateX,translateY,translate,rotate,skew,skewX,skewY,matrix,' +
@@ -79,6 +83,10 @@ const UNITLESS_PROPS = new Set([
 // why `transition-delay: 200` shipped as invalid unitless 200.
 const TIME_PROPS = new Set([
   'transition-delay', 'transition-duration', 'animation-delay', 'animation-duration',
+  // v0.8.0 — the animation shorthand takes bare numbers as ms too:
+  // `animation: spin 1s infinite` is fine, but `animation: ghost 400` used
+  // to become "ghost 400px" (invalid). 400 → 400ms, matching animate:.
+  'animation',
 ]);
 
 // A practical whitelist of standard CSS properties (loud errors beat silent ones)
@@ -216,6 +224,15 @@ function resolveValue(raw, ctx) {
         }
         const inner = raw.slice(i + 1, j - 1);
         const fname = ident.toLowerCase();
+        // v0.8.0 — url() is atomic. The validator used to tokenize INSIDE it,
+        // so `url(a.png)` raised "unknown value a.png" (quoted urls worked
+        // only because strings were already consumed whole). CSS allows the
+        // unquoted form; DSSL passes it through untouched now.
+        if (fname === 'url') {
+          out += 'url(' + inner.trim() + ')';
+          i = j;
+          continue;
+        }
         // v0.3.2 fix: repeat(COUNT, tracks) — the leading count is an integer,
         // never a length. `repeat(4, 1fr)` used to become `repeat(4px, 1fr)`,
         // which the browser rejected and the whole grid silently collapsed.
@@ -487,7 +504,21 @@ function buildGradient(v, ctx) {
 
 function parseFlexWords(value, ctx, dir) {
   const out = [{ prop: 'display', value: 'flex' }, { prop: 'flex-direction', value: dir }];
+  // v0.8.0 — axis roles. Every place word used to write BOTH axes, so
+  // `row: gap 8 between center` (the guide's own example) compiled to
+  // justify-content: space-between followed by justify-content: center —
+  // and center won, bunching everything in the middle. Words now declare
+  // the axis they are actually about: distribution words (between/around/
+  // evenly) own the main axis, stretch/baseline own the cross axis, and
+  // center/start/end fill whichever axes are still free. A word whose axes
+  // are all taken is a loud warning instead of a silent overwrite.
+  const FLEX_AXIS = {
+    between: 'main', around: 'main', evenly: 'main',
+    stretch: 'cross', baseline: 'cross',
+    center: 'both', start: 'both', end: 'both',
+  };
   const atoms = value.split(/\s+/).filter(Boolean);
+  let mainSet = null, crossSet = null;
   for (let k = 0; k < atoms.length; k++) {
     const a = atoms[k];
     if (a === 'gap') {
@@ -500,9 +531,36 @@ function parseFlexWords(value, ctx, dir) {
     if (a === 'nowrap') { out.push({ prop: 'flex-wrap', value: 'nowrap' }); continue; }
     if (a === 'reverse') { out[1].value = dir + '-reverse'; continue; }
     if (a === 'inline') { out[0].value = 'inline-flex'; continue; }
-    if (PLACE_WORDS[a]) {
-      out.push({ prop: 'align-items', value: PLACE_WORDS[a][0] });
-      out.push({ prop: 'justify-content', value: PLACE_WORDS[a][1] });
+    if (FLEX_AXIS[a]) {
+      const role = FLEX_AXIS[a];
+      const pc = PLACE_WORDS[a]; // [cross, main]
+      const axisWarn = (prop, prev) => {
+        ctx.warnings = ctx.warnings || [];
+        ctx.warnings.push(prev === a
+          ? { file: ctx.file, line: ctx.line, message: `"${a}" is written twice in ${dir} — the second copy wins`, hint: `drop the duplicate; one distribution word + one alignment word is the whole grammar` }
+          : { file: ctx.file, line: ctx.line, message: `two words in ${dir} write ${prop}: "${a}" overrides "${prev}"`, hint: `later words win — drop one, or reorder so the distribution word comes first` });
+      };
+      let wrote = false;
+      if (role === 'main' || (role === 'both' && !mainSet)) {
+        if (mainSet) axisWarn('justify-content', mainSet);
+        out.push({ prop: 'justify-content', value: pc[1] });
+        mainSet = a; wrote = true;
+      }
+      if (role === 'cross' || (role === 'both' && !crossSet)) {
+        if (crossSet) axisWarn('align-items', crossSet);
+        out.push({ prop: 'align-items', value: pc[0] });
+        crossSet = a; wrote = true;
+      }
+      if (!wrote) {
+        ctx.warnings = ctx.warnings || [];
+        ctx.warnings.push({
+          file: ctx.file, line: ctx.line,
+          message: mainSet === a || crossSet === a
+            ? `"${a}" is written twice in ${dir} — both axes already came from it`
+            : `"${a}" has nowhere to go: justify-content came from "${mainSet}", align-items came from "${crossSet}"`,
+          hint: 'one distribution word + one alignment word is the whole grammar — the extra word is dropped',
+        });
+      }
       continue;
     }
     ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown word "${a}" in ${dir}`, hint: didYouMean(a, ['gap', 'center', 'start', 'end', 'between', 'around', 'evenly', 'stretch', 'baseline', 'wrap', 'nowrap', 'reverse', 'inline']) });
@@ -613,17 +671,7 @@ const SEMANTIC = {
     return out;
   },
   fluid(v, ctx) {
-    const parts = v.split(',').map(s => s.trim());
-    const px = (s) => {
-      const m = String(s).match(/^([0-9.]+)\s*(px|rem|em|%)?$/);
-      if (!m) { ctx.errors.push({ file: ctx.file, line: ctx.line, message: `fluid: "${s}" is not a size` }); return '0px'; }
-      return m[2] ? `${m[1]}${m[2]}` : `${m[1]}px`;
-    };
-    const min = px(parts[0]); const max = px(parts[1]);
-    const vmin = px(parts[2] || '360'); const vmax = px(parts[3] || '1200');
-    const mv = parseFloat(min), xv = parseFloat(max);
-    const slope = ((xv - mv) / (parseFloat(vmax) - parseFloat(vmin))) * 100;
-    return [{ prop: 'font-size', value: `clamp(${min}, calc(${min} + ${slope.toFixed(3)}vw), ${max})` }];
+    return buildFluidParts(v.split(',').map(s => s.trim()).filter(Boolean), ctx);
   },
   shadow(v, ctx) {
     const t = v.trim();
@@ -697,6 +745,22 @@ const SEMANTIC = {
       const atoms = part.split(/\s+/);
       const dur = atoms[0];
       if (!/^\d*\.?\d+(ms|s)?$/.test(dur)) {
+        // v0.8.0 — the CSS habit is property-first (`transition: color .2s
+        // ease`). That used to be a generic "not a time" error and the part
+        // silently dropped. The error now REWRITES the value into the DSSL
+        // order (time · easing · property) so the fix is a copy-paste.
+        const timeAtom = atoms.find(a => /^\d*\.?\d+(ms|s)?$/.test(a));
+        const easeAtom = atoms.find(a => EASINGS[a]);
+        const propAtom = atoms.find(a => a !== timeAtom && a !== easeAtom && (KNOWN_PROPS.has(a) || DEFORM_TO_TRANSFORM[a]));
+        if (timeAtom) {
+          const msOut = /^\d+$/.test(timeAtom) ? timeAtom : /ms$/.test(timeAtom) ? timeAtom.replace(/ms$/, '') : String(parseFloat(timeAtom) * 1000);
+          ctx.errors.push({
+            file: ctx.file, line: ctx.line,
+            message: `transition: the CSS form (property first) is not DSSL`,
+            hint: `write  transition: ${msOut}${easeAtom ? ' ' + easeAtom : ''}${propAtom ? ' ' + propAtom : ''}  — time first, easing, property last`,
+          });
+          continue;
+        }
         ctx.errors.push({ file: ctx.file, line: ctx.line, message: `transition duration "${dur}" is not a time`, hint: 'order is duration · easing · property — try 200 or 0.2s' });
         continue;
       }
@@ -876,13 +940,51 @@ const SEMANTIC = {
   },
 };
 
+/* v0.8.0 — fluid sizing sugar. `fluid: 16, 24` keeps working (font-size),
+ * and now any length-ish property takes it inline: `font-size: fluid 16 24`.
+ * Both compile to a clamp() that scales linearly between the viewport bounds
+ * (360px and 1200px by default) — the formula everyone writes by hand and
+ * gets wrong. */
+const FLUID_PROPS = new Set(('font-size,width,height,inline-size,block-size,min-width,max-width,min-height,max-height,' +
+  'gap,row-gap,column-gap,padding,margin,inset,top,right,bottom,left').split(','));
+
+function buildFluidParts(parts, ctx, prop = 'font-size') {
+  const px = (s) => {
+    const m = String(s).match(/^([0-9.]+)\s*(px|rem|em|%)?$/);
+    if (!m) {
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `fluid: "${s}" is not a size`, hint: 'fluid takes two sizes and optionally the viewport bounds — fluid 16 24, or fluid 16 24 360 1200' });
+      return '0px';
+    }
+    return m[2] ? `${m[1]}${m[2]}` : `${m[1]}px`;
+  };
+  const min = px(parts[0]); const max = px(parts[1]);
+  const vmin = px(parts[2] || '360'); const vmax = px(parts[3] || '1200');
+  const mv = parseFloat(min), xv = parseFloat(max);
+  const slope = ((xv - mv) / (parseFloat(vmax) - parseFloat(vmin))) * 100;
+  return [{ prop, value: `clamp(${min}, calc(${min} + ${slope.toFixed(3)}vw), ${max})` }];
+}
+
 /* ------------------------------------------------------------------ *
  * resolveDecl — one declaration → zero or more engine decls
  * ------------------------------------------------------------------ */
 
 function resolveDecl(prop, value, ctx) {
   const errors = ctx.errors;
-  const ctx2 = { ...ctx, prop, errors };
+  const ctx2 = { ...ctx, prop, errors, warnings: ctx.warnings };
+
+  // v0.8.0 — !important does not exist in DSSL. It used to fall through as a
+  // value: the compiler said "unknown value important" AND still emitted
+  // `red !important`, which the browser then silently dropped as an invalid
+  // inline value. Now: one loud error, nothing emitted, and the pin { }
+  // answer to the actual question.
+  if (hasImportant(value)) {
+    errors.push({
+      file: ctx.file, line: ctx.line,
+      message: `!important does not exist in DSSL — "${prop}: ${String(value).replace(/\s*!\s*important\s*/i, '')}" was NOT applied`,
+      hint: 'the cascade is (layer, order) and later wins — put the rule in pin { } when it genuinely must win',
+    });
+    return [];
+  }
 
   if (prop.startsWith('--')) {
     // v0.4.0 — scoped tokens. Dotted names are token re-declarations:
@@ -899,6 +1001,22 @@ function resolveDecl(prop, value, ctx) {
   const sem = SEMANTIC[prop];
   if (sem) return sem(value, ctx2);
 
+  // v0.8.0 — the animation shorthand passes through (it is legal CSS), but
+  // bare motion names must not pay the generic unknown-value tax: "spin"
+  // used to error with the surreal suggestion "did you mean span?". Motion
+  // names pass silently here and a dedicated warning in the final loop says
+  // the DSSL way (motion + animate) when the name matches nothing.
+  if (prop === 'animation' || prop === 'animation-name') {
+    return [{ prop, value: resolveValue(value, { ...ctx2, unitless: UNITLESS_PROPS.has(prop), bareIdents: true }) }];
+  }
+
+  // v0.8.0 — inline fluid sugar on any length-ish property:
+  // font-size: fluid 16 24  →  clamp(16px, calc(16px + 0.952vw), 24px)
+  const fluidM = /^fluid\s+([\s\S]+)$/.exec(String(value).trim());
+  if (fluidM && FLUID_PROPS.has(prop)) {
+    return buildFluidParts(fluidM[1].split(/[\s,]+/).filter(Boolean), ctx2, prop);
+  }
+
   if (!KNOWN_PROPS.has(prop)) {
     errors.push({
       file: ctx.file, line: ctx.line,
@@ -908,6 +1026,19 @@ function resolveDecl(prop, value, ctx) {
     return [];
   }
   return [{ prop, value: resolveValue(value, { ...ctx2, unitless: UNITLESS_PROPS.has(prop), bareIdents: prop === 'font-family' }) }];
+}
+
+/** string-aware !important scan — quoted content: "!important" must not trip it */
+function hasImportant(v) {
+  const s = String(v);
+  let q = null;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) { if (c === q && s[i - 1] !== '\\') q = null; continue; }
+    if (c === '"' || c === "'") { q = c; continue; }
+    if (c === '!' && /\s*important/i.test(s.slice(i + 1))) return true;
+  }
+  return false;
 }
 
 /* ------------------------------------------------------------------ *
@@ -960,6 +1091,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   const errors = [];
   const rules = [];
   const shadowRules = [];
+  const raws = []; // v0.8.0 — raw { } / @css { } verbatim passthrough blocks
   const motions = {};
   const behaviors = {};
   // v0.7.0 — compile-time warnings: things that compile and run but are
@@ -999,7 +1131,10 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       } else if (node.kind === 'motion') {
         motions[node.name] = node;
       } else {
-        for (const child of node.children) if (child.kind !== 'decl') prepass([child]);
+        // v0.8.0 — defensive `|| []`: a malformed tree can throw from here
+        // and take the whole stylesheet down (the @font-face crash report).
+        // The parser now skips unknown at-rules whole, but the guard stays.
+        for (const child of (node.children || [])) if (child.kind !== 'decl') prepass([child]);
       }
     }
   };
@@ -1018,7 +1153,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       const m = label.match(/^at\s+([0-9.]+)\s*%?$/);
       return m ? parseFloat(m[1]) : null;
     };
-    const ctxBase = { file, line: node.line, errors, tokens: tokenMap, tokenNames: [...tokenMap.keys()], prop: 'motion', unitless: false };
+    const ctxBase = { file, line: node.line, errors, warnings, tokens: tokenMap, tokenNames: [...tokenMap.keys()], prop: 'motion', unitless: false };
     for (const child of node.children) {
       if (child.kind === 'decl' && child.prop === 'essential') {
         node._parsed.essential = child.value === '' || child.value === 'true';
@@ -1075,7 +1210,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
 
   const resolveTokenDecls = (keys, conds) => {
     const decls = [];
-    const ctxBase = { file, line: 0, errors, tokens: tokenMap, tokenNames: tokenNames(), prop: 'token', unitless: false };
+    const ctxBase = { file, line: 0, errors, warnings, tokens: tokenMap, tokenNames: tokenNames(), prop: 'token', unitless: false };
     for (const key of keys) {
       const raw = tokenMap.get(key);
       const prop = '--dssl-' + key.replace(/\./g, '-');
@@ -1130,7 +1265,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
             bh._active = false;
             break;
           }
-          const resolved = resolveDecl(node.prop, node.value, { file, line: node.line, errors, tokens: tokenMap, tokenNames: tokenNames(), prop: node.prop, unitless: false });
+          const resolved = resolveDecl(node.prop, node.value, { file, line: node.line, errors, warnings, tokens: tokenMap, tokenNames: tokenNames(), prop: node.prop, unitless: false });
           for (const r of resolved) {
             // v0.7.0 — remember WHICH source property wrote a display value,
             // so the ordering linter can tell an explicit "display:" from a
@@ -1223,7 +1358,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           for (const d of node.children) {
             if (d.kind !== 'decl') { errors.push({ file, line: d.line, message: 'only declarations may appear inside a pseudo-element block (v0.2)' }); continue; }
             if (d.prop === 'content' && d.value === '') { srule.decls.push({ prop: 'content', value: '""', line: d.line }); continue; }
-            const resolved = resolveDecl(d.prop, d.value, { file, line: d.line, errors, tokens: tokenMap, tokenNames: tokenNames(), prop: d.prop, unitless: false });
+            const resolved = resolveDecl(d.prop, d.value, { file, line: d.line, errors, warnings, tokens: tokenMap, tokenNames: tokenNames(), prop: d.prop, unitless: false });
             // v0.5.0 — engine-native properties have no pseudo-element story:
             // there is no DOM handle to nudge, animate, stack or stagger. They
             // used to leak into the shadow sheet as junk CSS the browser
@@ -1247,6 +1382,14 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           collectTokens(node, '', ownKeys);
           const tr = ownKeys.length ? resolveTokenDecls(ownKeys, ctx) : null;
           if (tr) rules.push(tr);
+          break;
+        }
+        case 'raw': {
+          // v0.8.0 — verbatim CSS escape hatch (@font-face, @keyframes,
+          // @supports, @import, @property…). The parser captured the body
+          // untouched; it rides the same document stylesheet as the
+          // pseudo-element rules and survives `dssl build` verbatim.
+          if ((node.css || '').trim()) raws.push({ css: node.css.trim(), file, line: node.line, order: order++ });
           break;
         }
         case 'behavior':
@@ -1366,7 +1509,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   flush(rootRule, topCtx, 0);
 
   // parse all motions that were referenced
-  for (const r of rules) {
+  for (const r of [...rules, ...shadowRules]) {
     for (const d of r.decls) {
       if (d.prop === '@animate' && d.value && d.value.motion) {
         const m = parseMotion(d.value.motion);
@@ -1374,7 +1517,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           errors.push({
             file, line: d.line,
             message: `unknown motion "${d.value.motion}"`,
-            hint: didYouMean(d.value.motion, Object.keys(motions)),
+            hint: didYouMean(d.value.motion, Object.keys(motions)) || `define it first:  motion ${d.value.motion} { from { } to { } }  — then "animate: ${d.value.motion} 400" runs it`,
           });
           d.value.broken = true;
         } else {
@@ -1382,13 +1525,36 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           d.value.essential = m.essential;
         }
       }
+      // v0.8.0 — the animation shorthand is CSS passthrough, so a motion
+      // name that matches nothing used to be a SILENT no-op (no @keyframes
+      // can exist in DSSL). Warn with the whole story; if the keyframes come
+      // from raw { } or another stylesheet, the warning says it can be ignored.
+      if ((d.prop === 'animation' || d.prop === 'animation-name') && typeof d.value === 'string') {
+        const words = d.value.split(/[\s,]+/).filter(w => /^[A-Za-z][\w-]*$/.test(w));
+        const named = words.find(w => motions[w]);
+        if (words.length && !named) {
+          warnings.push({
+            file, line: d.line,
+            message: `animation "${d.value}" references no motion defined in this sheet — it will not run`,
+            hint: `motions are defined with  motion name { from { } to { } }  and run with  animate: name 400  — @keyframes does not exist in DSSL; raw { } can carry verbatim keyframes`,
+          });
+        }
+      }
     }
+  }
+
+  // v0.8.0 — pre-parse EVERY motion (not just referenced ones) so the static
+  // emitter can turn the whole motion vocabulary into real @keyframes.
+  const motionFrames = {};
+  for (const name of Object.keys(motions)) {
+    const m = parseMotion(name);
+    if (m && m.frames.length) motionFrames[name] = m;
   }
 
   const mediaQueries = new Set();
   for (const r of [...rules, ...shadowRules]) r.media.forEach(q => mediaQueries.add(q));
 
-  return { rules, shadowRules, motions, errors, warnings, mediaQueries: [...mediaQueries], tokens: Object.fromEntries(tokenMap), registryRule };
+  return { rules, shadowRules, raws, motions, motionFrames, errors, warnings, mediaQueries: [...mediaQueries], tokens: Object.fromEntries(tokenMap), registryRule };
 }
 
 /** naive `&` substitution + descendant join */

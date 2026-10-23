@@ -131,7 +131,10 @@ const declsOf = (doc, sel) => doc.rules.filter(r => r.sel === sel).flatMap(r => 
 }
 /* 12 — version */
 {
-  ok(VERSION === '0.7.2', 'engine VERSION is 0.7.2');
+  // v0.8.0 — pin loosened the same way v070's was: the suite must survive
+  // later releases, but catch an accidental DOWNGRADE below 0.7.2.
+  const [maj, min, pat] = String(VERSION).split('.').map(Number);
+  ok(maj === 0 && (min > 7 || (min === 7 && pat >= 2)), 'engine VERSION is >= 0.7.2 (got ' + VERSION + ')');
   ok(STATE_WORDS.has('hover') && STATE_WORDS.has('seen'), 'STATE_WORDS exported');
 }
 

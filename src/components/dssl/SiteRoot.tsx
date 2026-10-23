@@ -122,7 +122,7 @@ export default function SiteRoot() {
           </nav>
 
           <div className="nav-side">
-            <a href="#/changelog" className="ver-badge" onClick={(e) => { e.preventDefault(); go("changelog"); }}>v0.7.1</a>
+            <a href="#/changelog" className="ver-badge" onClick={(e) => { e.preventDefault(); go("changelog"); }}>v0.8.0</a>
             <button type="button" className="theme-btn" onClick={cycleTheme} aria-label="Toggle color theme" title="Theme: auto / light / dark">
               <span className="icon-sun"><SunIcon /></span>
               <span className="icon-moon"><MoonIcon /></span>
@@ -151,7 +151,7 @@ export default function SiteRoot() {
         <div className="wrap footer-inner">
           <div className="footer-col">
             <div className="footer-note">
-              <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.7.1 while
+              <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.8.0 while
               building this site; every feature it needed, it grew, and every bug you sent got
               fixed for real. This page runs on its own engine, no CSS files attached —
               the engine styles this DOM directly.

@@ -28,9 +28,9 @@ The point of this table is to stop two bad arguments: "DSSL is missing everythin
 | print styles (`@media print`) | not implemented | planned | |
 | `!important` | by design no | by-design-no | `pin { }` is the must-win block; specificity wars are the thing DSSL deletes |
 | Cascade | (layer, source order) | shipped | later wins; identical selectors resolve by order, deterministically |
-| Static extraction / view-source styling | live engine only today; prerender snapshot planned | planned | freeze() already makes big static pages zero-cost after first paint |
+| Static extraction / view-source styling | `dssl build` emits real CSS (v0.8.0); prerender snapshot for live pages planned | partially shipped | freeze() already makes big static pages zero-cost after first paint |
 | DevTools story | `DSSL.explain(el)` returns the cascade as data | shipped | matched rules with file/line, winning declaration per property, pseudo rules; browser-extension panel planned |
-| Work without JavaScript | not possible for first paint (today) | planned (prerender) | the honest trade; content pages should wait for prerender or pick another tool |
+| Work without JavaScript | `dssl build` emits the static subset as real CSS (v0.8.0); `@signal`/`animate:` stay runtime-only and counted | shipped for the static subset; prerender snapshot still planned for live pages | the honest trade has an exit now |
 
 ## The exit story
 
@@ -38,6 +38,14 @@ Abandoning DSSL leaves you: a DOM of valid inline styles, one small `<style>` el
 (pseudo-element rules), and token values sitting in `--dssl-*` custom properties. The page
 keeps working with the engine removed. No other styling replacement can say that, because
 no other replacement styles with the platform's own primitives.
+
+And since v0.8.0 there is a second exit: `dssl build styles.dssl -o styles.css`
+compiles the static subset to a real stylesheet before you ever ship — no runtime,
+no inline styles, CSP-clean, works without JavaScript. Tokens become custom properties,
+states become pseudo-classes, layers become `@layer`, motions become `@keyframes`,
+`pin` becomes `!important`, `raw { }` passes through verbatim, `seen` applies its final
+state. `@signal` rules and `animate:` stay runtime-only and are counted in the report,
+so the boundary is explicit, not folklore.
 
 ## What DSSL adds that CSS does not have
 
@@ -48,6 +56,36 @@ no other replacement styles with the platform's own primitives.
 - the overlap policy: translucent boxes refuse to cover things unless you say so
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
+
+## v0.8.0 review-driven corrections
+
+The second external review (repro snippets, headless browser) found five bugs and
+asked for the static build first. All fixed or shipped:
+
+- `row: gap 8 between center` — the guide's own example — kept its `between`
+  (every place word used to write both axes; the later word overwrote
+  `justify-content` silently). Place words now own an axis: between/around/evenly
+  are main-axis, stretch/baseline cross-axis, center/start/end fill free axes;
+  conflicts and duplicates warn loudly.
+- `@font-face { ... }` crashed the compiler with an uncaught throw. Unknown
+  at-rules now skip their entire balanced block with one clean error.
+- `@supports (...) { .a { ... } }` used to error AND still apply `.a`
+  unconditionally. The whole block is skipped now; nothing leaks.
+- Unquoted `url(a.png)` false-errored ("unknown value a.png"); `url()` is
+  atomic now, and the missing background words (`no-repeat`, `repeat-x/y`,
+  `space`, `round`, `scroll`, `local`) joined the vocabulary.
+- `color: red !important` used to error AND emit `red !important` (which the
+  browser then silently dropped). `!important` is now one loud error, nothing
+  is emitted, and the hint names `pin { }` as the actual answer.
+- `animation: spin ...` suggested "did you mean span"; it now passes motion
+  names through, warns when the motion is undefined, and bare durations are ms.
+- `transition: color .2s ease` (CSS order) is an error whose hint shows the
+  exact DSSL conversion (`transition: 200 ease color`).
+
+And the wishlist items that shipped: `raw { }` / `@css { }` verbatim passthrough,
+`dssl build` + `dssl check` (the CLI, with `--json` and CI exit codes),
+`DSSL.toCSS()`, headless-Chromium computed-style tests for every guide example
+(`scripts/test-guide-browser.mjs`), and `font-size: fluid 16 24` clamp sugar.
 
 ## v0.7.2 review-driven corrections
 

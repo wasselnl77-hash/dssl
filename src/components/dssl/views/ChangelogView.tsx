@@ -12,6 +12,50 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.8.0",
+    date: "growth phase · the exit drop",
+    title: "A second review found five bugs. The answer fixes them and adds the exit lane.",
+    why: "another external review landed with repro snippets: a layout word bug that compiled clean and laid out wrong, an at-rule that crashed the compiler, an @supports leak, url() false errors, and a wishlist that said build-a-CSS-exit first. Every claim was reproduced against the real compiler before anything moved, the same discipline as last time",
+    kind: "spec",
+    body:
+      "The layout bug was the worst kind: silent and documented. row: gap 8 between center — the guide's own example — compiled with zero errors and lost the between, because every place word wrote BOTH axes and the later center overwrote justify-content. Words now own their axis: between/around/evenly are main-axis words, stretch/baseline are cross-axis words, center/start/end fill whichever axes are still free, and a word with nowhere to go is a loud warning instead of a silent overwrite. @font-face used to crash the whole compiler (node.children is not iterable — an uncaught throw, the entire stylesheet dead); unknown at-rules now skip their whole balanced block with one clean error, which also kills the @supports leak where the inner rule applied unconditionally after an error. url() is atomic now, so url(a.png) no-repeat stopped raising two false errors. !important errors loudly and emits NOTHING (it used to error AND still emit red !important, which the browser then silently dropped). The animation shorthand stopped suggesting did you mean \"span\" for motion names and warns the DSSL way instead (motion name { } + animate:), and the CSS transition form now teaches the conversion in the error: transition: color .2s ease → write transition: 200 ease color. Then the wishlist's top four, because they fix tested problems: raw { } / @css { } drops verbatim CSS (@font-face, @keyframes, @supports, @import) into the page stylesheet; DSSL.toCSS() and dssl build compile the static subset to a real .css file — tokens to custom properties, states to :hover, layers to @layer, motions to @keyframes, pin to !important, seen to its no-JS final state, with a report that counts what stays in the runtime; dssl check puts the real compiler in CI with exit codes and --json; and the docs examples are now rendered in headless Chromium with computed-style assertions (real mouse hover, real IntersectionObserver, dark mode, viewport widths) because \"it compiles\" is what let the layout bug ship. Bonus sugar: font-size: fluid 16 24 compiles to the clamp() everyone writes wrong by hand.",
+    code: `# the exit lane: same source, real CSS, no runtime required
+$ dssl check styles.dssl            # CI: exit 1 on errors, --json for editors
+$ dssl build styles.dssl -o styles.css
+  built styles.css from styles.dssl
+    6 rule(s), 1 pseudo-element rule(s), 1 @keyframes, 1 raw block(s)
+    layers: tokens < components < utilities
+    1 seen rule(s) applied unconditionally (the no-JS state)
+
+/* tokens → custom properties · states → :hover · layers → @layer
+   motions → @keyframes · raw { } → verbatim · pin → !important */
+.toolbar {
+  display: flex;
+  justify-content: space-between;   /* the guide example, now true */
+  align-items: center;
+  font-size: clamp(16px, calc(16px + 0.952vw), 24px);
+}`,
+  },
+  {
+    version: "v0.7.2",
+    date: "growth phase · the review drop",
+    title: "An external review reproduced twelve bugs. This release is the answer.",
+    why: "a thorough third-party agent review landed with repro cases instead of vibes: nested-state cascade loss, dead nested @media, broken docs examples, unitless delays, silent hex alpha, page-wide hover recomputes. The only honest response was to reproduce every claim, fix what was real, and make the docs examples test-verified",
+    kind: "spec",
+    body:
+      "The headline bug: a nested hover block sorted BEFORE its parent\u2019s own declarations, so background: red on the parent always beat hover { background: red } nested inside it \u2014 the exact pattern the docs and the starter teach. Same walk, worse: nested @media, @signal and @layer blocks flushed with the parent context, so their condition was dropped entirely and they sorted before base. A nested dark mode was silently dead. Both fixed at the resolver walk: nested blocks now flush after everything the parent said so far, and every block flushes with the context it was actually walked with. The parser got its own fix: declarations and a nested block sharing one line (background: red; hover { ... }) used to swallow the declaration into the block\u2019s selector, so it vanished. Raw hex alpha is real now: #ff0000/50 compiles to color-mix instead of the invalid #ff0000/50px. transition-delay and friends take bare numbers as ms (they used to ship unitless-invalid or px). grid: 3 gap 12 \u2014 the documented form \u2014 actually works, and rows N joined it. seen { opacity: 0 -> 1 } now fails LOUD with the two real patterns in the hint. A nested hovr typo warns did-you-mean instead of silently becoming a descendant selector. fill, stroke, text-wrap and content-visibility joined the vocabulary. ::part() rides the shadow pipeline; ::slotted() gets a loud explanation of why it cannot work from the light DOM. The engine caught up too: the gate prefilter actually runs before native matches() now (the review caught it in the wrong order), hover recomputes are scoped to the hovered subtree and its ancestors instead of the whole page (the review measured 33,060 recomputes for hovering 8 cards in a 1k list \u2014 the candidate collection that caused it is gone), and checkbox states finally hear change and toggle events, so unchecking with Space unstyles immediately. And the feature everyone asked about shipped as documentation: DSSL has been embeddable in HTML all along via <style type=\"text/dssl\">, and now <script type=\"text/dssl\"> works too. One distribution note the release has to carry: the editor extension bundles this same engine, but the packaged 0.7.1 vsix was built before these fixes landed, so anyone who installed it was still getting the old compiler's squiggles. The 0.7.2 vsix replaces it in the repo files and is the first package that actually contains this changelog.",
+    code: `// the pattern the docs teach, now actually true:
+.card {
+  background: color.card
+  shadow: sm
+  hover { background: color.card-hover; shadow: lg }
+
+  @media dark { background: color.card-dark }
+
+  seen { animate: rise-in 400 snap }
+}`,
+  },
+  {
     version: "v0.7.1",
     date: "growth phase · the credibility drop",
     title: "The language moves into the editor, the bench goes public, and a reviewer bug dies",

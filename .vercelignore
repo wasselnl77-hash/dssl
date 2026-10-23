@@ -1,0 +1,16 @@
+/download/
+/upload/
+/tool-results/
+/scripts/
+/tests/
+/examples/
+/mini-services/
+/db/
+/prisma/
+/node_modules/
+/worklog.md
+/*.tar.gz
+/dev.log
+/server.log
+/.vercel
+/package/

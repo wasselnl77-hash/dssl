@@ -109,6 +109,44 @@ Token overrides can be scoped under `@media` or `@signal` for themes.
 .hero    { center: both }
 ```
 
+Each place word owns an axis (v0.8.0 — the example above used to silently
+lose the `between` because every word wrote both axes):
+
+- `between`, `around`, `evenly` are main-axis words (`justify-content`)
+- `stretch`, `baseline` are cross-axis words (`align-items`)
+- `center`, `start`, `end` fill whichever axes are still free
+
+One distribution word + one alignment word is the whole grammar. A word
+whose axes are already taken warns loudly ("has nowhere to go") instead of
+overwriting, and a word written twice warns too.
+
+### Sizing that moves: fluid
+
+`font-size: fluid 16 24` (and any length-ish property: width, height, gap,
+padding, margin…) compiles to the linear `clamp()` between 360px and 1200px
+viewports — the formula everyone writes wrong by hand. Custom bounds:
+`font-size: fluid 16 24 400 800`. The comma form still works: `fluid: 16, 24`.
+
+### raw { } — the escape hatch
+
+DSSL has no sugar for `@font-face`, `@keyframes`, `@supports`, `@import` or
+`@property` yet. `raw { }` (alias `@css { }`) drops verbatim CSS into the
+page stylesheet, top-level only:
+
+```dssl
+raw {
+  @font-face {
+    font-family: Inter
+    src: url(/fonts/inter.woff2)
+  }
+}
+```
+
+Unknown at-rules outside `raw { }` are skipped whole, with one clean error
+and a pointer here — they never leak their inner rules (that was a real
+0.7.2 bug: `@supports (display:grid) { .a { … } }` applied `.a` everywhere
+after erroring).
+
 ### The cascade is (layer, order)
 
 No specificity, no `!important`. Later wins inside a layer. Layers sort
@@ -211,7 +249,7 @@ for liveness. `unfreeze()` re-arms everything.
 
 Three ways to get it:
 
-1. Download `dssl-vscode/dssl-vscode-0.7.2.vsix` from the repo files, then
+1. Download `dssl-vscode/dssl-vscode-0.8.0.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. Works in VS Code and VSCodium.
 2. Build it: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 3. Registry listing: staged for Open VSX (the registry VSCodium searches).
@@ -222,10 +260,31 @@ did-you-mean included, line numbers accurate since the v0.7.1 parser fix),
 completions folded from your workspace token registry, hover docs, a TextMate
 grammar for `.dssl`.
 
+### The exit lane: dssl check + dssl build
+
+v0.8.0 answers the honest limits below without giving up the language:
+
+```sh
+node cli/dssl.mjs check styles.dssl --strict   # CI: real compiler, exit 1 on errors, --json
+node cli/dssl.mjs build styles.dssl -o styles.css
+```
+
+`build` compiles the static subset to a real stylesheet: tokens become
+custom properties, states become `:hover`, `@media`/`@container` pass
+through, layers become `@layer`, motions become `@keyframes`, `pin` becomes
+`!important`, `raw { }` passes through verbatim, and `seen` applies its
+final state unconditionally (the graceful no-JS look). What needs the
+runtime stays out and gets counted: `@signal` rules and `animate:`.
+The same output is available in the browser as `DSSL.toCSS(source)`.
+
 ## 6. Tooling and tests
 
 ```sh
-node scripts/test-v072.mjs      # latest regression suite (40 assertions)
+node cli/dssl.mjs check public/styles/*.dssl   # compile everything, exit code for CI
+node scripts/test-v073.mjs      # 0.8.0 regression suite (65 assertions)
+node scripts/test-guide-examples.mjs        # every guide example compiles
+node scripts/test-guide-browser.mjs         # guide examples asserted in headless Chromium
+node scripts/test-v072.mjs      # 0.7.2 regression suite (40 assertions)
 node scripts/test-v071.mjs      # parser line-number suite
 node scripts/test-v070.mjs      # v0.7 feature suite (60)
 node scripts/test-v050.mjs      # v0.5 feature suite (61)
@@ -242,16 +301,24 @@ run the sync script so the editor extension ships the same compiler.
 
 Read this before choosing DSSL for a real site.
 
-- **JavaScript is required.** No JS, no styles. The engine ships no CSS
-  fallback because there is no CSS. If a page must work without JS, use CSS.
+- **JavaScript is required** for the live engine. No JS, no styles at runtime.
+  v0.8.0 adds the exit lane: `dssl build styles.dssl -o styles.css` compiles
+  the static subset to a real stylesheet you can `<link>` instead of the
+  engine — tokens as custom properties, states as `:hover`, layers as
+  `@layer`, motions as `@keyframes`, `raw { }` verbatim. What genuinely needs
+  JS (`@signal`, `animate:`, deform, overlap) stays out and is counted in the
+  report, so you always know what a no-JS page gives up. If a page must work
+  without JS AND uses the dynamic features, use CSS.
 - **First paint.** Styles are applied by the engine after it loads, so large
-  pages can flash unstyled content (CLS). The docs site solves this by
-  inlining its stylesheets into the SSR HTML. The planned prerender mode
-  (server renders the final inline styles) is the real fix and is on the
-  PARITY roadmap as the next big item.
+  pages can flash unstyled content (CLS). The build output fixes this for
+  static pages (real CSS paints before any JS). For live pages, the docs site
+  solves it by inlining its stylesheets into the SSR HTML. The planned
+  prerender mode (server renders the final inline styles) is the real fix
+  and is on the PARITY roadmap as the next big item.
 - **CSP.** Pseudo-elements compile to one real stylesheet the engine injects;
   strict `style-src 'self'` blocks inline style attributes and that sheet.
-  DSSL wants `unsafe-inline` for styles today.
+  DSSL wants `unsafe-inline` for styles today — or use the `dssl build`
+  output, which is a normal external stylesheet and CSP-clean.
 - **Interop is invasive.** DSSL normal declarations beat external CSS, and
   `pin` beats external `!important`. Mixing with an existing CSS design
   system works but the engine wins by design.

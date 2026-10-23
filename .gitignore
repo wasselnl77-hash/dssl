@@ -58,3 +58,6 @@ server.log
 
 .env
 mini-services/
+
+# local screenshots, never published
+.zscripts/

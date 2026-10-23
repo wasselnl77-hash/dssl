@@ -118,7 +118,8 @@ select { use focus-ring }
 [data-view="cheat"] .nl-cheat,
 [data-view="spec"] .nl-spec,
 [data-view="playground"] .nl-playground,
-[data-view="changelog"] .nl-changelog {
+[data-view="changelog"] .nl-changelog,
+[data-view="bench"] .nl-bench {
   color: color.accent
   border-bottom-color: color.accent
 }
