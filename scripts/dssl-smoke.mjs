@@ -182,7 +182,7 @@ const cardRule = doc.rules.find(r => r.sel === '.card');
 assert(cardRule, '.card rule exists');
 assert(cardRule.decls.some(d => d.prop === 'background' && d.value.includes('var(--dssl-color-card)')), 'background resolved to var');
 assert(cardRule.decls.some(d => d.prop === 'padding' && d.value.includes('var(--dssl-space-4)')), 'space.4 resolved to var ref');
-assert(cardRule.decls.some(d => d.prop === '@animate' && d.value.frames && d.value.frames.length === 1), 'animate wired with frames');
+assert(doc.rules.filter(r => r.sel === '.card').some(r => r.decls.some(d => d.prop === '@animate' && d.value.frames && d.value.frames.length === 1)), 'animate wired with frames');
 assert(doc.rules.some(r => r.sel === '.card:focus-visible'), 'behavior expanded into state selector');
 assert(doc.rules.some(r => r.sel === '.card:hover .tip'), 'nested state descendant composed');
 assert(doc.rules.some(r => r.sel === ':root' && r.signals.length === 1), 'signal token override rule');

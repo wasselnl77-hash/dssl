@@ -228,6 +228,25 @@ export class DsslEngine {
     on('pointerdown', (e) => this.stateEvent('active', e.target));
     on('pointerup', (e) => this.stateEvent('active', e.target));
     on('pointercancel', (e) => this.stateEvent('active', e.target));
+    // v0.7.2 — form-state events. checked/indeterminate live on properties
+    // the pointer and focus listeners never see: unchecking with Space went
+    // stale, and programmatic el.checked = true never restyled until focus
+    // moved. change bubbles, so delegation reaches it. toggle does NOT
+    // bubble — a capture-phase listener on document still catches it on the
+    // way down. Note for docs: programmatic property writes fire no event at
+    // all; dispatch a bubbling change event after setting .checked.
+    on('change', (e) => {
+      const t = e.target;
+      if (!t || t.nodeType !== 1) return;
+      this.stateEvent('checked', t);
+      this.stateEvent('disabled', t);
+      this.stateEvent('indeterminate', t);
+    });
+    {
+      const tgl = (e) => { const t = e.target; if (t && t.nodeType === 1) this.stateEvent('open', t); };
+      document.addEventListener('toggle', tgl, true);
+      this._listeners.push({ target: document, type: 'toggle', fn: tgl, opts: true });
+    }
 
     // --- DOM mutations ---
     const mo = new MutationObserver((muts) => {
@@ -368,19 +387,56 @@ export class DsslEngine {
       node = node.parentElement;
     }
 
+    // v0.7.2 — candidate collection is no longer page-wide. The external
+    // review measured 33,060 recomputes for hovering 8 cards in a 1k-card
+    // page: every state event queried the whole document for EVERY stateful
+    // rule and batched every match. Reality: a subject-state rule (.card:hover)
+    // can only ever change the chain collected above. Rules where the state
+    // sits on an ANCESTOR compound (.card:hover .title) reach further down —
+    // queried from the matching ancestor via :scope, so the cost is bounded
+    // by that ancestor's subtree, never the page. computeElement re-checks
+    // the full stateful selector, so a superset batch is only wasted work,
+    // never wrong output.
     for (const rule of this.rules) {
       const hit = rule.states.has(state) || (state === 'focus' && rule.states.has('focus-visible')) || (state === 'focus-visible' && rule.states.has('focus'));
       if (!hit) continue;
-      // v0.3 fix: query the state-less base selector. On pointerout the
-      // element that just LEFT hover no longer matches `:hover` — querying
-      // the stateful selector skipped it and the hover styles stuck forever.
-      // The base selector is a superset; computeElement re-evaluates the
-      // real (stateful) match, so both entering and leaving are handled.
-      const base = rule.sel.replace(STATE_PSEUDO_RE, '').trim() || '*';
-      let els;
-      try { els = (this.scope || document).querySelectorAll(base); }
-      catch { try { els = (this.scope || document).querySelectorAll(rule.sel); } catch { continue; } }
-      els.forEach(el => batch.add(el));
+      const reach = rule._reach !== undefined ? rule._reach : (rule._reach = stateReach(rule.sel, state));
+      if (reach === null) continue; // subject-state: the chain covers it
+      if (reach.fallback) {
+        // :has()/:not() wrappers defeat the cheap strip — keep the old
+        // page-wide superset for this rare shape
+        const base = rule.sel.replace(STATE_PSEUDO_RE, '').trim() || '*';
+        let els; try { els = (this.scope || document).querySelectorAll(base); } catch { continue; }
+        els.forEach(el => batch.add(el));
+        continue;
+      }
+      for (const anc of batch) {
+        let prefixOK;
+        try { prefixOK = anc.matches(reach.prefix); } catch { prefixOK = false; }
+        if (!prefixOK) continue;
+        if (reach.sib) {
+          // sibling tails: querySelectorAll cannot leave the subtree, so walk
+          // the siblings by hand (+ stops at the first; ~ keeps scanning)
+          let sib = anc.nextElementSibling;
+          while (sib) {
+            let hitSib = false;
+            try { hitSib = sib.matches(reach.firstSeg); } catch { hitSib = false; }
+            if (hitSib) {
+              batch.add(sib);
+              if (reach.restAfter) {
+                let sub; try { sub = sib.querySelectorAll(reach.restAfter); } catch { sub = null; }
+                if (sub) sub.forEach(x => batch.add(x));
+              }
+            }
+            if (reach.sib === '+') break;
+            sib = sib.nextElementSibling;
+          }
+          continue;
+        }
+        let els;
+        try { els = anc.querySelectorAll(':scope ' + reach.rest); } catch { continue; }
+        els.forEach(el => batch.add(el));
+      }
     }
     if (batch.size) this.schedule(batch);
   }
@@ -489,6 +545,14 @@ export class DsslEngine {
       if (rule.sel === ':root') {
         if (el !== rootEl) continue;
       } else {
+        // v0.7.2 — the gate now runs BEFORE native matches(). The external
+        // review caught the wrong order: every element paid a full el.matches()
+        // for every rule even when the cheap gate could say no. Same contract
+        // as v0.7.0: the gate only ever says NO, and bails to null on anything
+        // it does not fully understand — a missed optimization beats a missed
+        // match.
+        const gate = rule._gate !== undefined ? rule._gate : (rule._gate = gateFor(rule.sel));
+        if (gate && !gatePass(el, gate)) continue;
         let sel = rule.sel;
         if (rule.states.has('seen')) {
           // v0.4.0 — `seen` belongs to the engine, not to CSS selectors: until
@@ -498,16 +562,6 @@ export class DsslEngine {
           sel = sel.replace(/:seen\b/g, '') || '*';
         }
         if (!this.matches(el, sel)) continue;
-      }
-      // v0.7.0 — gate prefilter: skip the native matches() call when the
-      // element obviously cannot match (missing class/tag/id). gateFor is
-      // conservative — it only ever says NO, and bails to null on anything
-      // it does not fully understand, so a missed optimization beats a
-      // missed match. This is the cheap half of the speed story; freeze()
-      // is the big half.
-      {
-        const gate = rule._gate !== undefined ? rule._gate : (rule._gate = gateFor(rule.sel));
-        if (gate && !gatePass(el, gate)) continue;
       }
       if (!rule.media.every(q => this.mql(q).matches)) continue;
       if (!this.signalsPass(rule)) continue;
@@ -1422,6 +1476,50 @@ export function gateFor(sel) {
 }
 
 /* Duck-typed on purpose: tests drive it with fake elements. */
+/* v0.7.2 — stateReach: where can a state change reach in the DOM?
+ * Pure and exported for tests. Given a stateful selector and the state that
+ * just flipped on some element, it answers:
+ *   null              → subject-state (state on the rightmost compound): only
+ *                       the event chain can change, no query needed at all
+ *   { fallback:true } → the cheap strip cannot handle it (:has()/:not()
+ *                       wrappers): caller keeps the page-wide superset
+ *   { prefix, rest }  → batch every chain element matching `prefix` (the part
+ *                       up to and including the stateful compound, states
+ *                       stripped) and query `:scope` + `rest` under each
+ *   { prefix, sib, firstSeg, restAfter } → the tail starts with a sibling
+ *                       combinator; walk that element's siblings manually
+ *                       (querySelectorAll cannot leave the subtree)
+ */
+export function stateReach(sel, state) {
+  const segs = [];
+  let depth = 0, cur = '', pendingComb = '';
+  for (let i = 0; i < sel.length; i++) {
+    const c = sel[i];
+    if (c === '(' || c === '[') depth++;
+    else if (c === ')' || c === ']') depth = Math.max(0, depth - 1);
+    if (depth === 0 && (c === '>' || c === '+' || c === '~' || /\s/.test(c))) {
+      const comb = c === ' ' ? ' ' : c;
+      if (cur.trim()) { segs.push({ comb: pendingComb || ' ', seg: cur.trim() }); cur = ''; pendingComb = comb; }
+      else if (comb !== ' ') pendingComb = comb;
+      continue;
+    }
+    cur += c;
+  }
+  if (cur.trim()) segs.push({ comb: pendingComb || ' ', seg: cur.trim() });
+  if (segs.length <= 1) return null;
+  const idx = segs.findIndex(s => new RegExp(':' + state + '\\b').test(s.seg));
+  if (idx === -1 || idx === segs.length - 1) return null;
+  const prefix = segs.slice(0, idx + 1).map(s => s.seg).join(' ').replace(STATE_PSEUDO_RE, '').trim();
+  if (!prefix || /\(\s*\)/.test(prefix)) return { fallback: true };
+  const tail = segs.slice(idx + 1);
+  if (tail[0].comb === '+' || tail[0].comb === '~') {
+    const restAfter = tail.slice(1).map(s => (s.comb === ' ' ? ' ' : ' ' + s.comb + ' ') + s.seg).join('').trim();
+    return { prefix, sib: tail[0].comb, firstSeg: tail[0].seg, restAfter };
+  }
+  const rest = tail.map(s => (s.comb === ' ' ? ' ' : ' ' + s.comb + ' ') + s.seg).join('').trim();
+  return { prefix, rest };
+}
+
 export function gatePass(el, gate) {
   if (!gate) return true;
   for (const g of gate) {

@@ -20,7 +20,7 @@
 import { levenshtein, didYouMean, composeDeform } from './utils.js';
 // v0.5.0 — the resolver validates the `::name` half of full selectors so a
 // typo like .card::befor is a LOUD error, never a silently dead rule.
-import { PSEUDO_ELEMENTS, VENDOR_PSEUDO } from './parser.js';
+import { PSEUDO_ELEMENTS, VENDOR_PSEUDO, STATE_WORDS } from './parser.js';
 
 /* ------------------------------------------------------------------ *
  * Vocabulary
@@ -68,9 +68,17 @@ const UNITLESS_PROPS = new Set([
   'opacity', 'line-height', 'z-index', 'font-weight', 'flex-grow', 'flex-shrink',
   'flex', 'order', 'scale', 'widows', 'orphans', 'column-count', 'aspect-ratio',
   'animation-iteration-count', 'flood-opacity', 'fill-opacity', 'stop-opacity',
-  'shape-image-threshold', 'animation-delay', 'transition-delay',
+  'shape-image-threshold',
   // grid line placement takes integers, not lengths:  grid-column: span 2
   'grid-row', 'grid-column', 'grid-area',
+]);
+
+// v0.7.2 — time properties: a bare number is milliseconds, never px, and
+// never unitless (both used to emit values the browser silently rejected).
+// transition-delay/animation-delay used to sit in UNITLESS_PROPS, which is
+// why `transition-delay: 200` shipped as invalid unitless 200.
+const TIME_PROPS = new Set([
+  'transition-delay', 'transition-duration', 'animation-delay', 'animation-duration',
 ]);
 
 // A practical whitelist of standard CSS properties (loud errors beat silent ones)
@@ -82,8 +90,8 @@ const KNOWN_PROPS = new Set(('all,appearance,accent-color,align-content,align-it
   'border-inline,border-inline-color,border-inline-end,border-inline-end-color,border-inline-end-style,border-inline-end-width,border-inline-start,border-inline-start-color,border-inline-start-style,border-inline-start-width,border-inline-style,border-inline-width,' +
   'border-left,border-left-color,border-left-style,border-left-width,border-radius,border-right,border-right-color,border-right-style,border-right-width,' +
   'border-spacing,border-start-end-radius,border-start-start-radius,border-style,border-top,border-top-color,border-top-left-radius,border-top-right-radius,border-top-style,border-top-width,border-width,' +
-  'bottom,box-decoration-break,box-shadow,box-sizing,break-after,break-before,break-inside,caret-color,caret-shape,clear,clip,clip-path,color,color-scheme,column-count,column-fill,column-gap,column-rule,column-rule-color,column-rule-style,column-rule-width,column-span,column-width,columns,contain,contain-intrinsic-size,container,container-name,container-type,content,cursor,caret,display,empty-cells,filter,flex,flex-basis,flex-direction,flex-flow,flex-grow,flex-shrink,flex-wrap,float,font,font-family,font-feature-settings,font-kerning,font-language-override,font-optical-sizing,font-palette,font-size,font-size-adjust,font-stretch,font-style,font-synthesis,font-variant,font-variant-caps,font-variant-east-asian,font-variant-ligatures,font-variant-numeric,font-variant-position,font-variation-settings,font-weight,forced-color-adjust,gap,grid,grid-area,grid-auto-columns,grid-auto-flow,grid-auto-rows,grid-column,grid-column-end,grid-column-gap,grid-column-start,grid-gap,grid-row,grid-row-end,grid-row-gap,grid-row-start,grid-template,grid-template-areas,grid-template-columns,grid-template-rows,' +
-  'hanging-punctuation,height,hyphenate-character,hyphenate-limit-chars,hyphens,image-orientation,image-rendering,inline-size,inset,inset-block,inset-block-end,inset-block-start,inset-inline,inset-inline-end,inset-inline-start,isolation,justify-content,justify-items,justify-self,justify-tracks,left,letter-spacing,line-break,line-height,list-style,list-style-image,list-style-position,list-style-type,margin,margin-block,margin-block-end,margin-block-start,margin-bottom,margin-inline,margin-inline-end,margin-inline-start,margin-left,margin-right,margin-top,margin-trim,mask,mask-border,mask-border-mode,mask-border-outset,mask-border-repeat,mask-border-slice,mask-border-source,mask-border-width,mask-clip,mask-composite,mask-image,mask-mode,mask-origin,mask-position,mask-repeat,mask-size,max-height,max-inline-size,max-width,min-block-size,min-height,min-inline-size,min-width,mix-blend-mode,object-fit,object-position,offset,offset-anchor,offset-distance,offset-path,offset-rotate,opacity,order,outline,outline-color,outline-offset,outline-style,outline-width,overflow,overflow-anchor,overflow-clip-margin,overflow-wrap,overflow-x,overflow-y,overscroll-behavior,overscroll-behavior-block,overscroll-behavior-inline,overscroll-behavior-x,overscroll-behavior-y,padding,padding-block,padding-block-end,padding-block-start,padding-bottom,padding-inline,padding-inline-end,padding-inline-start,padding-left,padding-right,padding-top,page-break-after,page-break-before,page-break-inside,paint-order,perspective,perspective-origin,place-content,place-items,place-self,pointer-events,position,print-color-adjust,quotes,resize,right,rotate,row-gap,ruby-align,ruby-merge,scale,scroll-behavior,scroll-margin,scroll-margin-block,scroll-margin-block-end,scroll-margin-block-start,scroll-margin-bottom,scroll-margin-inline,scroll-margin-inline-end,scroll-margin-inline-start,scroll-margin-left,scroll-margin-right,scroll-margin-top,scroll-padding,scroll-padding-block,scroll-padding-bottom,scroll-padding-inline,scroll-padding-left,scroll-padding-right,scroll-padding-top,scroll-snap-align,scroll-snap-stop,scroll-snap-type,scrollbar-color,scrollbar-gutter,scrollbar-width,shape-image-threshold,shape-margin,shape-outside,tab-size,table-layout,text-align,text-align-last,text-combine-upright,text-decoration,text-decoration-color,text-decoration-line,text-decoration-skip-ink,text-decoration-style,text-decoration-thickness,text-emphasis,text-emphasis-color,text-emphasis-position,text-emphasis-style,text-indent,text-justify,text-orientation,text-overflow,text-rendering,text-shadow,text-transform,text-underline-offset,text-underline-position,top,touch-action,transform,transform-box,transform-origin,transform-style,transition,transition-behavior,transition-delay,transition-duration,transition-property,transition-timing-function,translate,unicode-bidi,user-select,vertical-align,visibility,white-space,white-space-collapse,width,will-change,word-break,word-spacing,word-wrap,writing-mode,z-index,zoom,' +
+  'bottom,box-decoration-break,box-shadow,box-sizing,break-after,break-before,break-inside,caret-color,caret-shape,clear,clip,clip-path,color,color-scheme,column-count,column-fill,column-gap,column-rule,column-rule-color,column-rule-style,column-rule-width,column-span,column-width,columns,contain,contain-intrinsic-size,container,container-name,container-type,content,content-visibility,cursor,caret,display,empty-cells,filter,flex,flex-basis,flex-direction,flex-flow,flex-grow,flex-shrink,flex-wrap,float,fill,fill-rule,fill-opacity,stroke,stroke-dasharray,stroke-dashoffset,stroke-linecap,stroke-linejoin,stroke-opacity,stroke-width,font,font-family,font-feature-settings,font-kerning,font-language-override,font-optical-sizing,font-palette,font-size,font-size-adjust,font-stretch,font-style,font-synthesis,font-variant,font-variant-caps,font-variant-east-asian,font-variant-ligatures,font-variant-numeric,font-variant-position,font-variation-settings,font-weight,forced-color-adjust,gap,grid,grid-area,grid-auto-columns,grid-auto-flow,grid-auto-rows,grid-column,grid-column-end,grid-column-gap,grid-column-start,grid-gap,grid-row,grid-row-end,grid-row-gap,grid-row-start,grid-template,grid-template-areas,grid-template-columns,grid-template-rows,' +
+  'hanging-punctuation,height,hyphenate-character,hyphenate-limit-chars,hyphens,image-orientation,image-rendering,inline-size,inset,inset-block,inset-block-end,inset-block-start,inset-inline,inset-inline-end,inset-inline-start,isolation,justify-content,justify-items,justify-self,justify-tracks,left,letter-spacing,line-break,line-height,list-style,list-style-image,list-style-position,list-style-type,margin,margin-block,margin-block-end,margin-block-start,margin-bottom,margin-inline,margin-inline-end,margin-inline-start,margin-left,margin-right,margin-top,margin-trim,mask,mask-border,mask-border-mode,mask-border-outset,mask-border-repeat,mask-border-slice,mask-border-source,mask-border-width,mask-clip,mask-composite,mask-image,mask-mode,mask-origin,mask-position,mask-repeat,mask-size,max-height,max-inline-size,max-width,min-block-size,min-height,min-inline-size,min-width,mix-blend-mode,object-fit,object-position,offset,offset-anchor,offset-distance,offset-path,offset-rotate,opacity,order,outline,outline-color,outline-offset,outline-style,outline-width,overflow,overflow-anchor,overflow-clip-margin,overflow-wrap,overflow-x,overflow-y,overscroll-behavior,overscroll-behavior-block,overscroll-behavior-inline,overscroll-behavior-x,overscroll-behavior-y,padding,padding-block,padding-block-end,padding-block-start,padding-bottom,padding-inline,padding-inline-end,padding-inline-start,padding-left,padding-right,padding-top,page-break-after,page-break-before,page-break-inside,paint-order,perspective,perspective-origin,place-content,place-items,place-self,pointer-events,position,print-color-adjust,quotes,resize,right,rotate,row-gap,ruby-align,ruby-merge,scale,scroll-behavior,scroll-margin,scroll-margin-block,scroll-margin-block-end,scroll-margin-block-start,scroll-margin-bottom,scroll-margin-inline,scroll-margin-inline-end,scroll-margin-inline-start,scroll-margin-left,scroll-margin-right,scroll-margin-top,scroll-padding,scroll-padding-block,scroll-padding-bottom,scroll-padding-inline,scroll-padding-left,scroll-padding-right,scroll-padding-top,scroll-snap-align,scroll-snap-stop,scroll-snap-type,scrollbar-color,scrollbar-gutter,scrollbar-width,shape-image-threshold,shape-margin,shape-outside,tab-size,table-layout,text-align,text-align-last,text-combine-upright,text-decoration,text-decoration-color,text-decoration-line,text-decoration-skip-ink,text-decoration-style,text-decoration-thickness,text-emphasis,text-emphasis-color,text-emphasis-position,text-emphasis-style,text-indent,text-justify,text-orientation,text-overflow,text-rendering,text-shadow,text-transform,text-underline-offset,text-underline-position,text-wrap,top,touch-action,transform,transform-box,transform-origin,transform-style,transition,transition-behavior,transition-delay,transition-duration,transition-property,transition-timing-function,translate,unicode-bidi,user-select,vertical-align,visibility,white-space,white-space-collapse,width,will-change,word-break,word-spacing,word-wrap,writing-mode,z-index,zoom,' +
   'animation,animation-composition,animation-delay,animation-direction,animation-duration,animation-fill-mode,animation-iteration-count,animation-name,animation-play-state,animation-range,animation-timeline,animation-timing-function,' +
   'view-transition-name,interpolate-size,text-box,text-box-edge,text-box-trim,dynamic-range-limit,field-sizing,anchor-name,position-anchor,position-area,scroll-timeline,scroll-timeline-axis,scroll-timeline-name,timeline-scope,view-timeline,view-timeline-axis,view-timeline-name,' +
   '-webkit-background-clip,-webkit-text-fill-color,-webkit-box-orient,-webkit-line-clamp,-webkit-tap-highlight-color,-webkit-font-smoothing,-moz-osx-font-smoothing,-webkit-box-shadow,-webkit-text-stroke').split(','));
@@ -182,7 +190,7 @@ function resolveValue(raw, ctx) {
         unit = raw.slice(j, k).toLowerCase();
         j = k;
       }
-      out += num + (unit ? unit : (ctx.unitless ? '' : 'px'));
+      out += num + (unit ? unit : (ctx.unitless ? '' : TIME_PROPS.has(ctx.prop) ? 'ms' : 'px'));
       i = j;
       continue;
     }
@@ -267,8 +275,18 @@ function resolveValue(raw, ctx) {
     if (c === '#') { // hex color
       let j = i + 1;
       while (j < n && /[0-9a-fA-F]/.test(raw[j])) j++;
-      out += raw.slice(i, j);
+      const hex = raw.slice(i, j);
+      out += hex;
       i = j;
+      // v0.7.2 — alpha on a raw hex color: #ff0000/50 used to become
+      // #ff0000/50px (the bare number got the generic px treatment) — invalid
+      // CSS, silently dropped by the browser. Tokens always had /NN via
+      // color-mix; raw hex now gets the same treatment.
+      const am = raw.slice(i).match(/^\s*\/\s*([0-9.]+)\s*%?/);
+      if (am) {
+        out = out.slice(0, out.length - hex.length) + `color-mix(in oklab, ${hex} ${am[1]}%, transparent)`;
+        i += am[0].length;
+      }
       continue;
     }
     out += c;
@@ -510,15 +528,31 @@ const SEMANTIC = {
   column: (v, ctx) => parseFlexWords(v, ctx, 'column'),
   grid(v, ctx) {
     const atoms = v.split(/\s+/).filter(Boolean);
-    let cols;
-    if (atoms.length === 1 && /^[0-9]+$/.test(atoms[0])) {
-      cols = `repeat(${atoms[0]}, 1fr)`;
-    } else if ((atoms[0] === 'auto-fill' || atoms[0] === 'auto-fit') && atoms[1]) {
-      cols = `repeat(${atoms[0]}, minmax(${len(atoms[1], ctx)}, 1fr))`;
-    } else {
-      cols = atoms.map(a => len(a, ctx)).join(' ');
+    // v0.7.2 — `grid: 3 gap 12` (the documented form) used to die: the gap
+    // atoms were fed into grid-template-columns → "3px gap 12px", invalid.
+    // gap and rows are now first-class words of the shorthand.
+    let gap = null, rows = null;
+    const rest = [];
+    for (let i = 0; i < atoms.length; i++) {
+      if (atoms[i] === 'gap' && atoms[i + 1]) { gap = atoms[++i]; continue; }
+      if (atoms[i] === 'rows' && atoms[i + 1]) { rows = atoms[++i]; continue; }
+      rest.push(atoms[i]);
     }
-    return [{ prop: 'display', value: 'grid' }, { prop: 'grid-template-columns', value: cols }];
+    let cols;
+    if (!rest.length) {
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: 'grid needs columns', hint: 'grid: 3 · grid: auto-fill 200 · grid: 200px 1fr — optionally with gap N and rows N' });
+      cols = 'none';
+    } else if (rest.length === 1 && /^[0-9]+$/.test(rest[0])) {
+      cols = `repeat(${rest[0]}, 1fr)`;
+    } else if ((rest[0] === 'auto-fill' || rest[0] === 'auto-fit') && rest[1]) {
+      cols = `repeat(${rest[0]}, minmax(${len(rest[1], ctx)}, 1fr))`;
+    } else {
+      cols = rest.map(a => len(a, ctx)).join(' ');
+    }
+    const out = [{ prop: 'display', value: 'grid' }, { prop: 'grid-template-columns', value: cols }];
+    if (gap) out.push({ prop: 'gap', value: len(gap, ctx) });
+    if (rows) out.push({ prop: 'grid-template-rows', value: /^[0-9]+$/.test(rows) ? `repeat(${rows}, 1fr)` : len(rows, ctx) });
+    return out;
   },
   stack(v, ctx) {
     const word = (v || 'center').trim();
@@ -1064,6 +1098,22 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   /* ---- main recursive walk ---- */
 
   const walk = (children, ctx, ctxRule) => {
+    // v0.7.2 — parent-first flush. Two real bugs lived here. (1) A nested
+    // block (hover { }, @media, a nested selector) was emitted BEFORE the
+    // parent's own declarations got their cascade order, so `background: red`
+    // on the parent always beat `hover { background: red }` nested inside it
+    // — the exact pattern the docs taught, and the external review's headline
+    // finding. (2) media/container/signal/layer blocks flushed with the
+    // PARENT context, dropping the condition or layer entirely: a nested
+    // `@media dark` was silently unconditional AND sorted before base.
+    // Nested blocks now flush everything the parent has said so far first,
+    // and every block flushes with the context it was actually walked with.
+    const flushPending = (line) => {
+      if (ctxRule && ctxRule.decls.length && ctx.sel) {
+        flush(ctxRule, ctx, line);
+        ctxRule.decls = [];
+      }
+    };
     for (const node of children) {
       switch (node.kind) {
         case 'decl': {
@@ -1091,6 +1141,11 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           break;
         }
         case 'selector': {
+          if (/^[a-zA-Z][a-zA-Z0-9-]*$/.test(node.sel) && ctx.sel) {
+            const near = didYouMean(node.sel.toLowerCase(), [...STATE_WORDS]);
+            if (near) warnings.push({ file, line: node.line, message: `"${node.sel}" compiled as a descendant selector ("${combine(ctx.sel, node.sel)}")`, hint: `if you meant the state, it is spelled "${near}" — this block currently styles descendants called <${node.sel}>` });
+          }
+          flushPending(node.line);
           const sel = ctx.sel === '' ? node.sel : combine(ctx.sel, node.sel);
           const childCtx = { ...ctx, sel };
           const sub = { decls: [] };
@@ -1103,7 +1158,19 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
             errors.push({ file, line: node.line, message: `"${node.name}" needs a selector around it` });
             break;
           }
+          flushPending(node.line);
           const childCtx = { ...ctx, sel: ctx.sel + ':' + node.name };
+          // v0.7.2 — the arrow is motion/gradient-stop syntax; inside a seen
+          // block it compiled into an inline style the browser rejects, so the
+          // element just sat at its base style forever. Say so, loudly, and
+          // point at the two real patterns (final value, or a motion).
+          if (node.name === 'seen') {
+            for (const d of node.children) {
+              if (d.kind === 'decl' && typeof d.value === 'string' && d.value.includes('->')) {
+                errors.push({ file, line: d.line, message: `"${d.prop}: ${d.value}" — the -> arrow is motion syntax and does nothing inside seen { }`, hint: 'write the final style (seen { opacity: 1 }) or attach a motion (seen { animate: rise-in 400 })' });
+              }
+            }
+          }
           const sub = { decls: [] };
           walk(node.children, childCtx, sub);
           flush(sub, childCtx, node.line);
@@ -1111,31 +1178,39 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
         }
         case 'media': {
           const q = normalizeMedia(node.query, { errors, file, line: node.line }, node.line);
+          flushPending(node.line);
+          const childCtx = { ...ctx, media: [...ctx.media, q] };
           const sub = { decls: [] };
-          walk(node.children, { ...ctx, media: [...ctx.media, q] }, sub);
-          flush(sub, ctx, node.line);
+          walk(node.children, childCtx, sub);
+          flush(sub, childCtx, node.line);
           break;
         }
         case 'container': {
           const q = normalizeMedia(node.query || '(min-width: 0)', { errors, file, line: node.line }, node.line);
+          flushPending(node.line);
+          const childCtx = { ...ctx, containers: [...ctx.containers, q] };
           const sub = { decls: [] };
-          walk(node.children, { ...ctx, containers: [...ctx.containers, q] }, sub);
-          flush(sub, ctx, node.line);
+          walk(node.children, childCtx, sub);
+          flush(sub, childCtx, node.line);
           break;
         }
         case 'signal': {
           const sig = parseSignal(node.expr, { errors, file, line: node.line }, node.line);
+          flushPending(node.line);
+          const childCtx = { ...ctx, signals: [...ctx.signals, sig] };
           const sub = { decls: [] };
-          walk(node.children, { ...ctx, signals: [...ctx.signals, sig] }, sub);
-          flush(sub, ctx, node.line);
+          walk(node.children, childCtx, sub);
+          flush(sub, childCtx, node.line);
           break;
         }
         case 'layer':
         case 'pin': {
           const layer = node.kind === 'pin' ? 'pin' : (['tokens', 'base', 'components', 'utilities', 'pin'].includes(node.name) ? node.name : 'components');
+          flushPending(node.line);
+          const childCtx = { ...ctx, layer };
           const sub = { decls: [] };
-          walk(node.children, { ...ctx, layer }, sub);
-          flush(sub, ctx, node.line);
+          walk(node.children, childCtx, sub);
+          flush(sub, childCtx, node.line);
           break;
         }
         case 'pseudo': {
@@ -1214,7 +1289,15 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           errors.push({
             file, line,
             message: `unknown pseudo-element "::${pseudo}"`,
-            hint: 'try ::before, ::after, ::selection, or a vendor one like ::-webkit-scrollbar-thumb',
+            hint: 'try ::before, ::after, ::selection, ::part(name), or a vendor one like ::-webkit-scrollbar-thumb',
+          });
+          continue;
+        }
+        if (name === 'slotted') {
+          errors.push({
+            file, line,
+            message: '::slotted() only exists inside a shadow tree, and DSSL styles the light DOM',
+            hint: 'style the slotted element itself with a normal selector — it IS reachable from the page',
           });
           continue;
         }

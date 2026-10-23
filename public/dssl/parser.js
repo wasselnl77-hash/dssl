@@ -12,7 +12,7 @@
  * resolution happens in resolver.js.
  * ========================================================================= */
 
-const STATE_WORDS = new Set([
+export const STATE_WORDS = new Set([
   'hover', 'focus', 'focus-visible', 'active', 'disabled', 'checked',
   'empty', 'target', 'required', 'invalid', 'valid', 'open', 'closed',
   'placeholder-shown', 'read-only', 'read-write', 'enabled',
@@ -28,6 +28,11 @@ const STATE_WORDS = new Set([
 export const PSEUDO_ELEMENTS = new Set([
   'before', 'after', 'placeholder', 'selection', 'marker',
   'first-line', 'first-letter', 'backdrop', 'file-selector-button',
+  // v0.7.2 — ::part() rides the shadow-CSS pipeline (a document stylesheet
+  // CAN style shadow parts of custom elements). ::slotted() is accepted by
+  // the parser but rejected by the resolver with a loud explanation: it only
+  // exists inside a shadow tree, which is not a place DSSL styles.
+  'part', 'slotted',
 ]);
 
 // v0.4.2 — vendor pseudo-elements pass through verbatim (::-webkit-scrollbar
@@ -48,6 +53,20 @@ function scanFor(str, ch, from = 0) {
     if (depth === 0 && c === ch) return i;
   }
   return -1;
+}
+
+/** find index of LAST top-level occurrence of `ch` (skips strings + parens) */
+function scanForLast(str, ch) {
+  let depth = 0, q = null, found = -1;
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (q) { if (c === q && str[i - 1] !== '\\') q = null; continue; }
+    if (c === '"' || c === "'") { q = c; continue; }
+    if (c === '(' || c === '[') { depth++; continue; }
+    if (c === ')' || c === ']') { depth = Math.max(0, depth - 1); continue; }
+    if (depth === 0 && c === ch) found = i;
+  }
+  return found;
 }
 
 /** split a string on a top-level separator */
@@ -158,6 +177,26 @@ export function parse(source, file = 'inline.dssl') {
 
       if (open !== -1) {
         const header = rest.slice(0, open).trim();
+        // v0.7.2 — declarations and a nested block sharing one line:
+        // `.card { background: red; hover { ... } }`. Everything before the
+        // header used to be swallowed whole into it, so `background: red`
+        // silently became part of a selector named "background: red; hover"
+        // and vanished. Declarations before the LAST top-level ';' are now
+        // processed as declarations; the header is what follows them.
+        if (header) {
+          const semi = scanForLast(header, ';');
+          if (semi !== -1) {
+            processContent(header.slice(0, semi), line);
+            const realHeader = header.slice(semi + 1).trim();
+            if (!realHeader) { err(line, 'block is missing a header before "{"'); rest = rest.slice(open + 1); continue; }
+            const meta = classify(realHeader, line);
+            const node = { ...meta, line, children: [] };
+            stack[stack.length - 1].children.push(node);
+            if (meta.kind !== 'bogus') stack.push(node);
+            rest = rest.slice(open + 1);
+            continue;
+          }
+        }
         if (!header) { err(line, 'block is missing a header before "{"'); rest = rest.slice(open + 1); continue; }
         const meta = classify(header, line);
         const node = { ...meta, line, children: [] };

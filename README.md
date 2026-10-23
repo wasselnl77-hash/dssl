@@ -4,7 +4,7 @@ license: mit
 
 # DSSL
 
-DSSL is a style language for the web. It replaces CSS.
+DSSL is a style language for the web. For the pages it fits, it replaces writing CSS entirely. It does not replace the CSS platform: the engine ends in inline styles that the browser parses, and it needs JavaScript. Where it wins is the authoring experience: tokens, words-as-layout, states and motion in one grammar, loud errors, zero build. PARITY.md keeps the honest feature ledger.
 
 Not a preprocessor that spits out stylesheets. Not a utility class graveyard. You write `.dssl` files, the page loads a small engine, and the engine walks your DOM in real time and applies every rule it matches straight onto the elements it finds. Nothing is compiled. There is no build step for styles.
 
@@ -134,7 +134,7 @@ tokens {
     accent: oklch(62% 0.19 35)
   }
   radius { md: 14 }
-  shadow { md: 0 2 4 ink/10, 0 4 12 ink/8 }
+  shadow { md: 0 2 4 color.ink/10, 0 4 12 color.ink/8 }
   space  { 9: 96 }          // numeric keys are legal (v0.7)
 }
 
@@ -277,9 +277,14 @@ motion pulse {
 
 .pt-card {
   seen {
-    opacity: 0 -> 1
-    translate: 0 18 -> 0
-    animate: rise 600 ease-out
+    animate: rise 600 ease-out   // the motion below owns the from-state
+  }
+}
+
+motion rise {
+  from {
+    opacity: 0
+    translate: 0 18
   }
 }
 ```

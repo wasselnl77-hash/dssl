@@ -193,4 +193,80 @@ console.log(`\n${pass} passed, ${fail} failed`);
 }
 
 console.log(`${pass} passed, ${fail} failed`);
+
+// 12. overlap policy — the "nothing below 100% opacity overlaps" feature
+{
+  const { doc, errors } = compile(`
+    body { overlap: auto }
+    .badge { overlap: deny }
+    .scrim { overlap: allow }
+    .off { overlap: none }
+  `);
+  check('12 no errors', errors.length === 0, JSON.stringify(errors));
+  const get = (sel) => doc.rules.find(r => r.sel === sel)?.decls.find(d => d.prop === '@overlap')?.value;
+  check('12 body policy = auto', get('body') === 'auto', get('body'));
+  check('12 deny passes through', get('.badge') === 'deny', get('.badge'));
+  check('12 allow passes through', get('.scrim') === 'allow', get('.scrim'));
+  check('12 none is an alias of allow', get('.off') === 'allow', get('.off'));
+
+  const bad = compile('.card { overlap: never }');
+  check('12 bad policy is a LOUD error', bad.errors.length === 1 && /unknown overlap policy/.test(bad.errors[0].message), JSON.stringify(bad.errors));
+  check('12 hint names the vocabulary', /allow|deny|auto/.test(bad.errors[0].hint || ''));
+
+  const dead = compile('.card { overlap: nevr }');
+  check('12 nothing emitted on error', dead.doc.rules.length === 0);
+
+  // site.dssl now carries the global switch — regression-guard it
+  const fs = await import('node:fs');
+  const site = fs.readFileSync(new URL('../public/styles/site.dssl', import.meta.url).pathname, 'utf8');
+  check('12 site.dssl body opts in', /overlap:\s*auto/.test(site));
+}
+
+// 13. the escape math (overlapNudge) — pure function, no DOM needed
+{
+  const { overlapNudge } = await import('../public/dssl/engine.js');
+  const box = (l, t, r, b) => ({ left: l, top: t, right: r, bottom: b });
+
+  // candidate [0,0,100,100] vs obstacle [50,0,150,100]: push left past the
+  // near edge costs 50, push right past the far edge costs 150 → left wins
+  let n = overlapNudge(box(0, 0, 100, 100), [box(50, 0, 150, 100)]);
+  check('13 shortest escape wins (left 50)', n.x === -50 && n.y === 0, JSON.stringify(n));
+
+  // deep obstacle above, 10px of y-penetration → dropping down 10 beats climbing 200
+  n = overlapNudge(box(0, 90, 200, 200), [box(0, 0, 200, 100)]);
+  check('13 vertical kiss resolves down 10', n.x === 0 && n.y === 10, JSON.stringify(n));
+
+  // no overlap → no nudge
+  n = overlapNudge(box(0, 0, 10, 10), [box(20, 20, 30, 30)]);
+  check('13 clear boxes stay put', n.x === 0 && n.y === 0, JSON.stringify(n));
+
+  // touching edges are NOT overlap (the shared-border tremble guard)
+  n = overlapNudge(box(0, 0, 100, 100), [box(100, 0, 200, 100)]);
+  check('13 touching edges do not count', n.x === 0 && n.y === 0, JSON.stringify(n));
+
+  // two walls with a real gap between them → nudge must land inside the gap
+  n = overlapNudge(box(70, 0, 90, 100), [box(0, 0, 80, 100), box(120, 0, 200, 100)]);
+  const cleared = (b, obs) => obs.every(o =>
+    Math.min(b.right, o.right) - Math.max(b.left, o.left) <= 0.01 ||
+    Math.min(b.bottom, o.bottom) - Math.max(b.top, o.top) <= 0.01);
+  const moved = box(70 + n.x, 0 + n.y, 90 + n.x, 100 + n.y);
+  check('13 box clears both walls into the gap', n.x === 10 && cleared(moved, [box(0, 0, 80, 100), box(120, 0, 200, 100)]), JSON.stringify({ n, moved }));
+}
+
+console.log(`${pass} passed, ${fail} failed`);
+
+// 14. engine-native props inside pseudo blocks fail loud (no junk shadow CSS)
+{
+  const a = compile('.card::before { animate: pop 400 }');
+  check('14 nested animate-in-pseudo is LOUD', a.errors.length === 1 && /engine-native/.test(a.errors[0].message), JSON.stringify(a.errors));
+  check('14 nothing leaked to shadow CSS', a.doc.shadowRules.length === 0 && a.doc.rules.length === 0);
+
+  const b = compile('.card::before { overlap: deny }');
+  check('14 top-level overlap-in-pseudo is LOUD', b.errors.length === 1 && /engine-native/.test(b.errors[0].message), JSON.stringify(b.errors));
+
+  const c = compile('.card { ::after { --x: 1 } }');
+  check('14 custom props still pass in pseudo blocks', c.errors.length === 0 && c.doc.shadowRules.length === 1, JSON.stringify(c.errors));
+}
+
+console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

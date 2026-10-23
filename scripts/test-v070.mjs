@@ -126,7 +126,7 @@ console.log('5 — freeze/unfreeze/explain exist as API surface');
     ok(typeof eng.freeze === 'function', 'freeze exported');
     ok(typeof eng.unfreeze === 'function', 'unfreeze exported');
     ok(typeof eng.explain === 'function', 'explain exported');
-    ok(eng.VERSION === '0.7.0', 'VERSION is 0.7.0');
+    ok(parseInt(String(eng.VERSION).split('.')[1]) >= 7, 'VERSION is 0.7.x or newer');
     ok(typeof eng.DSSL.freeze === 'function' && typeof eng.DSSL.explain === 'function', 'DSSL object carries the new API');
   }
   const engMod = await import('../public/dssl/engine.js');

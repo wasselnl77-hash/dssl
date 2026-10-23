@@ -48,3 +48,29 @@ no other replacement styles with the platform's own primitives.
 - the overlap policy: translucent boxes refuse to cover things unless you say so
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
+
+## v0.7.2 review-driven corrections
+
+An external agent review reproduced a batch of real bugs; all of them are fixed
+and regression-tested (scripts/test-v072.mjs). Rows affected:
+
+- Nested state blocks (hover/focus/... inside a rule) now sort AFTER the parent
+  rule's own declarations, so nested overrides win the cascade. Nested @media,
+  @signal and @layer blocks also keep their condition and layer (they used to
+  be dropped, making nested dark mode silently dead).
+- Declarations and a nested block can share one line (`.card { bg: red; hover { } }`)
+  without the declaration being swallowed.
+- Raw hex alpha is real: `#ff0000/50` compiles to color-mix (was invalid /50px).
+- Time properties take bare numbers as ms (`transition-delay: 200` -> 200ms).
+- `grid: 3 gap 12` works; `rows N` joined the shorthand.
+- `seen { ... }` rejects motion-arrow syntax loudly and points at the real forms.
+- SVG and modern properties added: fill, stroke (and friends), text-wrap,
+  content-visibility.
+- `::part()` rides the shadow pipeline; `::slotted()` is rejected with an
+  explanation (it only exists inside shadow trees).
+- The gate prefilter now actually runs before native matches().
+- State events scope candidate recomputation to the hovered subtree and its
+  ancestors instead of the whole page (a 1k-card hover went from ~4,100
+  recomputes per event to the touched chain).
+- checkbox/details states hear `change` and `toggle` events, so keyboard
+  toggles and programmatic dispatch restyle immediately.

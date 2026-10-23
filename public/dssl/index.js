@@ -18,7 +18,7 @@ import { parse } from './parser.js';
 import { resolve, DEFAULT_TOKENS } from './resolver.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.7.1';
+export const VERSION = '0.7.2';
 
 let counter = 0;
 const engines = new Map();
@@ -205,7 +205,9 @@ if (typeof window !== 'undefined') {
   const boot = async () => {
     try {
       const links = [...document.querySelectorAll('link[rel="stylesheet/dssl"]')];
-      const inlines = [...document.querySelectorAll('style[type="text/dssl"]')];
+      // v0.7.2 — inline DSSL blocks also work as <script type="text/dssl">
+      // (some editors highlight/parse those better than an unknown style type)
+      const inlines = [...document.querySelectorAll('style[type="text/dssl"], script[type="text/dssl"]')];
 
       const sources = [];
       for (const l of links) sources.push({ name: l.getAttribute('href'), kind: 'link', el: l });
