@@ -1,0 +1,67 @@
+{
+  "name": "dssl-vscode",
+  "displayName": "DSSL Language Support",
+  "description": "The DSSL style language in your editor: syntax highlighting, real-compiler diagnostics (the same errors the browser console shows), completions from the live token registry, hover docs. Works in VS Code and VSCodium.",
+  "version": "0.7.1",
+  "publisher": "EHS-Studio",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "keywords": [
+    "dssl",
+    "css",
+    "styling",
+    "design tokens",
+    "style language"
+  ],
+  "activationEvents": [
+    "onLanguage:dssl"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "dssl",
+        "aliases": [
+          "DSSL",
+          "dssl"
+        ],
+        "extensions": [
+          ".dssl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "dssl",
+        "scopeName": "source.dssl",
+        "path": "./syntaxes/dssl.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "DSSL",
+      "properties": {
+        "dssl.diagnostics.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run the real DSSL compiler on save and change, and surface errors and warnings as diagnostics."
+        },
+        "dssl.diagnostics.debounce": {
+          "type": "number",
+          "default": 250,
+          "description": "Milliseconds to wait after a keystroke before re-running the compiler."
+        }
+      }
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://huggingface.co/EHS-Studio/dssl"
+  }
+}

@@ -1,0 +1,189 @@
+{
+  "name": "DSSL",
+  "scopeName": "source.dssl",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#at-rules" },
+    { "include": "#block-keywords" },
+    { "include": "#use" },
+    { "include": "#state-headers" },
+    { "include": "#strings" },
+    { "include": "#properties" },
+    { "include": "#values" },
+    { "include": "#selectors" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.dssl",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.dssl",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "patterns": [{ "include": "#values" }]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        { "name": "string.quoted.double.dssl", "begin": "\"", "end": "\"", "patterns": [{ "include": "#values" }] },
+        { "name": "string.quoted.single.dssl", "begin": "'", "end": "'", "patterns": [{ "include": "#values" }] }
+      ]
+    },
+    "at-rules": {
+      "patterns": [
+        {
+          "name": "meta.at-rule.dssl",
+          "match": "(@)(media|container|signal|layer|supports)\\b([^\\n{]*)",
+          "captures": {
+            "1": { "name": "punctuation.definition.at-rule.dssl" },
+            "2": { "name": "keyword.control.at-rule.dssl" },
+            "3": {
+              "patterns": [
+                { "include": "#values" },
+                { "name": "entity.name.condition.dssl", "match": "[\\w-]+\\s*\\(" },
+                { "name": "variable.other.signal.dssl", "match": "\\b[a-z][\\w-]*\\b" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "block-keywords": {
+      "patterns": [
+        {
+          "name": "meta.tokens-block.dssl",
+          "match": "^\\s*(tokens|pin)(?=\\s*\\{)",
+          "captures": { "1": { "name": "keyword.control.block.dssl" } }
+        },
+        {
+          "name": "meta.named-block.dssl",
+          "match": "^\\s*(behavior|motion)\\s+([\\w-]+)(?=\\s*\\{)",
+          "captures": {
+            "1": { "name": "keyword.control.block.dssl" },
+            "2": { "name": "entity.name.function.dssl" }
+          }
+        }
+      ]
+    },
+    "use": {
+      "patterns": [
+        {
+          "name": "meta.use-behavior.dssl",
+          "match": "(?<=^\\s*|;\\s*)(use)\\s+([\\w-]+)",
+          "captures": {
+            "1": { "name": "keyword.control.use.dssl" },
+            "2": { "name": "entity.name.function.dssl" }
+          }
+        }
+      ]
+    },
+    "state-headers": {
+      "patterns": [
+        {
+          "name": "meta.state-block.dssl",
+          "match": "^\\s*(hover|focus|focus-visible|active|press|pressed|disabled|checked|empty|target|seen|before|after)(?=\\s*\\{)",
+          "captures": { "1": { "name": "keyword.control.state.dssl" } }
+        }
+      ]
+    },
+    "properties": {
+      "patterns": [
+        {
+          "name": "meta.property.dssl",
+          "match": "(?<=^\\s*|;\\s*|\\{\\s*)(--?[\\w-]+)\\s*:(?![^;\\n]*\\{)",
+          "captures": {
+            "1": {
+              "patterns": [
+                {
+                  "name": "support.type.property-name.custom.dssl",
+                  "match": "^--"
+                },
+                {
+                  "name": "support.type.property-name.dssl",
+                  "match": ".+"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "values": {
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        {
+          "name": "constant.numeric.token-ref.dssl",
+          "match": "(?<=[\\s:(,])([\\w-]+\\.[\\w-]+(?:\\.[\\w-]+)*)",
+          "captures": { "1": { "name": "variable.other.token.dssl" } }
+        },
+        {
+          "name": "constant.other.color.hex.dssl",
+          "match": "#[0-9a-fA-F]{3,8}\\b"
+        },
+        {
+          "name": "constant.numeric.dssl",
+          "match": "(?<![\\w.#-])-?\\d+(?:\\.\\d+)?(?:%|px|s|ms|deg|fr|em|rem|vh|vw|ch)?"
+        },
+        {
+          "name": "support.constant.keyword.dssl",
+          "match": "\\b(infinite|alternate|alternate-reverse|reverse|snap|essential|linear|ease|ease-in|ease-out|ease-in-out|from|to|odd|even|flex-start|flex-end|center|stretch|baseline|nowrap|wrap|bold|manual|pixelated|crisp-edges|solid|dashed|dotted|hidden|visible|sticky|absolute|relative|fixed|block|inline|flex|grid|left|right|top|bottom|both|forwards|backwards|none|auto|inherit|initial|unset|revert)\\b"
+        },
+        {
+          "name": "keyword.operator.arrow.dssl",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.alpha.dssl",
+          "match": "(?<=\\w)/\\d+"
+        },
+        {
+          "name": "punctuation.separator.comma.dssl",
+          "match": ","
+        }
+      ]
+    },
+    "selectors": {
+      "patterns": [
+        {
+          "name": "meta.selector.dssl",
+          "match": "(?<![\\w-])\\.[\\w-]+",
+          "captures": { "0": { "name": "entity.other.attribute-name.class.dssl" } }
+        },
+        {
+          "name": "meta.selector.id.dssl",
+          "match": "(?<![\\w-])#[\\w-]+",
+          "captures": { "0": { "name": "entity.other.attribute-name.id.dssl" } }
+        },
+        {
+          "name": "keyword.operator.parent.dssl",
+          "match": "&"
+        },
+        {
+          "name": "keyword.operator.combinator.dssl",
+          "match": ">"
+        },
+        {
+          "name": "entity.name.tag.dssl",
+          "match": "(?<![\\w.\\-#])([a-zA-Z][\\w-]*)(?=[\\s,{>:])"
+        },
+        {
+          "name": "entity.other.pseudo-class.dssl",
+          "match": "::?(-webkit-|-moz-|-ms-)?[\\w-]+(?![\\w-])"
+        },
+        {
+          "name": "punctuation.section.block.begin.dssl",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.section.block.end.dssl",
+          "match": "\\}"
+        }
+      ]
+    }
+  }
+}

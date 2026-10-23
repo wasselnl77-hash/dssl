@@ -7,9 +7,10 @@ import CheatSheetView from "./views/CheatSheetView";
 import SpecView from "./views/SpecView";
 import PlaygroundView from "./views/PlaygroundView";
 import ChangelogView from "./views/ChangelogView";
+import BenchView from "./views/BenchView";
 import { SunIcon, MoonIcon, MenuIcon } from "./icons";
 
-export type ViewName = "home" | "docs" | "cheat" | "spec" | "playground" | "changelog";
+export type ViewName = "home" | "docs" | "cheat" | "spec" | "playground" | "changelog" | "bench";
 
 const VIEWS: { name: ViewName; label: string }[] = [
   { name: "home", label: "Home" },
@@ -18,6 +19,7 @@ const VIEWS: { name: ViewName; label: string }[] = [
   { name: "spec", label: "Spec" },
   { name: "playground", label: "Playground" },
   { name: "changelog", label: "Changelog" },
+  { name: "bench", label: "Bench" },
 ];
 
 function viewFromHash(): ViewName {
@@ -120,7 +122,7 @@ export default function SiteRoot() {
           </nav>
 
           <div className="nav-side">
-            <a href="#/changelog" className="ver-badge" onClick={(e) => { e.preventDefault(); go("changelog"); }}>v0.7.0</a>
+            <a href="#/changelog" className="ver-badge" onClick={(e) => { e.preventDefault(); go("changelog"); }}>v0.7.1</a>
             <button type="button" className="theme-btn" onClick={cycleTheme} aria-label="Toggle color theme" title="Theme: auto / light / dark">
               <span className="icon-sun"><SunIcon /></span>
               <span className="icon-moon"><MoonIcon /></span>
@@ -142,13 +144,14 @@ export default function SiteRoot() {
         {view === "spec" && <SpecView />}
         {view === "playground" && <PlaygroundView />}
         {view === "changelog" && <ChangelogView />}
+        {view === "bench" && <BenchView />}
       </main>
 
       <footer className="footer">
         <div className="wrap footer-inner">
           <div className="footer-col">
             <div className="footer-note">
-              <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.7.0 while
+              <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.7.1 while
               building this site; every feature it needed, it grew, and every bug you sent got
               fixed for real. This page runs on its own engine, no CSS files attached —
               the engine styles this DOM directly.

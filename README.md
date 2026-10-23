@@ -68,6 +68,10 @@ Both drop a `dssl-engine/` folder next to you: the engine, a starter token set, 
 
 Prefer to click: [dssl-engine.zip](https://dssl-sable.vercel.app/dssl-engine.zip) or [dssl-engine.tar.gz](https://dssl-sable.vercel.app/dssl-engine.tar.gz). Same package, straight from the browser.
 
+Writing your own .dssl? The official editor extension puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API): grab `dssl-vscode/dssl-vscode-0.7.1.vsix` from the repo source, or build it with `npx @vscode/vsce package` inside `dssl-vscode/`, then Extensions panel -> ... -> Install from VSIX.
+
+AI agents and machine reviewers: this repo ships `llms.txt` (dense, structured facts), `AGENTS.md` (how to work on the codebase) and `PARITY.md` (the honest feature matrix against CSS). The site serves the same `llms.txt` at https://dssl-sable.vercel.app/llms.txt
+
 Then wire it into a page with two tags:
 
 ```html
@@ -389,7 +393,7 @@ const rep = DSSL.explain(document.querySelector('.doc-card'))
 
 The matcher also pre-filters every rule through a cheap class/tag/id gate extracted from the selector's rightmost compound, so a recompute skips obvious non-matches instead of asking the browser rule by rule. The gate only ever says no; anything it does not fully understand falls back to native matching.
 
-## What works today (v0.7.0)
+## What works today (v0.7.1)
 
 - the full selector surface, including `:nth-child`, `:not`, `:is`, `:where`, `:has`
 - flexbox and grid with `row:` / `column:` / `grid:` / `stack:` / `center:` sugar
@@ -404,6 +408,8 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 - compiler warnings for cascade-order footguns
 - `DSSL.freeze()` / `DSSL.unfreeze()` / `DSSL.explain()`
 - bare font names, `hyphens: manual`, loud did-you-mean errors
+- honest line numbers: a v0.7.1 parser bug (every `//` comment shifted later lines +1, so diagnostics pointed one line late) is fixed and regression-tested
+- the editor extension bundles the real compiler, so editor squiggles and browser console agree
 
 ## Repo layout
 
@@ -412,10 +418,12 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 - `package/` what ships in the download: engine, starter files, usage guide, installers
 - `src/` the Next.js site (docs, playground, changelog)
 - `scripts/` smoke tests for the engine
+- `dssl-vscode/` the editor extension (VS Code + VSCodium, bundles the real parser/resolver)
+- `llms.txt`, `AGENTS.md`, `PARITY.md` for machine reviewers and contributors
 
 ## Status
 
-v0.7.0, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; if a page must work without JavaScript, a style runtime is not the right tool for it. Freeze makes big static pages viable; live interaction is what the engine is for.
+v0.7.1, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; if a page must work without JavaScript, a style runtime is not the right tool for it. Freeze makes big static pages viable; live interaction is what the engine is for.
 
 ## License
 

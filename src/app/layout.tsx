@@ -28,7 +28,7 @@ const prePaint = `
 // executes (right after parse, before first paint), so there is no fetch
 // waterfall and no wait for React hydration. Server-side read also means a
 // browser refresh picks up .dssl edits instantly in dev.
-const DSSL_SHEETS = ["tokens", "site", "home", "docs", "playground", "changelog"] as const;
+const DSSL_SHEETS = ["tokens", "site", "home", "docs", "playground", "changelog", "bench"] as const;
 
 function dsslInlineStyles(): { name: string; src: string }[] {
   return DSSL_SHEETS.map((name) => {

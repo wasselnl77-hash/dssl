@@ -79,8 +79,14 @@ function stripComments(src) {
     }
     if (c === '"' || c === "'") { q = c; out += c; continue; }
     if (c === '/' && n === '/') {
+      // v0.7.1 bugfix: this handler used to emit its own '\n' AND rewind so
+      // the main loop emitted the same newline again — every // comment
+      // doubled a line, and every line number after the first comment
+      // drifted +1 (diagnostics pointed one line late). The newline is now
+      // emitted exactly once by the main loop.
       while (i < src.length && src[i] !== '\n') i++;
-      out += '\n'; i--; continue;
+      if (i < src.length) i--; // reprocess the newline once, below
+      continue;
     }
     if (c === '/' && n === '*') {
       let j = i + 2;

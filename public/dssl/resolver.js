@@ -26,7 +26,9 @@ import { PSEUDO_ELEMENTS, VENDOR_PSEUDO } from './parser.js';
  * Vocabulary
  * ------------------------------------------------------------------ */
 
-const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,none,auto,currentcolor,transparent,' +
+// exported for the editor extension: completions ride the same list the
+// compiler validates against, so the two can never drift apart
+export const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,none,auto,currentcolor,transparent,' +
   'black,silver,gray,white,maroon,red,purple,fuchsia,green,lime,olive,yellow,navy,blue,teal,aqua,' +
   'orange,gold,pink,brown,violet,cyan,magenta,indigo,crimson,coral,tomato,goldenrod,khaki,' +
   'slategray,slategrey,dimgray,dimgrey,lightgray,lightgrey,darkgray,darkgrey,gainsboro,whitesmoke,' +

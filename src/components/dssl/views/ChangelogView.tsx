@@ -12,6 +12,26 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.7.1",
+    date: "growth phase · the credibility drop",
+    title: "The language moves into the editor, the bench goes public, and a reviewer bug dies",
+    why: "several AI agents tested DSSL and reached the same verdict — good for prototypes — citing v0.x, JS-only, inline-style cost and a one-person ecosystem. This release answers all four without pivoting the architecture",
+    kind: "add",
+    body:
+      "The verdict said prototype, so this release aims straight at the verdict. The official editor extension arrived, and it is not a loose re-implementation: it bundles the real parser and resolver, so the squiggles in your editor are the same errors the browser console prints, including the did-you-mean and the new warnings. Completions ride the live token registry folded across the workspace (type color. and get your palette with resolved values), hovers explain the semantic vocabulary, and one grammar serves both VS Code and VSCodium because they share the same extension API — the .vsix installs in either, two clicks. The extension immediately paid for itself: its test suite caught a parser bug where every // comment doubled a line in the stripped source, so all line numbers after the first comment drifted +1 and every diagnostic — editor squiggle AND browser console — pointed one line late. Fixed, regression-tested, and honestly a little embarrassing. The repo gained the machine-reviewer layer: llms.txt at the site root and in the repo (dense, factual, structured for the agents that keep grading this project), AGENTS.md for contributors with a motor in their chest, and PARITY.md, the honest feature matrix against CSS. And the argument that used to happen from priors now happens from numbers: the Bench page runs 100 / 1,000 / 10,000 synthetic nodes three ways on this very page — a plain CSS stylesheet, the live engine, and the frozen engine — and reports first paint and restyle-all as medians of three. No build step appeared anywhere. The engine stays the engine.",
+    code: `// in your editor now, same compiler the browser runs
+.bad { background: colr.accent }
+//   ^ unknown token "colr" (did you mean "color.accent"?) — as a squiggle
+
+// completions come from YOUR registry, folded across the workspace
+tokens { space { 9: 96 } }
+.hero { padding: space.9 }   // typing space. offers 9 = 96
+
+// the bench, on this page, median of 3 — numbers come from YOUR machine
+10,000 nodes · CSS <style> · DSSL live · DSSL frozen
+//        first paint + restyle-all, per lane, per size`,
+  },
+  {
     version: "v0.7.0",
     date: "growth phase · the engine gets a handbrake",
     title: "Freeze, explain, and a compiler that warns before you debug",
