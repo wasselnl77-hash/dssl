@@ -296,6 +296,7 @@ await withBrowser(async ({ open, errors }) => {
 await withBrowser(async ({ open }) => {
   const p = await open('/showcase/wood/index.html');
   await p.waitForFunction('window.DSSL'); await p.waitForTimeout(800);
+  ok('every file the page links to is an absolute path, so the clean URL /showcase/wood works too', !/(href|src)="(?!https?:|\/|#|data:)[^"]+\.(css|dssl|js)"/.test(readFileSync(new URL('../public/showcase/wood/index.html', import.meta.url), 'utf8')));
   ok('and none on a 390px phone', !(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth)));
 }, { viewport: { width: 390, height: 844 } });
 
