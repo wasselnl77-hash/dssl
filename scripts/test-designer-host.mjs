@@ -20,7 +20,8 @@ const EXT = join(ROOT, 'dssl-vscode');
 const pkg = JSON.parse(readFileSync(join(EXT, 'package.json'), 'utf8'));
 
 section('the package manifest');
-ok('the version matches the engine it bundles', pkg.version === VERSION, `${pkg.version} vs ${VERSION}`);
+const mm = (v) => v.split('.').slice(0, 2).join('.');
+ok('the version line (major.minor) matches the engine it bundles; patch may differ for extension-only releases', mm(pkg.version) === mm(VERSION), `${pkg.version} vs ${VERSION}`);
 ok('main points at a file that exists', existsSync(join(EXT, pkg.main)));
 ok('the icon exists', existsSync(join(EXT, pkg.icon)));
 const declared = pkg.contributes.commands.map((c) => c.command);

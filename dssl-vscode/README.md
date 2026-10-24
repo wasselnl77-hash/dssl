@@ -1,5 +1,13 @@
 # DSSL Language Support (VS Code + VSCodium)
 
+> **About the publisher name.** You may see a warning when you install this, because the
+> publisher `ehs-studio` is new on Open VSX. It is me: **EHS-Studio is the same person as
+> [wasselnl77-hash on GitHub](https://github.com/wasselnl77-hash)**, and the project is
+> open source (MIT). The source is in the
+> [Hugging Face repo](https://huggingface.co/EHS-Studio/dssl), and you can read every file in
+> this extension before you install it. It does not make network requests and does not
+> collect anything.
+
 The DSSL style language in your editor. Not a re-implementation: this extension bundles
 the **real parser and resolver** that ship in the engine, so the diagnostics you see are
 the same errors the browser console prints, did-you-mean included.

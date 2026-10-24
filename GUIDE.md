@@ -592,7 +592,7 @@ Three ways to get it:
 
 1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
    https://open-vsx.org/extension/ehs-studio/dssl-vscode
-2. VS Code: download `dssl-vscode/dssl-vscode-0.9.0.vsix` from the repo files, then
+2. VS Code: download `dssl-vscode/dssl-vscode-0.9.1.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
 3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 
