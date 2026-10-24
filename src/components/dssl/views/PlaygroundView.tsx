@@ -6,7 +6,7 @@ import type { DsslError, DsslApplyResult } from "../SiteRoot";
 const PRESETS: Record<string, { label: string; src: string }> = {
   cards: {
     label: "Cards",
-    src: `// style the canvas — bare numbers are px,
+    src: `// style the canvas, bare numbers are px,
 // bare identifiers are tokens
 tokens {
   color {
@@ -70,7 +70,7 @@ tokens {
   tokens: {
     label: "Tokens",
     src: `// tokens compile to custom properties on the
-// canvas element — try flipping these
+// canvas element, try flipping these
 tokens {
   color {
     pop: oklch(0.65 0.19 300)
@@ -169,7 +169,7 @@ motion shimmer {
   },
   signals: {
     label: "Signals",
-    src: `// press the button in the canvas —
+    src: `// press the button in the canvas,
 // DSSL.signal('pgdemo', 'hot') re-styles live
 .pc-board {
   grid: 3
@@ -216,7 +216,7 @@ motion shimmer {
   },
   errors: {
     label: "Errors",
-    src: `// this preset fails on purpose —
+    src: `// this preset fails on purpose,
 // read the panel below the editor
 .pc-card {
   backgroud: color.card       // typo
@@ -234,8 +234,8 @@ motion shimmer {
 };
 
 const SAMPLE_CARDS = [
-  { badge: "one", title: "Styled live", text: "Everything on the left is applied to this canvas by the DSSL engine — scoped, so the rest of the site is untouched." },
-  { badge: "two", title: "Tokens & states", text: "Use color.*, space.*, radius.* — or define your own. Hover states work right here." },
+  { badge: "one", title: "Styled live", text: "Everything on the left is applied to this canvas by the DSSL engine, scoped, so the rest of the site is untouched." },
+  { badge: "two", title: "Tokens & states", text: "Use color.*, space.*, radius.*, or define your own. Hover states work right here." },
   { badge: "three", title: "Loud errors", text: "Misspell a token and the panel below explains what it thinks you meant." },
 ];
 
@@ -298,11 +298,10 @@ export default function PlaygroundView() {
   return (
     <div className="wrap">
       <div className="page-head">
-        <div className="kicker">try it</div>
         <h1 className="page-title">Playground</h1>
         <p className="page-sub">
           Real engine, real errors, zero setup. Your stylesheet is applied{" "}
-          <b>scoped</b> to the canvas — nothing leaks to the rest of the page.
+          <b>scoped</b> to the canvas, nothing leaks to the rest of the page.
         </p>
       </div>
 
@@ -334,14 +333,14 @@ export default function PlaygroundView() {
           />
           <div className={`pg-status ${ok ? "pg-status-ok" : "pg-status-err"}`} role="status">
             {ok
-              ? `ok — ${stats?.rules ?? 0} rules, ${stats?.tokens ?? 0} tokens, ${stats?.motions ?? 0} motions`
-              : `${errors.length} error${errors.length === 1 ? "" : "s"} — fix and keep going`}
+              ? `ok, ${stats?.rules ?? 0} rules, ${stats?.tokens ?? 0} tokens, ${stats?.motions ?? 0} motions`
+              : `${errors.length} error${errors.length === 1 ? "" : "s"}: fix and keep going`}
           </div>
           {!ok && (
             <div className="pg-errors" aria-live="polite">
               {errors.map((e, i) => (
                 <div key={i} className="pg-error">
-                  <span>line {e.line ?? "?"} — {e.message}</span>
+                  <span>line {e.line ?? "?"}: {e.message}</span>
                   {e.hint && <span className="pg-error-hint">did you mean <em>“{e.hint}”</em>?</span>}
                 </div>
               ))}
@@ -352,7 +351,7 @@ export default function PlaygroundView() {
         {/* ------------------------------------ canvas */}
         <div className="pg-pane">
           <div className="pg-head">
-            <span>#pg-canvas — scoped</span>
+            <span>#pg-canvas: scoped</span>
             <div className="pg-head-tools">
               {preset === "signals" && (
                 <button type="button" className="doc-btn btn-sm" onClick={toggleHot}>
@@ -368,7 +367,7 @@ export default function PlaygroundView() {
           </div>
           <div className="pg-canvas-wrap">
             <div className="pg-canvas" id="pg-canvas">
-              <p className="pg-canvas-title">canvas — your dssl styles this</p>
+              <p className="pg-canvas-title">canvas: your dssl styles this</p>
               <div className="pc-board">
                 {SAMPLE_CARDS.map(c => (
                   <article className="pc-card" key={c.badge}>

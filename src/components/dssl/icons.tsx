@@ -1,4 +1,4 @@
-// Tiny inline icon set (no icon library needed — DSSL styles the rest)
+// Tiny inline icon set (no icon library needed, DSSL styles the rest)
 export function SunIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">

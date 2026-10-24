@@ -1,80 +1,94 @@
 // =========================================================================
-// tokens.dssl — DSSL's own design tokens
-// v0.3.3 "The Classic Edition": a print-era look — parchment paper, ink,
-// oxblood accent, serif display type, squared corners, hairline rules.
-// The dark palette lives in a behavior and is `use`d by both the system
-// preference and the manual theme signal — define once, apply twice.
+// tokens.dssl: the vocabulary the whole site is written in.
+//
+// The look: cool lilac paper, deep violet ink, one loud accent. The accent is
+// a live token. The editor on the home page rewrites it and the whole site
+// retints, which is the point of tokens being the vocabulary.
+//
+// Colour is used with a job each:
+//   accent  the one thing you can act on (links, primary buttons, focus)
+//   tape    warning-tape yellow, only ever for errors and warnings
+//   ok      something worked
+// Code always sits on a dark panel, in light and dark mode alike, so a code
+// sample reads as "the language" and the page around it reads as "the talk".
 // =========================================================================
 
 tokens {
   font {
-    serif: "Charter", "Iowan Old Style", "Palatino Linotype", "Palatino", "Georgia", "Times New Roman", serif
-    sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif
-    mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace
+    sans: var(--font-display), "Helvetica Neue", Arial, system-ui, sans-serif
+    serif: var(--font-display), "Helvetica Neue", Arial, system-ui, sans-serif
+    mono: var(--font-code), ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace
   }
   color {
-    paper: #f5f0e4
-    card: #fdfaf2
-    ink: #26201a
-    muted: #6f6250
-    line: #ddd2bc
-    accent: #7c2d2d
-    accent-ink: #f9efdd
-    ok: #3d6b46
-    err: #a83226
-    code-bg: #ece4cf
-    code-ink: #2b2318
-    code-line: #d8cbac
-    code-key: #8e3b1f
-    code-sel: #38614f
-    code-prop: #35566e
-    code-str: #6f5a22
-    code-num: #6e3b52
-    code-com: #6f6350
+    paper: #f2f0f7
+    card: #ffffff
+    ink: #1a1426
+    muted: #655d77
+    line: #dcd7e6
+    accent: #d1006f
+    accent-ink: #ffffff
+    ok: #17794f
+    err: #c2261d
+    tape: #ffd23f
+    tape-ink: #2b2200
+    code-bg: #17111f
+    code-ink: #ece7f5
+    code-line: #2e2540
+    code-key: #ff8ac4
+    code-sel: #9ce3c0
+    code-prop: #a9c6ff
+    code-str: #ffd98a
+    code-num: #e5a6ff
+    code-com: #8c82a3
   }
   radius {
-    sm: 2
-    md: 4
-    lg: 6
-    xl: 8
+    sm: 4
+    md: 8
+    lg: 14
+    xl: 22
     full: 999
   }
   shadow {
-    sm: 0 1 2 color.ink/12
-    md: 0 2 6 color.ink/14
-    lg: 0 6 18 color.ink/16
+    sm: 0 1 2 color.ink/10
+    md: 0 4 14 color.ink/10
+    lg: 0 22 60 color.ink/24
   }
 }
 
 // ---- dark palette (shared) ---------------------------------------------
-// classic dark = a candlelit study: deep walnut, parchment text, brass accent
+// the same hues, turned down: a violet-black page and a code panel a shade
+// deeper than it. There is deliberately NO accent in here. One accent works on
+// both papers (white text on it is 5.3:1, and it is 3.5:1 or better against
+// either page), and keeping it out of the palettes means a tokens block
+// elsewhere can change it. Palettes win over later sheets, so anything they set
+// cannot be edited live.
 
 behavior palette-dark {
   tokens {
     font {
-      serif: "Charter", "Iowan Old Style", "Palatino Linotype", "Palatino", "Georgia", "Times New Roman", serif
-      sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif
-      mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace
+      sans: var(--font-display), "Helvetica Neue", Arial, system-ui, sans-serif
+      serif: var(--font-display), "Helvetica Neue", Arial, system-ui, sans-serif
+      mono: var(--font-code), ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace
     }
     color {
-      paper: #181310
-      card: #221b15
-      ink: #ece2cd
-      muted: #a5937a
-      line: #372d21
-      accent: #c98d52
-      accent-ink: #241402
-      ok: #7fae8a
-      err: #d97e6c
-      code-bg: #120e0b
-      code-ink: #e5d9bd
-      code-line: #2e261c
-      code-key: #d99a62
-      code-sel: #8fb8a2
-      code-prop: #92b4cc
-      code-str: #c9b47c
-      code-num: #c9a0b4
-      code-com: #94856a
+      paper: #130f1b
+      card: #1c1626
+      ink: #efeaf7
+      muted: #a79eba
+      line: #322a42
+      ok: #5fd39a
+      err: #ff7a70
+      tape: #ffd23f
+      tape-ink: #2b2200
+      code-bg: #0c0811
+      code-ink: #ece7f5
+      code-line: #2a2139
+      code-key: #ff8ac4
+      code-sel: #9ce3c0
+      code-prop: #a9c6ff
+      code-str: #ffd98a
+      code-num: #e5a6ff
+      code-com: #8c82a3
     }
   }
 }
@@ -94,29 +108,29 @@ behavior palette-dark {
 behavior palette-light {
   tokens {
     font {
-      serif: "Charter", "Iowan Old Style", "Palatino Linotype", "Palatino", "Georgia", "Times New Roman", serif
-      sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif
-      mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace
+      sans: var(--font-display), "Helvetica Neue", Arial, system-ui, sans-serif
+      serif: var(--font-display), "Helvetica Neue", Arial, system-ui, sans-serif
+      mono: var(--font-code), ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace
     }
     color {
-      paper: #f5f0e4
-      card: #fdfaf2
-      ink: #26201a
-      muted: #6f6250
-      line: #ddd2bc
-      accent: #7c2d2d
-      accent-ink: #f9efdd
-      ok: #3d6b46
-      err: #a83226
-      code-bg: #ece4cf
-      code-ink: #2b2318
-      code-line: #d8cbac
-      code-key: #8e3b1f
-      code-sel: #38614f
-      code-prop: #35566e
-      code-str: #6f5a22
-      code-num: #6e3b52
-      code-com: #6f6350
+      paper: #f2f0f7
+      card: #ffffff
+      ink: #1a1426
+      muted: #655d77
+      line: #dcd7e6
+      ok: #17794f
+      err: #c2261d
+      tape: #ffd23f
+      tape-ink: #2b2200
+      code-bg: #17111f
+      code-ink: #ece7f5
+      code-line: #2e2540
+      code-key: #ff8ac4
+      code-sel: #9ce3c0
+      code-prop: #a9c6ff
+      code-str: #ffd98a
+      code-num: #e5a6ff
+      code-com: #8c82a3
     }
   }
 }

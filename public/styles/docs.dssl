@@ -1,31 +1,33 @@
 // =========================================================================
-// docs.dssl — language reference layout (also used by the spec view)
+// docs.dssl, language reference layout (also used by the spec view)
 // =========================================================================
 
 .page-head {
-  padding: space.6 0 space.2
+  padding: space.7 0 space.4
 }
 
 .page-title {
-  fluid: 30, 44
-  font-family: font.serif
-  font-weight: 650
-  letter-spacing: -0.01em
-  margin: space.2 0 space.2
+  font-size: fluid 34 56
+  font-weight: 760
+  line-height: 1.04
+  letter-spacing: -0.032em
+  margin: 0 0 space.3
+  font-variation-settings: "wdth" 88
+  text-wrap: balance
 }
 
 .page-sub {
-  font-family: font.serif
   color: color.muted
-  font-size: 16.5
-  line-height: 1.7
-  max-width: 640
+  font-size: 19
+  line-height: 1.6
+  max-width: 660
+  margin: 0
 }
 
 .docs-layout {
   display: grid
-  grid-template-columns: 230 minmax(0, 1fr)
-  gap: space.6
+  grid-template-columns: 236 minmax(0, 1fr)
+  gap: fluid 24 64
   align-items: start
   padding-bottom: space.7
 }
@@ -40,7 +42,7 @@
   scrollbar-width: thin
 }
 
-// v0.3.3 fix: this block MUST come after the .docs-side rule above —
+// v0.3.3 fix: this block MUST come after the .docs-side rule above:
 // `column:` expands to display:flex, and "later wins" in the cascade,
 // so an earlier display:none silently loses (same gotcha as the mobile
 // nav sheet in v0.3.0). Here it lives after, so the sidebar actually
@@ -55,13 +57,11 @@
 }
 
 .side-head {
-  font-family: font.mono
-  font-size: 10.5
-  text-transform: uppercase
-  letter-spacing: 0.14em
-  color: color.muted
+  font-size: 14
+  font-weight: 700
+  color: color.ink
   padding: 0 12
-  margin: space.3 0 4
+  margin: space.5 0 6
 }
 
 .side-head:first-child {
@@ -70,18 +70,17 @@
 
 .docs-side a {
   padding: 6 12
-  radius: 0 sm sm 0
-  font-size: 13.5
+  radius: 0
+  font-size: 14.5
   color: color.muted
   transition: 130
-  border-left: 2 solid transparent
+  border-left: 2 solid color.line
   line-height: 1.4
 }
 
 .docs-side a:hover {
   color: color.ink
-  background: color.line/50
-  border-left-color: color.accent/40
+  border-left-color: color.accent
 }
 
 .docs-body {
@@ -95,11 +94,11 @@
 }
 
 .doc-lead {
-  font-family: font.serif
   color: color.muted
-  font-size: 15.5
-  line-height: 1.75
+  font-size: 17
+  line-height: 1.7
   margin: 0
+  max-width: 720
 }
 
 // live example well
@@ -117,9 +116,9 @@
 }
 
 // tables (semantic property reference, spec votes, …)
-// v0.5 — display: block + fit-content + internal scroll: the raw table's
+// v0.5, display: block + fit-content + internal scroll: the raw table's
 // min-content width (705px) used to push the whole page past 360px viewports
-// — the last un-swept overflow on this page. Same rules, now owned by the
+//, the last un-swept overflow on this page. Same rules, now owned by the
 // stylesheet that actually styles the table, so last-word-wins stays honest.
 .tbl {
   display: block
@@ -133,13 +132,10 @@
 .tbl th {
   text-align: left
   padding: 9 12
-  background: color.card
-  border-bottom: 2 solid color.line
-  font-size: 11
-  text-transform: uppercase
-  letter-spacing: 0.09em
-  color: color.muted
-  font-family: font.mono
+  border-bottom: 2 solid color.ink
+  font-size: 14
+  font-weight: 700
+  color: color.ink
 }
 
 .tbl td {
@@ -151,16 +147,16 @@
 }
 
 .tbl tr:hover td {
-  background: color.accent/4
+  background: color.ink/4
 }
 
 .tbl code {
   font-family: font.mono
   font-size: 12.5
-  color: color.accent
-  background: color.accent/9
+  color: color.ink
+  background: color.ink/8
   padding: 1 6
-  radius: md
+  radius: sm
   white-space: nowrap
 }
 
@@ -173,7 +169,7 @@
 // callouts
 .note {
   border-left: 3 solid color.accent
-  background: color.accent/7
+  background: color.ink/5
   radius: 0 md md 0
   padding: space.3 space.4
   font-size: 14
@@ -182,8 +178,8 @@
 }
 
 .note-warn {
-  border-left-color: color.err
-  background: color.err/7
+  border-left-color: color.tape
+  background: color.tape/22
 }
 
 .note b {
@@ -307,7 +303,7 @@
   background: color.accent
 }
 
-// motion demo — replayed via DSSL.replay()
+// motion demo, replayed via DSSL.replay()
 motion pop {
   from {
     opacity: 0
@@ -334,7 +330,7 @@ motion pop {
 }
 
 // =========================================================================
-// cheat sheet (v0.3) — one-page quick reference
+// cheat sheet (v0.3), one-page quick reference
 // =========================================================================
 
 .cheat-grid {
@@ -356,12 +352,9 @@ motion pop {
 }
 
 .cheat-card {
-  background: color.card
-  border: 1 solid color.line
-  radius: md
-  padding: space.4
+  border-top: 2 solid color.ink
+  padding: space.3 0 0
   column: gap 10
-  shadow: sm
   min-width: 0
 }
 
@@ -372,14 +365,12 @@ motion pop {
 }
 
 .cheat-k {
-  font-family: font.mono
-  font-size: 11
-  letter-spacing: 0.12em
-  text-transform: uppercase
-  color: color.accent
-  background: color.accent/9
-  padding: 3 10
-  radius: full
+  font-size: 12.5
+  font-weight: 700
+  color: color.accent-ink
+  background: color.accent
+  padding: 2 8
+  radius: sm
   align-self: start
 }
 
@@ -393,16 +384,18 @@ motion pop {
 .cheat-p code {
   font-family: font.mono
   font-size: 12
-  color: color.accent
-  background: color.accent/9
+  color: color.ink
+  background: color.ink/8
   padding: 1 5
-  radius: md
+  radius: sm
 }
 
 .cheat-p a {
-  color: color.accent
+  color: color.ink
   font-weight: 600
   text-decoration: underline
+  text-decoration-color: color.accent
+  text-decoration-thickness: 2
   text-underline-offset: 3
 }
 
@@ -418,10 +411,10 @@ motion pop {
 .cheat-list code {
   font-family: font.mono
   font-size: 12.5
-  color: color.accent
-  background: color.accent/9
+  color: color.ink
+  background: color.ink/8
   padding: 1 6
-  radius: md
+  radius: sm
   white-space: nowrap
 }
 
@@ -433,7 +426,7 @@ motion pop {
 
 // ---------------------------------------------------- v0.4.0 · power tools
 
-// scoped tokens live demo — inside this box, --color.accent re-declares the
+// scoped tokens live demo, inside this box, --color.accent re-declares the
 // accent token as color.ok. The tok-dots run the same rules as the palette
 // demo above, but the var() references inherit our override, so they go green.
 .tok-scope {
@@ -445,7 +438,7 @@ motion pop {
   column: gap 10
 }
 
-// seen + stagger live demo — four cards that cascade in when you scroll here
+// seen + stagger live demo, four cards that cascade in when you scroll here
 motion rise-in {
   from {
     opacity: 0
@@ -487,7 +480,7 @@ motion rise-in {
   font-family: font.mono
   font-size: 18
   font-weight: 700
-  color: color.accent
+  color: color.ink
 }
 
 .pt-card span:last-child {
@@ -497,8 +490,8 @@ motion rise-in {
 }
 
 // =========================================================================
-// v0.5 — the pseudo-elements section's live demo. The rules below are
-// written in the FULL-SELECTOR form (.pe-tag::before) — the spelling that
+// v0.5, the pseudo-elements section's live demo. The rules below are
+// written in the FULL-SELECTOR form (.pe-tag::before), the spelling that
 // used to compile ok and then match nothing. The demo renders right only
 // if the trap stays closed. The dot is also the site's first `infinite`
 // animation, so v0.5 dogfoods both headline features at once.
@@ -543,10 +536,10 @@ motion pe-pulse {
 }
 
 // =========================================================================
-// v0.5 — the overlap section's live demo. The ghost is a real 45%-opacity
+// v0.5, the overlap section's live demo. The ghost is a real 45%-opacity
 // element; the site-wide `body { overlap: auto }` policy shoves it out of
 // the card after layout. The toggle grants the ghost its own
-// `overlap: allow` — the same opt-out a scrim or translucent nav uses.
+// `overlap: allow`, the same opt-out a scrim or translucent nav uses.
 // The ghost's transition sits on the translate channel, the same channel
 // the engine's nudge writes, so the escape glides instead of teleporting.
 // =========================================================================
@@ -599,7 +592,7 @@ motion pe-pulse {
 }
 
 // =========================================================================
-// v0.6.0 — the deform section's live demos. The button genuinely flexes
+// v0.6.0, the deform section's live demos. The button genuinely flexes
 // under the pointer (:active bend + stretch riding the transform channel),
 // the chip row is a real bend-around container re-laid on resize, and the
 // two mini cards bend-up / fold on hover with edge pivots baked into the
@@ -671,7 +664,7 @@ motion pe-pulse {
 }
 
 // =========================================================================
-// v0.6.0 — the gradient section's live demos. The banner flows forever
+// v0.6.0, the gradient section's live demos. The banner flows forever
 // (gradient-flow loops background-position through WAAPI and sizes the
 // background to 200% itself), the headline clips a gradient into the
 // glyphs, and the swatches are the three kinds, one line each.
@@ -712,9 +705,8 @@ motion pe-pulse {
 
 .gd-con { gradient: conic from 45, color.accent, color.line, color.card, color.accent }
 
-// v0.7 — performance chapter sub-heads (dssl-ready / freeze / explain)
+// v0.7, performance chapter sub-heads (dssl-ready / freeze / explain)
 .doc-h3 {
-  font-family: font.serif
   font-weight: 650
   font-size: 18
   letter-spacing: -0.01em

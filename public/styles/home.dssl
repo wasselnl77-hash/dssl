@@ -1,550 +1,409 @@
 // =========================================================================
-// home.dssl — the landing view
+// home.dssl: the landing page
+//
+// One loud thing: the live editor in the hero, which rewrites the page it
+// sits on. Everything below it is a plain two-column read: a heading on the
+// left, the answer on the right, no cards.
 // =========================================================================
 
 // ------------------------------------------------------------------- hero
 
 .hero {
-  position: relative
-  overflow: hidden
-  padding: space.8 0 space.7
-}
-
-.hero-glow {
-  position: absolute
-  top: -220
-  right: -160
-  size: 560
-  circle: 560
-  background: radial-gradient(circle, color.accent/12, transparent 65%)
-  pointer-events: none
-}
-
-.hero-glow-2 {
-  position: absolute
-  bottom: -260
-  left: -200
-  size: 520
-  circle: 520
-  background: radial-gradient(circle, color.accent/6, transparent 60%)
-  pointer-events: none
+  padding-top: fluid 36 80
+  padding-bottom: fluid 48 96
 }
 
 .hero-grid {
-  row: gap space.6 between
-  align: center
-  position: relative
+  display: grid
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr)
+  gap: fluid 32 64
+  align-items: start
 }
 
-@media (width <= 940) {
+@media (width <= 980) {
   .hero-grid {
-    display: grid
-    gap: space.6
+    grid-template-columns: minmax(0, 1fr)
   }
 }
 
 .hero-copy {
-  max-width: 560
   min-width: 0
+  max-width: 600
 }
 
 .hero-title {
-  fluid: 40, 62
-  font-family: font.serif
-  font-weight: 650
-  line-height: 1.08
-  letter-spacing: -0.015em
-  margin: space.3 0 space.4
-}
-
-.hero-title em {
-  font-style: italic
-  color: color.accent
+  font-size: fluid 38 68
+  font-weight: 760
+  line-height: 1.02
+  letter-spacing: -0.035em
+  margin: 0 0 space.4
+  text-wrap: balance
+  font-variation-settings: "wdth" 86
 }
 
 .hero-sub {
-  font-family: font.serif
-  font-size: 17.5
-  line-height: 1.75
+  font-size: 19
+  line-height: 1.6
+  color: color.ink
+  margin: 0 0 space.3
+}
+
+.hero-sub-2 {
   color: color.muted
-  margin: 0 0 space.5
+  margin-bottom: space.5
+}
+
+.hero-sub a {
+  color: color.ink
+  text-decoration: underline
+  text-decoration-color: color.accent
+  text-decoration-thickness: 2
+  text-underline-offset: 3
 }
 
 .hero-ctas {
   row: gap 12 center wrap
 }
 
-.hero-meta {
-  row: gap 14 center wrap
-  margin-top: space.5
-  color: color.muted
-  font-size: 13
-  font-family: font.mono
-}
-
-.hero-meta span::before {
-  content: ""
-  inline-size: 4
-  aspect-ratio: 1
-  background: color.ok
-  radius: 0
-  display: inline-block
-  margin-right: 7
-  vertical-align: 1
-}
-
-// ------------------------------------------------------- hero demo stage
-
-.demo {
-  width: 100%
-  max-width: 480
-  min-width: 0
-}
-
-.demo-tabs {
-  row: gap 6
-  margin-bottom: 10
-}
-
-.demo-tab {
-  padding: 7 14
-  radius: sm
-  font-size: 13
+.hero-link {
   font-weight: 600
+  padding: 12 8
+  text-decoration: underline
+  text-decoration-color: color.accent
+  text-decoration-thickness: 2
+  text-underline-offset: 5
+}
+
+.hero-link:hover {
+  text-decoration-thickness: 4
+}
+
+.hero-facts {
+  margin: space.5 0 0
   color: color.muted
-  border: 1 solid color.line
-  background: color.card/50
-  cursor: pointer
-  transition: 140
+  font-size: 15
 }
 
-.demo-tab:hover {
-  color: color.ink
-  border-color: color.ink/40
-}
+// ------------------------------------------------- the live editor
 
-.demo-tab[aria-pressed="true"] {
-  background: color.accent
-  border-color: color.accent
-  color: color.accent-ink
-}
-
-.demo-stage {
-  background: color.card
-  border: 1 solid color.ink/30
-  radius: xl
-  overflow: hidden
-}
-
-.demo-code {
-  border: none
-  border-bottom: 1 solid color.code-line/60
-  radius: 0
-  font-size: 12.5
-  padding: space.3 space.4
-  min-height: 168
-}
-
-.demo-canvas {
-  padding: space.5
-  display: grid
-  place: center
-  gap: 14
-  min-height: 190
-}
-
-// shared vertical rhythm between intro text and grids
-.sect-gap {
-  margin-top: space.4
-}
-
-// the live demo card — every rule below is real, hovering it really works
-motion rise-in {
-  from {
-    opacity: 0
-    translate: 0 12
-  }
-}
-
-.demo-card {
-  width: 240
-  padding: space.4
-  radius: md
-  background: color.card
-  border: 1 solid color.line
-  shadow: sm
-  transition: 200
-  column: gap 10
-  animate: rise-in 500 snap
-}
-
-.demo-card:hover {
-  shadow: md
-  border-color: color.ink/38
-}
-
-.demo-swatch {
-  height: 64
-  radius: sm
-  background: linear-gradient(135deg, color.accent, color.accent/45)
-  transition: 250
-}
-
-.demo-card:hover .demo-swatch {
-  background: linear-gradient(135deg, color.accent/60, color.ink/80)
-}
-
-.demo-card h4 {
-  font-size: 15.5
-  font-weight: 700
-}
-
-.demo-card p {
-  font-size: 13
-  color: color.muted
-  line-height: 1.5
-  margin: 0
-}
-
-.demo-chip {
-  align-self: start
-  font-family: font.mono
-  font-size: 11
-  color: color.accent
-  background: color.accent/12
-  padding: 3 9
-  radius: sm
-}
-
-// states demo: a real focusable button styled by focus-visible
-.demo-btn {
-  padding: 12 22
-  radius: md
-  background: color.ink
-  color: color.paper
-  font-weight: 650
-  font-size: 14.5
-  cursor: pointer
-  transition: 160
-  border: none
-}
-
-.demo-btn:hover { shadow: md; filter: brightness(1.15) }
-
-// motion demo
-.demo-motion {
-  width: 200
-  padding: space.4
-  radius: md
+.try {
+  min-width: 0
+  display: flex
+  flex-direction: column
   background: color.code-bg
-  color: color.code-ink
-  font-family: font.mono
-  font-size: 13
-  text-align: center
+  radius: lg
+  overflow: hidden
+  // the one thing on the site that floats, so the one shadow
+  shadow: lg
 }
 
-// signal demo — the button toggles a JS signal; DSSL re-styles live
-.demo-signal-card {
-  width: 240
-  padding: space.4
-  radius: md
-  background: color.card
-  border: 1 solid color.line
-  transition: 300
-  column: gap 8
-  font-size: 13.5
-  color: color.muted
-}
-
-@signal demo == on {
-  .demo-signal-card {
-    background: color.accent
-    border-color: color.accent
-    color: color.accent-ink
-    shadow: sm
-  }
-}
-
-// ------------------------------------------------------------ pain cards
-
-.pain-grid {
-  display: grid
-  grid-template-columns: repeat(2, 1fr)
-  gap: space.4
-}
-
-@media (width <= 760) {
-  .pain-grid {
-    grid-template-columns: 1fr
-  }
-}
-
-.pain-card {
-  padding: space.5
-  column: gap 10
-}
-
-.pain-label {
-  font-family: font.mono
-  font-size: 12
-  color: color.err
-  font-weight: 600
-}
-
-.pain-cure {
-  font-family: font.mono
-  font-size: 12
-  color: color.ok
-  font-weight: 600
-}
-
-.pain-card h3 {
-  font-size: 17
-  font-weight: 700
-  margin: 0
-}
-
-.pain-card p {
-  margin: 0
-  font-size: 14
-  line-height: 1.65
-  color: color.muted
-}
-
-// ------------------------------------------------------------ comparison
-
-.compare {
-  display: grid
-  grid-template-columns: 1fr 1fr
-  gap: space.4
-  align-items: start
-}
-
-@media (width <= 820) {
-  .compare {
-    grid-template-columns: 1fr
-  }
-}
-
-.compare-col {
-  column: gap 10
-  min-width: 0
-}
-
-.compare-tag {
+.try-bar {
+  row: gap 12 between
+  align: center
+  padding: 9 12 9 22
+  background: color.code-line
+  color: color.code-com
   font-family: font.mono
   font-size: 12.5
-  font-weight: 700
+}
+
+.try-tools {
   row: gap 8 center
 }
 
-.compare-tag-css { color: color.err }
-.compare-tag-dssl { color: color.ok }
-
-// ---------------------------------------------------------- feature grid
-
-.feature-grid {
-  display: grid
-  grid-template-columns: repeat(4, 1fr)
-  gap: space.4
-}
-
-@media (width <= 980) {
-  .feature-grid {
-    grid-template-columns: repeat(2, 1fr)
-  }
-}
-
-@media (width <= 560) {
-  .feature-grid {
-    grid-template-columns: 1fr
-  }
-}
-
-.feature {
-  padding: space.5
-  column: gap 10
-}
-
-.feature-icon {
-  size: 40
-  circle: 40
-  center: both
-  background: color.accent/12
-  color: color.accent
-  font-size: 19
-  font-weight: 700
+.try-tool {
   font-family: font.mono
+  font-size: 12
+  color: color.code-ink/85
+  border: 1 solid color.code-com/50
+  radius: md
+  padding: 5 11
+  cursor: pointer
+  transition: 130
 }
 
-.feature h3 {
-  font-size: 16
-  font-weight: 700
-  margin: 0
+.try-tool:hover {
+  color: color.code-key
+  border-color: color.code-key
 }
 
-.feature p {
-  margin: 0
+.try-editor {
+  display: block
+  width: 100%
+  height: 322
+  border: 0
+  resize: none
+  background: color.code-bg
+  color: color.code-ink
+  font-family: font.mono
   font-size: 13.5
-  line-height: 1.6
-  color: color.muted
-}
-
-// ------------------------------------------------- get the engine (v0.4.1)
-// The install section: three platform cards and the two-tag wiring snippet.
-// Same reveal choreography as the grids above, because consistency is style.
-
-.get-grid {
-  display: grid
-  grid-template-columns: repeat(3, 1fr)
-  gap: space.4
-}
-
-@media (width <= 980) {
-  .get-grid {
-    grid-template-columns: 1fr
+  line-height: 1.75
+  padding: 18 22
+  tab-size: 2
+  white-space: pre
+  overflow: auto
+  caret-color: color.code-key
+  focus-visible {
+    outline: 3 solid color.accent
+    outline-offset: -3
   }
 }
 
-.get-card {
-  column: gap space.4
-  padding: space.5
+// status line: calm green when it applied, warning tape when it did not
+.try-status {
+  column: gap 6
+  padding: 12 22
+  min-height: 62
+  font-size: 14
+  line-height: 1.5
+  transition: 160
+}
+
+.try-good {
+  background: color.code-bg
+  color: color.code-sel
+  border-top: 1 solid color.code-line
+}
+
+.try-bad {
+  background: color.tape
+  color: color.tape-ink
+}
+
+.try-err b {
+  font-weight: 700
+}
+
+.try-err code {
+  font-family: font.mono
+  font-size: 13
+  font-weight: 700
+  background: color.tape-ink/12
+  padding: 0 5
+  radius: sm
+}
+
+.try-result {
+  padding: 22
+  background: color.card
+}
+
+.try-button {
+  cursor: pointer
+  border: 0
+  font-family: inherit
+  font-size: 16
+  font-weight: 600
+}
+
+// -------------------------------------------------------------- the rest
+
+.block {
+  padding-top: fluid 40 72
+}
+
+.split {
+  display: grid
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr)
+  gap: fluid 24 72
+  align-items: start
+}
+
+@media (width <= 900) {
+  .split {
+    grid-template-columns: minmax(0, 1fr)
+  }
+}
+
+// the heading stays put while the long answer scrolls past it
+.split-head {
+  position: sticky
+  top: 92
+}
+
+@media (width <= 900) {
+  .split-head {
+    position: static
+  }
+}
+
+.split-body {
   min-width: 0
 }
 
-// grid children default to min-width auto: without this the long install
-// one-liners push their card (and the whole grid) past the viewport instead
-// of scrolling inside the code block
-.get-wire-code {
-  min-width: 0
+.split p code,
+.split li code,
+.split dd code {
+  font-family: font.mono
+  font-size: 0.86em
+  background: color.ink/8
+  padding: 1 6
+  radius: sm
 }
 
-.get-card .code {
-  font-size: 12.5
+.split p a,
+.split-body a:not(.btn) {
+  color: color.ink
+  text-decoration: underline
+  text-decoration-color: color.accent
+  text-decoration-thickness: 2
+  text-underline-offset: 3
 }
 
-.get-os {
+// ----------------------------------------- four things CSS leaves to you
+
+.fight {
+  padding-bottom: space.4
+  margin-bottom: space.4
+  border-bottom: 1 solid color.line
+}
+
+.fight:last-child {
+  border-bottom: 0
+  margin-bottom: 0
+  padding-bottom: 0
+}
+
+.fight h3 {
+  font-size: 22
+  font-weight: 680
+  letter-spacing: -0.015em
+  margin: 0 0 space.2
+}
+
+.fight p {
+  margin: 0 0 8
+  font-size: 17
+  line-height: 1.55
+}
+
+// which language a sentence is about: a structural label, so it stays
+.lang {
+  display: inline-block
   font-family: font.mono
   font-size: 11.5
   font-weight: 700
-  letter-spacing: 0.09em
-  text-transform: uppercase
-  color: color.accent
+  padding: 2 7
+  radius: sm
+  margin-right: 10
+  vertical-align: 1
 }
 
-.get-note {
-  margin: 0
-  font-size: 13
-  line-height: 1.6
+.lang-css {
+  background: color.ink/10
   color: color.muted
 }
 
-.get-downloads {
-  row: gap space.3
+.lang-dssl {
+  background: color.accent
+  color: color.accent-ink
 }
 
-.get-wire {
-  display: grid
-  grid-template-columns: 3fr 2fr
-  gap: space.5
-  margin-top: space.6
-  align-items: center
-}
+// ---------------------------------------------------- the same card, twice
 
-@media (width <= 980) {
-  .get-wire {
-    grid-template-columns: 1fr
-    margin-top: space.5
-  }
-}
-
-.get-wire-copy {
-  column: gap space.3
-}
-
-.get-wire-copy h3 {
-  font-family: font.serif
-  font-size: 22
-  font-weight: 650
-  margin: 0
-}
-
-.get-wire-copy p {
-  margin: 0
-  font-size: 14
-  line-height: 1.7
-  color: color.muted
-}
-
-.get-grid {
-  stagger: 60
-}
-
-.get-card {
-  seen {
-    animate: rise-in 480 snap
-  }
-}
-
-// ------------------------------------------------------------------- cta
-
-.cta-band {
-  text-align: center
-  padding: space.8 space.4
-  radius: xl
-  background:
-    radial-gradient(ellipse at 30% 0%, color.accent/14, transparent 55%),
-    radial-gradient(ellipse at 75% 100%, color.accent/10, transparent 50%),
-    color.card
-  border: 1 solid color.line
+.versus {
   column: gap space.4
-  align-items: center
 }
 
-.cta-band h2 {
-  fluid: 28, 40
-  font-family: font.serif
-  font-weight: 650
-  letter-spacing: -0.01em
-  margin: 0
-}
-
-.cta-band p {
-  font-family: font.serif
+.versus-label {
+  font-family: font.mono
+  font-size: 13
   color: color.muted
-  max-width: 520
-  line-height: 1.7
+  margin: 0 0 8
+}
+
+// --------------------------------------------------------- engine parts
+
+.parts {
   margin: 0
 }
 
-.cta-band .hero-ctas {
-  justify-content: center
+.part {
+  display: grid
+  grid-template-columns: 190px minmax(0, 1fr)
+  gap: space.4
+  padding: space.3 0
+  border-top: 1 solid color.line
 }
 
-// ------------------------------------------------------ v0.4.0 · the reveal
-// This page dogfoods the power tools: both grids below the fold hold their
-// rise-in motion until each card scrolls into view (seen — engine-native,
-// fires once), and the container staggers the children so they cascade
-// instead of arriving as a wall. Reduced-motion skips the motion entirely —
-// the cards are simply there, because opacity 0 only ever exists inside the
-// WAAPI from-frame, never in the base styles.
-
-.pain-grid {
-  stagger: 70
+.part:first-child {
+  border-top: 0
+  padding-top: 0
 }
 
-.pain-card {
-  seen {
-    animate: rise-in 480 snap
+@media (width <= 560) {
+  .part {
+    grid-template-columns: minmax(0, 1fr)
+    gap: 4
   }
 }
 
-.feature-grid {
-  stagger: 60
+.part dt {
+  font-weight: 680
+  font-size: 17
 }
 
-.feature {
-  seen {
-    animate: rise-in 480 snap
-  }
+.part dd {
+  margin: 0
+  color: color.ink/85
+  line-height: 1.6
+}
+
+// ------------------------------------------------------------- limits
+
+.limits {
+  margin: 0 0 space.4
+  padding: 0
+  column: gap 12
+}
+
+.limits li {
+  position: relative
+  padding-left: 22
+  font-size: 17
+  line-height: 1.6
+}
+
+.limits li::before {
+  content: ""
+  position: absolute
+  left: 2
+  top: 0.62em
+  size: 8
+  background: color.tape
+  border: 1 solid color.ink/40
+  radius: 1
+}
+
+.limits li b {
+  font-weight: 700
+}
+
+.limits-exit {
+  margin: 0 0 space.4
+  font-size: 17
+  line-height: 1.65
+}
+
+// ------------------------------------------------------------- install
+
+.install {
+  column: gap space.5
+}
+
+.install-row h3 {
+  font-size: 19
+  font-weight: 680
+  margin: 0 0 space.2
+}
+
+.install-row p {
+  margin: space.2 0 0
+  color: color.muted
+  font-size: 15.5
+  line-height: 1.6
+}
+
+.install-downloads {
+  row: gap 10 wrap
 }

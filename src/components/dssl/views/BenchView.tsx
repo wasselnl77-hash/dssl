@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 /* The benchmark measures the engine while the engine styles the page.
  * Three lanes, one question each:
- *   CSS     — a real <style> tag, the platform baseline
- *   DSSL    — the live engine, ambient reactivity on
- *   DSSL ❄  — the engine frozen right after first paint (v0.7 freeze())
+ *   CSS:     a real <style> tag, the platform baseline
+ *   DSSL:    the live engine, ambient reactivity on
+ *   DSSL ❄:  the engine frozen right after first paint (v0.7 freeze())
  * Metrics: first paint (build + full style application, median of 3) and
  * restyle-all (one knob flipped, every node changes color).
  * Honest by construction: synthetic nodes, one machine, your browser.
  * The frozen lane's restyle is an explicit developer action (signal), not
- * ambient churn — that is the whole point of freeze, and the note says so. */
+ * ambient churn, that is the whole point of freeze, and the note says so. */
 
 declare global {
   interface Window {
@@ -167,7 +167,7 @@ export default function BenchView() {
           const stats = D.freeze();
           const s = Array.isArray(stats) ? stats.find((x: any) => x.engine !== "global") || stats[0] : stats;
           setFreezeStats(
-            `freeze() → ${s.elements} elements, ${s.rules} rules, ${s.shadowRules} shadow rules — ambient cost now zero`
+            `freeze() → ${s.elements} elements, ${s.rules} rules, ${s.shadowRules} shadow rules, ambient cost now zero`
           );
         }
 
@@ -191,7 +191,7 @@ export default function BenchView() {
     async (count: number | "all") => {
       const D = window.DSSL;
       if (!D) {
-        setErr("engine not booted yet (no window.DSSL) — wait for dssl-ready and retry");
+        setErr("engine not booted yet (no window.DSSL), wait for dssl-ready and retry");
         return;
       }
       setErr(null);
@@ -224,14 +224,14 @@ export default function BenchView() {
 
   const cell = (count: number, lane: LaneId, key: "paint" | "restyle") => {
     const r = rows.find((x) => x.count === count && x.lane === lane);
-    if (!r) return "—";
+    if (!r) return "n/a";
     return r[key] >= 100 ? Math.round(r[key]).toLocaleString() : r[key].toFixed(1);
   };
 
   return (
     <div className="wrap">
       <div className="bench-wrap">
-        <h2 className="bench-title">The bench</h2>
+        <h1 className="bench-title">The bench</h1>
         <p className="bench-sub">
           Synthetic nodes styled three ways on this page, on this machine, in this browser.
           Median of 3 runs. The point is not to win &mdash; it is to stop arguing from priors.

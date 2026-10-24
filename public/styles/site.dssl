@@ -1,29 +1,38 @@
 // =========================================================================
-// site.dssl — chrome shared by every view of the DSSL site
+// site.dssl: the chrome shared by every page of the DSSL site
+//
+// Rules of the house for this stylesheet:
+//   one family for people (font.sans), one for code (font.mono)
+//   left aligned, one column of reading, no stack of identical cards
+//   radius follows size: 4 on tags, 8 on controls, 14 on big panels
+//   shadow only where something floats (the live editor), nowhere else
 // =========================================================================
 
 html {
   font-family: font.sans
   -webkit-font-smoothing: antialiased
   scroll-behavior: smooth
+  font-optical-sizing: auto
 }
 
 body {
   background: color.paper
   color: color.ink
-  // v0.5.0 — the site-wide overlap policy: nothing below 100% opacity may
-  // overlap anything. Intentional overlays opt out with `overlap: allow`.
+  font-size: 17
+  line-height: 1.6
+  // nothing below 100% opacity may overlap anything; overlays opt out
+  // with `overlap: allow`
   overlap: auto
 }
 
 ::selection {
-  background: color.accent/22
+  background: color.accent/25
 }
 
 // accessibility: one behavior, used everywhere
 behavior focus-ring {
   focus-visible {
-    outline: 2 solid color.accent
+    outline: 3 solid color.accent
     outline-offset: 2
     radius: 4
   }
@@ -36,6 +45,24 @@ textarea { use focus-ring }
 select { use focus-ring }
 [tabindex] { use focus-ring }
 
+a {
+  color: inherit
+}
+
+.skip-link {
+  position: absolute
+  left: 16
+  top: -80
+  z: 100
+  padding: 10 16
+  background: color.ink
+  color: color.paper
+  radius: md
+  font-weight: 600
+  transition: 120 top
+  focus { top: 12 }
+}
+
 // ---------------------------------------------------------------- layout
 
 .site {
@@ -46,7 +73,7 @@ select { use focus-ring }
 
 .wrap {
   width: 100%
-  max-width: 1140
+  max-width: 1200
   margin: 0 auto
   padding: 0 space.5
 }
@@ -61,93 +88,80 @@ select { use focus-ring }
   position: sticky
   top: 0
   z: 50
-  background: color.paper/92
-  backdrop-filter: blur(10)
-  border-bottom: 1 solid color.ink/30
-  transition: 200
+  background: color.paper
+  border-bottom: 1 solid color.line
 }
 
 .nav-inner {
-  row: gap space.4 between
-  height: 64
+  row: gap space.5 between
+  height: 60
   align: center
 }
 
 .nav-logo {
   row: gap 2 center
-  font-family: font.serif
-  font-weight: 700
+  font-weight: 800
   font-size: 22
-  letter-spacing: 0
+  letter-spacing: -0.02em
   color: color.ink
-  transition: 120
 }
 
 .logo-mark {
-  font-family: font.serif
   color: color.accent
-  font-weight: 400
+  font-weight: 500
   font-size: 24
   margin-right: 6
+  transition: 220 color
 }
 
 .nav-links {
-  row: gap 4 center
+  row: gap 2 center
+  margin-right: auto
+  margin-left: space.5
 }
 
 .nav-link {
-  padding: 6 12
-  radius: 0
-  color: color.ink/70
-  font-size: 13.5
-  font-weight: 550
-  font-variant: small-caps
-  letter-spacing: 0.08em
-  transition: 130
+  padding: 8 12
+  color: color.muted
+  font-size: 15
+  font-weight: 500
   border-bottom: 2 solid transparent
+  radius: 0
 }
 
 .nav-link:hover {
   color: color.ink
 }
 
-// active view highlighting via a data attribute on the site root — no JS needed.
-// cheat was missing here before v0.3.3 — its tab never lit up.
-[data-view="home"] .nl-home,
-[data-view="docs"] .nl-docs,
-[data-view="cheat"] .nl-cheat,
-[data-view="spec"] .nl-spec,
-[data-view="playground"] .nl-playground,
-[data-view="changelog"] .nl-changelog,
-[data-view="bench"] .nl-bench {
-  color: color.accent
+// the page you are on: ink text and an accent underline. The attribute is set
+// by the router, so no stylesheet has to know which pages exist.
+.nav-link[aria-current="page"] {
+  color: color.ink
   border-bottom-color: color.accent
 }
 
 .nav-side {
-  row: gap 8 center
+  row: gap 10 center
 }
 
 .theme-btn {
   size: 36
-  // auto (system) mode shows the sun+moon PAIR, light/dark show one icon.
-  // `center:` centers a single-content box, but a two-item grid would stack
-  // the pair — an explicit flex row centers either state (v0.3.4)
+  // auto (system) mode shows the sun and moon as a pair, light and dark show
+  // one icon, so the box is an explicit flex row
   row: center gap 2
   color: color.muted
-  transition: 150
-  border: 1 solid color.ink/40
-  radius: sm
+  border: 1 solid color.line
+  radius: md
+  cursor: pointer
 }
 
 .theme-btn:hover {
   color: color.ink
-  background: color.line/70
-  translate: 0 -1px
+  border-color: color.ink/40
 }
 
-// icon switching driven by an html attribute — the engine re-styles on
-// attribute mutations, so the toggle needs zero style manipulation in JS
+// icon switching driven by an html attribute. The engine re-styles on
+// attribute mutations, so the toggle needs zero style code in JS.
 html[data-theme-mode="dark"] .icon-sun { display: none }
 html[data-theme-mode="light"] .icon-moon { display: none }
 html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
@@ -156,12 +170,13 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 
 .ver-badge {
   font-family: font.mono
-  font-size: 11.5
+  font-size: 12.5
   color: color.muted
-  border: 1 solid color.line
-  radius: sm
-  padding: 4 10
-  background: color.card/60
+  padding: 4 2
+}
+
+.ver-badge:hover {
+  color: color.ink
 }
 
 .nav-toggle { display: none }
@@ -171,26 +186,32 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
     display: grid
     place: center
     size: 36
-    radius: sm
+    radius: md
     color: color.muted
     border: 1 solid color.line
     transition: 130
+    cursor: pointer
   }
-  .nav-toggle:hover { color: color.ink; background: color.line/60 }
+  .nav-toggle:hover { color: color.ink; border-color: color.ink/40 }
 
   .nav-links {
     position: absolute
-    top: 64
+    top: 60
     left: 0
     right: 0
+    margin: 0
     column: gap 2
     padding: space.3 space.5 space.4
     background: color.paper
     border-bottom: 1 solid color.line
-    box-shadow: shadow.lg
-    // last word wins — `column:` above expands to display:flex,
-    // so display:none must come AFTER it to keep the sheet closed
+    // last word wins: `column:` above expands to display:flex, so
+    // display:none has to come AFTER it to keep the sheet closed
     display: none
+  }
+
+  .nav-link {
+    padding: 12 0
+    font-size: 17
   }
 
   @signal nav == open {
@@ -202,11 +223,11 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 
 .btn {
   row: gap 8 center
-  padding: 11 20
+  padding: 12 22
   radius: md
-  font-weight: 620
-  font-size: 15
-  transition: 160
+  font-weight: 600
+  font-size: 16
+  transition: 150 translate
   cursor: pointer
   border: 1 solid transparent
   user-select: none
@@ -216,64 +237,48 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 .btn-primary {
   background: color.accent
   color: color.accent-ink
-  shadow: sm
 }
 
 .btn-primary:hover {
-  shadow: md
-  filter: brightness(1.12)
+  filter: brightness(1.1)
+  translate: 0 -1
 }
 
 .btn-primary:active {
-  shadow: sm
-  filter: brightness(0.96)
+  filter: brightness(0.94)
+  translate: 0 0
   transition: 60
 }
 
 .btn-ghost {
-  border-color: color.ink/50
+  border-color: color.ink/30
   color: color.ink
-  background: color.card/40
+  background: transparent
 }
 
 .btn-ghost:hover {
-  background: color.line/45
-  border-color: color.accent
+  border-color: color.ink
 }
 
 .btn-sm {
   padding: 8 14
-  font-size: 13.5
-  radius: sm
+  font-size: 14
 }
 
-// ------------------------------------------------------------------ cards
+// ------------------------------------------------------------ small parts
 
+// legacy panel, still used by a few reference pages
 .card {
   background: color.card
   border: 1 solid color.line
   radius: lg
-  transition: 180
 }
 
-.card-hover:hover {
-  shadow: md
-  border-color: color.ink/38
-}
-
+// The small label that used to sit above every heading. The headings say
+// enough on their own, so it is gone from the markup and hidden here for any
+// page that still carries one.
 .kicker {
-  font-family: font.mono
-  font-size: 12.5
-  font-weight: 600
-  color: color.accent
-  letter-spacing: 0.14em
-  text-transform: uppercase
-  row: gap 8 center
-}
-
-.kicker::before {
-  content: "§"
-  color: color.accent/55
+  display: none
 }
 
 .section {
@@ -281,19 +286,20 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 }
 
 .section-title {
-  font-family: font.serif
-  font-size: 31
-  font-weight: 650
-  letter-spacing: -0.01em
-  margin: space.2 0 space.3
+  font-size: fluid 28 40
+  font-weight: 700
+  letter-spacing: -0.025em
+  line-height: 1.12
+  margin: 0 0 space.3
+  font-variation-settings: "wdth" 92
 }
 
 .section-sub {
-  font-family: font.serif
   color: color.muted
-  font-size: 16.5
-  line-height: 1.7
+  font-size: 18
+  line-height: 1.65
   max-width: 640
+  margin: 0
 }
 
 // -------------------------------------------------------------- code block
@@ -301,14 +307,14 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 .code {
   background: color.code-bg
   color: color.code-ink
-  radius: md
-  padding: space.4
+  radius: lg
+  padding: 18 22
   font-family: font.mono
-  font-size: 13
+  font-size: 13.5
   line-height: 1.75
   overflow-x: auto
   tab-size: 2
-  border: 1 solid color.code-line/60
+  margin: 0
 }
 
 .code code {
@@ -318,42 +324,40 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 .code-head {
   row: gap 8 between
   align: center
-  padding: 10 space.4
-  background: color.code-bg
-  border: 1 solid color.code-line/60
-  border-bottom: none
-  radius: md md 0 0
-  font-family: font.mono
-  font-size: 12
+  padding: 8 12 8 22
+  background: color.code-line
   color: color.code-com
+  radius: lg lg 0 0
+  font-family: font.mono
+  font-size: 12.5
 }
 
 .code-head + .code {
-  radius: 0 0 md md
+  radius: 0 0 lg lg
 }
 
 .code-plain {
-  radius: md
+  radius: lg
 }
 
 .copy-btn {
-  color: color.ink/80
-  font-size: 11.5
+  color: color.code-ink/80
+  font-size: 12
   row: gap 6 center
-  padding: 6 11
-  radius: sm
-  border: 1 solid color.ink/40
+  padding: 5 10
+  radius: md
+  border: 1 solid color.code-com/50
   transition: 130
   cursor: pointer
   font-family: font.mono
 }
 
 .copy-btn:hover {
-  color: color.accent
-  border-color: color.accent
+  color: color.code-key
+  border-color: color.code-key
 }
 
-// syntax token colors (spans produced by the site's tiny highlighter)
+// syntax colours (spans produced by the site's tiny highlighter)
 .tok-com { color: color.code-com; font-style: italic }
 .tok-sel { color: color.code-sel }
 .tok-prop { color: color.code-prop }
@@ -368,34 +372,33 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 // ------------------------------------------------------------------ prose
 
 .prose {
-  max-width: 780
+  max-width: 700
 }
 
 .prose p {
-  font-family: font.serif
   margin: 0 0 space.4
-  line-height: 1.85
-  color: color.ink/88
-  font-size: 16
+  line-height: 1.7
+  color: color.ink
+  font-size: 17
 }
 
 .prose p:last-child { margin-bottom: 0 }
 
 .prose h2 {
-  font-family: font.serif
-  font-size: 27
-  font-weight: 650
-  letter-spacing: -0.01em
+  font-size: 30
+  font-weight: 700
+  letter-spacing: -0.02em
+  line-height: 1.15
   margin: space.7 0 space.3
-  scroll-margin-top: 88
+  scroll-margin-top: 84
+  font-variation-settings: "wdth" 92
 }
 
 .prose h3 {
-  font-family: font.serif
-  font-size: 19.5
+  font-size: 20
   font-weight: 650
   margin: space.5 0 space.2
-  scroll-margin-top: 88
+  scroll-margin-top: 84
 }
 
 .prose ul {
@@ -404,22 +407,23 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
   padding: 0
 }
 
+// a small square in the accent, so the marker retints with the page
 .prose li {
-  padding-left: 18
+  padding-left: 20
   position: relative
-  line-height: 1.7
-  color: color.ink/88
-  font-size: 15.5
+  line-height: 1.65
+  color: color.ink
+  font-size: 17
 }
 
 .prose li::before {
-  content: "—"
+  content: ""
   position: absolute
-  left: 0
-  top: 0
-  background: none
-  color: color.accent/70
-  font-family: font.serif
+  left: 2
+  top: 0.62em
+  size: 7
+  background: color.accent
+  radius: 1
 }
 
 .prose strong {
@@ -427,13 +431,26 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
   color: color.ink
 }
 
-.prose code {
+.prose a {
+  color: color.ink
+  text-decoration: underline
+  text-decoration-color: color.accent
+  text-decoration-thickness: 2
+  text-underline-offset: 3
+}
+
+// inline code reads as code, not as a link: ink on a faint wash
+.prose code,
+.doc-lead code,
+.section-sub code,
+.cheat-p code,
+.note code {
   font-family: font.mono
   font-size: 0.86em
-  background: color.accent/10
-  color: color.accent
-  padding: 2 6
-  radius: md
+  background: color.ink/8
+  color: color.ink
+  padding: 1 6
+  radius: sm
 }
 
 .prose .code code {
@@ -445,53 +462,72 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 .inline-tag {
   font-family: font.mono
   font-size: 12
-  background: color.accent/10
-  color: color.accent
-  border: 1 solid color.accent/25
+  background: color.ink/8
+  color: color.ink
   padding: 2 8
-  radius: full
+  radius: sm
 }
 
 // ----------------------------------------------------------------- footer
 
 .footer {
-  margin-top: auto
-  border-top: 1 solid color.ink/30
-  padding: space.6 0 space.5
-  background: color.card/40
+  margin-top: space.8
+  border-top: 1 solid color.line
+  padding: space.6 0 space.6
 }
 
 .footer-inner {
-  row: gap space.4 between
-  align: center
+  row: gap space.6 between
+  align-items: flex-start
 }
 
-.footer-note {
-  color: color.muted
-  font-size: 14
-  line-height: 1.6
+@media (width <= 760) {
+  .footer-inner {
+    display: grid
+    gap: space.5
+  }
 }
 
 .footer-col {
   column: gap space.3
+  max-width: 560
+}
+
+.footer-note {
+  color: color.ink
+  font-size: 15
+  line-height: 1.65
+  margin: 0
 }
 
 .footer-fine {
   color: color.muted
-  font-size: 13.5
-  font-family: font.serif
-  letter-spacing: 0.01em
+  font-size: 14
+  line-height: 1.6
+  margin: 0
+}
+
+.footer-fine a {
+  color: color.ink
+  text-decoration: underline
+  text-decoration-color: color.accent
+  text-decoration-thickness: 2
+  text-underline-offset: 3
 }
 
 .footer-links {
-  row: gap 12 center wrap
+  row: gap 4 wrap
+  max-width: 340
 }
 
-// ------------------------------------------------- scrollbars (v0.4.2)
-// Native scrollbars were the last thing on this page wearing browser
-// defaults. There is no DOM handle on them — they are pseudo-elements, so
-// they ride the shadow-CSS exception. The parser grew vendor names
-// (::-webkit-scrollbar and friends) for exactly this.
+.footer-links .nav-link {
+  padding: 4 10 4 0
+  font-size: 15
+}
+
+// ------------------------------------------------------- scrollbars
+// Native scrollbars are pseudo-elements, so they ride the shadow-CSS
+// exception (the parser knows the vendor names).
 
 ::-webkit-scrollbar {
   width: 12
@@ -515,11 +551,6 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
 
 ::-webkit-scrollbar-corner {
   background: transparent
-}
-
-// text selection gets the same ink treatment — accent at a whisper
-::selection {
-  background: color.accent/25
 }
 
 // -------------------------------------------------------------- utilities

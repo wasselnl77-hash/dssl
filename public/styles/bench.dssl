@@ -1,4 +1,4 @@
-// bench.dssl — the benchmark view. The page measures the engine; the engine
+// bench.dssl, the benchmark view. The page measures the engine; the engine
 // styles the page. tabular numbers come from the JS side (canvas of fonts
 // varies), everything else lives here.
 
@@ -8,8 +8,12 @@
 }
 
 .bench-title {
-  font-size: 30
-  font-weight: bold
+  font-size: fluid 34 52
+  font-weight: 760
+  line-height: 1.05
+  letter-spacing: -0.03em
+  margin: 0
+  font-variation-settings: "wdth" 88
 }
 
 .bench-sub {
@@ -64,10 +68,10 @@
 .bench-table th {
   text-align: left
   padding: 8 10
-  border-bottom: 2 solid color.line
-  font-size: 12
-  color: color.muted
-  text-transform: uppercase
+  border-bottom: 2 solid color.ink
+  font-size: 14
+  font-weight: 700
+  color: color.ink
 }
 
 .bench-table td {

@@ -1,221 +1,230 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import CodeBlock from "../CodeBlock";
-import { highlightDssl } from "../highlight";
-import { ArrowIcon, PlayIcon } from "../icons";
 import { useEngineInfo } from "../engine-info";
-import type { ViewName } from "../SiteRoot";
+import type { DsslError } from "../SiteRoot";
 
-const DEMOS = {
-  tokens: `.demo-card {
-  background: color.card
-  radius: md
-  shadow: md
+/* The hero is the language itself. This editor feeds the real engine that is
+   styling the page you are looking at: change the accent token and the whole
+   site retints, mistype a property and you get the real error back. */
 
-  .demo-chip {
-    color: color.accent
-    background: color.accent/12
-  }
-
-  .demo-swatch {
-    background: linear-gradient(
-      135deg, color.accent, color.accent/45)
-  }
-}`,
-  states: `.demo-card {
-  transition: 200
+const START = `// Edit anything. The page is listening.
+tokens {
+  color { accent: #d1006f }
 }
 
-.demo-card:hover {
-  translate: 0 -5px
-  shadow: lg
-  border-color: color.accent/40
-
-  .demo-swatch {
-    background: linear-gradient(
-      135deg, color.accent/60, color.ink/80)
-  }
-}`,
-  motion: `motion rise-in {
-  from {
-    opacity: 0
-    translate: 0 12
-  }
+.try-button {
+  background: color.accent
+  color: color.accent-ink
+  padding: 10 18
+  radius: 8
+  hover { translate: 0 -2 }
 }
+`;
 
-.demo-card {
-  animate: rise-in 500 snap both
-}`,
-  // v0.4.0, the reveal tab: seen + stagger, both engine-native
-  reveal: `motion rise-in {
-  from {
-    opacity: 0
-    translate: 0 12
-  }
-}
+const FIGHTS = [
+  {
+    title: "The cascade is arithmetic",
+    css: "An id beats a class beats a tag, then !important beats everyone.",
+    dssl: "Later wins, inside layers. That is the whole cascade, and there is no !important to reach for.",
+  },
+  {
+    title: "Typos fail silently",
+    css: "Misspell background or a variable and the browser quietly does nothing.",
+    dssl: "You get the file, the line and a did-you-mean. The editor above shows exactly that.",
+  },
+  {
+    title: "Motion needs a paragraph",
+    css: "@keyframes plus an animation shorthand with five values in a fixed order.",
+    dssl: "Declare a motion once, then write animate: rise-in 400 snap.",
+  },
+  {
+    title: "Theming from JavaScript is a hack",
+    css: "You poke data attributes or inline styles by hand and hope the cascade agrees.",
+    dssl: "DSSL.signal('theme', 'dark') restyles the page, and you can ask the engine why.",
+  },
+];
 
-.feature-grid {
-  stagger: 60        // child i waits i × 60ms
-}
+const PARTS = [
+  ["Its own cascade", "Later wins. Layers when you care. No specificity score, and no !important, ever."],
+  ["Tokens as vocabulary", "color.ink, space.4, radius.md. References compile to custom properties you can inspect."],
+  ["Readable states", "hover, focus-visible and active are blocks. Rules nested under a state just work."],
+  ["One-word conditions", "@media dark, @media 768, @media 480..960. The same shape for @container and @signal."],
+  ["Motion in four words", "animate: rise-in 400 snap both. Add seen and stagger to reveal a grid on scroll. Reduced motion is respected by default."],
+  ["Behaviors", "Name a pattern once, like a focus ring or a chip, and use it anywhere with one line."],
+  ["Loud errors", "Unknown property, unknown token, bad value. Each one names the file and line and suggests a fix."],
+  ["A JavaScript bridge", "DSSL.signal restyles live, DSSL.replay reruns motion, DSSL.compile powers tools like the VS Code extension."],
+];
 
-.feature {
-  seen {             // engine-native state: fires once,
-    animate: rise-in 480 snap   // as the card scrolls into view
-  }
-}`,
-};
+const LIMITS = [
+  ["It needs JavaScript.", "With no JavaScript there are no styles, because there is no CSS to fall back to."],
+  ["Styles arrive after the engine loads.", "A big page can flash unstyled. This site avoids it by putting its stylesheets inside the HTML."],
+  ["Strict CSP blocks it.", "A policy that forbids inline styles stops the engine from working."],
+  ["Inline styles are heavy.", "In our test, 3000 small cards came to about 4.5 times the HTML of the same page with a CSS class."],
+];
 
-type DemoKey = keyof typeof DEMOS;
-
-export default function HomeView({ go }: { go: (v: ViewName) => void }) {
+export default function HomeView() {
   const info = useEngineInfo();
-  const [demo, setDemo] = useState<DemoKey>("tokens");
-  const [signalOn, setSignalOn] = useState(false);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [errors, setErrors] = useState<DsslError[]>([]);
+  const [ready, setReady] = useState(false);
+  const [applied, setApplied] = useState(false);
 
-  const toggleSignal = () => {
-    const next = !signalOn;
-    setSignalOn(next);
-    window.DSSL?.signal("demo", next ? "on" : null);
+  const run = useCallback((src: string) => {
+    if (!window.DSSL) return;
+    const res = window.DSSL.apply(src, { name: "try.dssl", replace: true });
+    setErrors(res.errors);
+    setApplied(true);
+  }, []);
+
+  // wait for the engine, then apply the starting sheet once
+  useEffect(() => {
+    if (window.DSSL) {
+      const t = setTimeout(() => setReady(true), 0);
+      return () => clearTimeout(t);
+    }
+    const onReady = () => setReady(true);
+    window.addEventListener("dssl-ready", onReady);
+    return () => window.removeEventListener("dssl-ready", onReady);
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const t = setTimeout(() => run(editorRef.current?.value ?? START), 0);
+    return () => clearTimeout(t);
+  }, [ready, run]);
+
+  const onEdit = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      if (editorRef.current) run(editorRef.current.value);
+    }, 250);
   };
 
-  const replayMotion = () => window.DSSL?.replay(".demo-motion");
+  const setSource = (src: string) => {
+    if (!editorRef.current) return;
+    editorRef.current.value = src;
+    run(src);
+  };
+
+  const breakIt = () => {
+    const cur = editorRef.current?.value ?? START;
+    // swap the first real property for a typo; if it is already broken, mend it
+    setSource(cur.includes("backgroud:") ? cur.replace("backgroud:", "background:") : cur.replace("background:", "backgroud:"));
+  };
+
+  // Tab inserts two spaces instead of leaving the editor
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Tab" || e.shiftKey) return;
+    e.preventDefault();
+    const el = e.currentTarget;
+    const { selectionStart: s, selectionEnd: en } = el;
+    el.setRangeText("  ", s, en, "end");
+    onEdit();
+  };
 
   return (
     <>
       {/* ------------------------------------------------ hero */}
       <section className="hero">
-        <div className="hero-glow" aria-hidden="true" />
-        <div className="hero-glow-2" aria-hidden="true" />
         <div className="wrap hero-grid">
           <div className="hero-copy">
-            <div className="kicker">domain specific style language</div>
-            <h1 className="hero-title">
-              CSS talks to the <em>engine</em>.
-              <br />
-              DSSL talks to the <em>design</em>.
-            </h1>
+            <h1 className="hero-title">A style language that tells you what you got wrong.</h1>
             <p className="hero-sub">
-              A styling language for the web that pairs with any HTML and any JavaScript.
-              Its own cascade with no specificity math and no <code>!important</code>.
-              Design tokens as the vocabulary, states you can read, motion in four words,
-              and errors that actually speak up. Zero dependencies, no build step.
+              In CSS, a mistyped property is quietly ignored. In DSSL it is an error with the
+              line number and a suggested fix. You also get design tokens as the vocabulary,
+              a cascade you can explain in one sentence, and motion in four words.
+            </p>
+            <p className="hero-sub hero-sub-2">
+              It needs JavaScript, and <a href="#limits">the section below</a> is honest about
+              what that costs.
             </p>
             <div className="hero-ctas">
-              <button type="button" className="btn btn-primary" onClick={() => go("docs")}>
-                Read the docs <ArrowIcon />
-              </button>
-              <button type="button" className="btn btn-ghost" onClick={() => go("playground")}>
-                <PlayIcon /> Try the playground
-              </button>
-              <a href="#get" className="btn btn-ghost">Get the engine</a>
+              <Link href="/playground" className="btn btn-primary">Open the playground</Link>
+              <Link href="/docs" className="btn btn-ghost">Read the docs</Link>
+              <a href="#install" className="hero-link">Install</a>
             </div>
-            <div className="hero-meta" aria-label="Engine facts">
-              <span>{info.gzKb} kB gzipped</span>
-              <span>zero dependencies</span>
-              <span>any HTML, any JS</span>
-            </div>
+            <p className="hero-facts">
+              {info.gzKb} kB gzipped, no dependencies, works with any HTML and any JavaScript.
+            </p>
           </div>
 
-          {/* live demo stage: the tabs swap real DSSL, the card below is styled by it */}
-          <div className="demo" aria-label="Live DSSL demo">
-            <div className="demo-tabs">
-              {(Object.keys(DEMOS) as DemoKey[]).map(k => (
-                <button
-                  key={k}
-                  type="button"
-                  className="demo-tab"
-                  aria-pressed={demo === k}
-                  onClick={() => setDemo(k)}
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
-            <div className="demo-stage">
-              <pre className="code demo-code">
-                <code dangerouslySetInnerHTML={{ __html: highlightDssl(DEMOS[demo]) }} />
-              </pre>
-              <div className="demo-canvas">
-                <div className="demo-card">
-                  <div className="demo-swatch" />
-                  <h4>Styled by DSSL</h4>
-                  <p>Hover me. States, tokens and motion are all handled by the engine.</p>
-                  <span className="demo-chip">live</span>
-                </div>
-                {demo === "motion" && (
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => window.DSSL?.replay(".demo-card")}>
-                    <PlayIcon /> replay rise-in
-                  </button>
-                )}
-                {demo === "reveal" && (
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => window.DSSL?.replay(".demo-card")}>
-                    <PlayIcon /> replay the reveal
-                  </button>
-                )}
+          {/* the one memorable thing: a live editor wired to the engine styling this page */}
+          <div className="try" aria-label="Live DSSL editor">
+            <div className="try-bar">
+              <span className="try-file">try.dssl</span>
+              <div className="try-tools">
+                <button type="button" className="try-tool" onClick={breakIt}>Break it</button>
+                <button type="button" className="try-tool" onClick={() => setSource(START)}>Reset</button>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------ pain points */}
-      <section className="section">
-        <div className="wrap">
-          <div className="kicker">why another language</div>
-          <h2 className="section-title">Four fights CSS makes you pick. DSSL refuses all of them.</h2>
-          <div className="pain-grid sect-gap">
-            <div className="card card-hover pain-card">
-              <span className="pain-label">CSS · specificity wars</span>
-              <h3>Cascade by arithmetic</h3>
-              <p>
-                <code>#id</code> beats <code>.class</code> beats <code>tag</code>, then{" "}
-                <code>!important</code> beats everyone. In DSSL the rule is one sentence:
-                later wins, inside layers. That is the whole cascade.
-              </p>
-              <span className="pain-cure">DSSL · layers + source order</span>
+            <textarea
+              ref={editorRef}
+              className="try-editor"
+              defaultValue={START}
+              onChange={onEdit}
+              onKeyDown={onKeyDown}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              aria-label="DSSL source, applied to this page as you type"
+              aria-describedby="try-status"
+            />
+            <div className={`try-status ${errors.length ? "try-bad" : "try-good"}`} id="try-status" role="status" aria-live="polite">
+              {!applied && <span>Waiting for the engine.</span>}
+              {applied && errors.length === 0 && (
+                <span>Applied with no errors. Change the accent and watch the whole page.</span>
+              )}
+              {errors.slice(0, 3).map((e, i) => (
+                <span key={i} className="try-err">
+                  <b>{e.line ? `Line ${e.line}` : "Error"}.</b> {e.message}
+                  {e.hint ? <> Did you mean <code>{e.hint}</code>?</> : null}
+                </span>
+              ))}
             </div>
-            <div className="card card-hover pain-card">
-              <span className="pain-label">CSS · silent failures</span>
-              <h3>Typo? Shipped anyway.</h3>
-              <p>
-                Misspell <code>background</code> or a variable and CSS quietly does nothing.
-                DSSL refuses to compile: file, line, and a did-you-mean that usually nails it.
-              </p>
-              <span className="pain-cure">DSSL · loud errors</span>
-            </div>
-            <div className="card card-hover pain-card">
-              <span className="pain-label">CSS · keyframe ceremony</span>
-              <h3>Motion needs a paragraph</h3>
-              <p>
-                <code>@keyframes</code> plus an <code>animation</code> shorthand with five
-                comma-separated values. DSSL: declare a motion once, then{" "}
-                <code>animate: rise-in 400 snap</code>.
-              </p>
-              <span className="pain-cure">DSSL · motion blocks</span>
-            </div>
-            <div className="card card-hover pain-card">
-              <span className="pain-label">CSS · invisible theming</span>
-              <h3>JS ↔ styles is a hack</h3>
-              <p>
-                Theming from JavaScript means poking data-attributes or inline styles by hand.
-                DSSL has a first-class bridge: <code>DSSL.signal(&apos;theme&apos;, &apos;dark&apos;)</code>{" "}
-                re-styles the page, inspectably.
-              </p>
-              <span className="pain-cure">DSSL · signals</span>
+            <div className="try-result">
+              <button type="button" className="try-button">A button, styled by the box above</button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ------------------------------------------------ side-by-side */}
-      <section className="section">
-        <div className="wrap">
-          <div className="kicker">same card, two languages</div>
-          <h2 className="section-title">The vocabulary is the difference</h2>
-          <div className="compare sect-gap">
-            <div className="compare-col">
-              <span className="compare-tag compare-tag-css">styles.css: 14 lines of machinery</span>
+      {/* ------------------------------------------------ four things CSS leaves to you */}
+      <section className="block">
+        <div className="wrap split">
+          <div className="split-head">
+            <h2 className="section-title">Four things CSS leaves to you</h2>
+          </div>
+          <div className="split-body">
+            {FIGHTS.map((f) => (
+              <div className="fight" key={f.title}>
+                <h3>{f.title}</h3>
+                <p><span className="lang lang-css">CSS</span>{f.css}</p>
+                <p><span className="lang lang-dssl">DSSL</span>{f.dssl}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------ same card */}
+      <section className="block">
+        <div className="wrap split">
+          <div className="split-head">
+            <h2 className="section-title">The same card, written twice</h2>
+            <p className="section-sub">
+              The DSSL version is about half the characters (141 against 304, ignoring
+              whitespace). It is not fewer lines. It is shorter because the vocabulary does the
+              work: tokens for colour and spacing, one word for a shadow, one number for a
+              transition.
+            </p>
+          </div>
+          <div className="split-body versus">
+            <div>
+              <p className="versus-label">styles.css</p>
               <CodeBlock plain code={`.card {
   background-color: var(--card);
   border-radius: 14px;
@@ -231,8 +240,8 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
 }
 .card:hover .chip { background: var(--accent-soft); }`} />
             </div>
-            <div className="compare-col">
-              <span className="compare-tag compare-tag-dssl">card.dssl: 8 lines of design</span>
+            <div>
+              <p className="versus-label">card.dssl</p>
               <CodeBlock plain code={`.card {
   background: color.card
   radius: md
@@ -251,175 +260,106 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
         </div>
       </section>
 
-      {/* ------------------------------------------------ features */}
-      <section className="section">
-        <div className="wrap">
-          <div className="kicker">the engine</div>
-          <h2 className="section-title">No stylesheet is attached to this page</h2>
-          <p className="section-sub">
-            Every rule below is implemented by the DSSL engine. It matches selectors
-            against the live DOM itself, runs its own cascade, and drives motion through
-            the Web Animations API. Only pseudo-elements fall back to generated CSS.
-          </p>
-          <div className="feature-grid sect-gap">
-            <div className="card card-hover feature">
-              <span className="feature-icon">{"{}"}</span>
-              <h3>Its own cascade</h3>
-              <p>Later wins. Layers when you care. No specificity score, no !important. Ever.</p>
-            </div>
-            <div className="card card-hover feature">
-              <span className="feature-icon">◆</span>
-              <h3>Tokens as vocabulary</h3>
-              <p>color.ink, space.4, radius.md: references compile to inspectable custom properties.</p>
-            </div>
-            <div className="card card-hover feature">
-              <span className="feature-icon">→</span>
-              <h3>Readable states</h3>
-              <p>hover, focus-visible, active as blocks. Nested rules under a state just work.</p>
-            </div>
-            <div className="card card-hover feature">
-              <span className="feature-icon">≋</span>
-              <h3>One-word conditions</h3>
-              <p>@media dark. @media 768. @media 480..960. Same shape for @container and @signal. Compose by nesting.</p>
-            </div>
-            <div className="card card-hover feature">
-              <span className="feature-icon">✦</span>
-              <h3>Motion in four words</h3>
-              <p>animate: rise-in 400 snap both. seen + stagger reveal grids on scroll. Reduced-motion is respected by default.</p>
-            </div>
-            <div className="card card-hover feature">
-              <span className="feature-icon">§</span>
-              <h3>Behaviors</h3>
-              <p>Name a pattern once (focus rings, chips) and use it anywhere with one line.</p>
-            </div>
-            <div className="card card-hover feature">
-              <span className="feature-icon">!</span>
-              <h3>Loud errors</h3>
-              <p>Unknown property, unknown token, bad value: each fails with file, line and a suggestion.</p>
-            </div>
-            <div className="card card-hover feature">
-              <span className="feature-icon">⇄</span>
-              <h3>JS bridge</h3>
-              <p>dssl.signal() re-styles live, dssl.replay() re-runs motion, dssl.compile() powers tools.</p>
-            </div>
+      {/* ------------------------------------------------ the engine */}
+      <section className="block">
+        <div className="wrap split">
+          <div className="split-head">
+            <h2 className="section-title">This page has no CSS file</h2>
+            <p className="section-sub">
+              The engine matches selectors against the live DOM, runs its own cascade and
+              drives motion through the Web Animations API. Pseudo-elements are the one
+              exception: they compile to a generated stylesheet, because inline styles
+              cannot reach them.
+            </p>
           </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------ bridge demo */}
-      <section className="section">
-        <div className="wrap">
-          <div className="kicker">javascript, meet styles</div>
-          <h2 className="section-title">One call restyles the page</h2>
-          <div className="compare sect-gap" style={{ alignItems: "center" }}>
-            <div className="compare-col">
-              <CodeBlock file="theme-toggle.js" code={`// flip a signal and DSSL re-evaluates
-// every @signal rule in the page
-
-DSSL.signal('demo', 'on')   // on
-DSSL.signal('demo', null)   // off`} />
-            </div>            <div className="compare-col demo-canvas" style={{ maxWidth: 480 }}>
-              <button type="button" className="btn btn-primary" onClick={toggleSignal}>
-                {signalOn ? "signal: demo == on" : "signal: demo == off"}, click
-              </button>
-              <div className="demo-signal-card">
-                <strong>@signal demo == on</strong>
-                <span>This card is styled by a signal-conditional rule. Flip the signal and the engine recomputes it. Inspect the html element to see the mirror attribute.</span>
+          <dl className="parts split-body">
+            {PARTS.map(([term, text]) => (
+              <div className="part" key={term}>
+                <dt>{term}</dt>
+                <dd>{text}</dd>
               </div>
-            </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------ limits */}
+      <section className="block" id="limits">
+        <div className="wrap split">
+          <div className="split-head">
+            <h2 className="section-title">Where DSSL is the wrong tool</h2>
+            <p className="section-sub">
+              DSSL is experimental and moving fast. It suits creative sites, prototypes, docs,
+              playgrounds and internal tools. Here is what to weigh before you pick it.
+            </p>
+          </div>
+          <div className="split-body">
+            <ul className="limits">
+              {LIMITS.map(([head, text]) => (
+                <li key={head}><b>{head}</b> {text}</li>
+              ))}
+            </ul>
+            <p className="limits-exit">
+              If a page has to work without JavaScript, build the part of DSSL that can be
+              plain CSS. <code>dssl build</code> turns tokens, states, media queries and layers
+              into a real <code>.css</code> file. <code>@signal</code> rules and{" "}
+              <code>animate:</code> stay in the engine, and the report counts them so you know
+              exactly what was left behind.
+            </p>
+            <CodeBlock plain file="terminal" code={`node cli/dssl.mjs build styles.dssl -o styles.css
+node cli/dssl.mjs check styles.dssl --strict   # for CI`} />
           </div>
         </div>
       </section>
 
-      {/* ------------------------------------------------ get the engine */}
-      <section className="section" id="get">
-        <div className="wrap">
-          <div className="kicker">get the engine</div>
-          <h2 className="section-title">One line, any platform</h2>
-          <p className="section-sub">
-            The whole engine is a folder of plain JavaScript files. No package
-            manager, no build step, nothing installed globally. Pick your
-            platform, paste the line, and a <code>dssl-engine</code> folder
-            appears with the engine, a starter token set, an example stylesheet
-            and the usage guide.
-          </p>
-          <div className="get-grid sect-gap">
-            <div className="card card-hover get-card">
-              <span className="get-os">macos · linux · bsd</span>
+      {/* ------------------------------------------------ install */}
+      <section className="block" id="install">
+        <div className="wrap split">
+          <div className="split-head">
+            <h2 className="section-title">Install</h2>
+            <p className="section-sub">
+              The engine is a folder of plain JavaScript files. No package manager, no build
+              step, nothing installed globally. Any of these gives you a{" "}
+              <code>dssl-engine</code> folder with the engine, a starter token set, an
+              example stylesheet and a usage guide.
+            </p>
+          </div>
+          <div className="split-body install">
+            <div className="install-row">
+              <h3>macOS, Linux and BSD</h3>
               <CodeBlock plain file="terminal" code="curl -fsSL https://dssl-sable.vercel.app/install.sh | sh" />
-              <p className="get-note">
-                Runs on plain sh (dash, ash and busybox included, bash not
-                required). Downloads with curl or wget, whichever you have, and
-                unpacks with tar, which every distro and macOS ship by default.
-                No tar? It falls back to unzip, then python3.
+              <p>
+                Plain <code>sh</code> is enough. It uses curl or wget, whichever you have, and
+                unpacks with tar, falling back to unzip or python3.
               </p>
             </div>
-            <div className="card card-hover get-card">
-              <span className="get-os">windows</span>
+            <div className="install-row">
+              <h3>Windows</h3>
               <CodeBlock plain file="powershell" code="irm https://dssl-sable.vercel.app/install.ps1 | iex" />
-              <p className="get-note">
-                PowerShell 5.1 or newer, no admin rights needed. Unpacks with
-                Expand-Archive into your current folder.
-              </p>
+              <p>PowerShell 5.1 or newer, no admin rights needed.</p>
             </div>
-            <div className="card card-hover get-card">
-              <span className="get-os">any os, no terminal</span>
-              <div className="get-downloads">
+            <div className="install-row">
+              <h3>No terminal</h3>
+              <div className="install-downloads">
                 <a className="btn btn-ghost btn-sm" href="/dssl-engine.zip" download>dssl-engine.zip</a>
                 <a className="btn btn-ghost btn-sm" href="/dssl-engine.tar.gz" download>dssl-engine.tar.gz</a>
               </div>
-              <p className="get-note">
-                The exact package the one-liners fetch, straight from the
-                browser. Unzip anywhere and follow USAGE.md inside.
-              </p>
+              <p>The exact package the one-liners fetch. Unzip it anywhere and read USAGE.md.</p>
             </div>
-          </div>
-
-          <div className="get-wire">
-            <div className="get-wire-code">
+            <div className="install-row">
+              <h3>Then wire it into a page</h3>
               <CodeBlock
                 file="your page"
                 code={`<script type="module" src="/dssl/boot.js"></script>
 <link rel="stylesheet/dssl" href="/styles/tokens.dssl">
 <link rel="stylesheet/dssl" href="/styles/hello.dssl">`}
               />
-            </div>
-            <div className="get-wire-copy">
-              <h3>That is the whole install</h3>
               <p>
-                Drop the <code>dssl/</code> folder where your page can serve
-                it, load <code>boot.js</code> as a module, and list your{" "}
-                <code>.dssl</code> files as links. The engine fetches them,
-                walks your DOM, and keeps restyling live as elements come and
-                go. Inline rules work too, via{" "}
-                <code>&lt;style type="text/dssl"&gt;</code>. The full tour
-                lives in the docs, and USAGE.md in the package covers the same
-                ground in two minutes.
+                The engine fetches your <code>.dssl</code> files, walks the DOM and keeps
+                restyling as elements come and go. Inline sheets work too, with{" "}
+                <code>{'<style type="text/dssl">'}</code>. The <Link href="/docs">docs</Link>{" "}
+                cover the rest.
               </p>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => go("docs")}>
-                Read the docs <ArrowIcon />
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------ cta */}
-      <section className="section">
-        <div className="wrap">
-          <div className="cta-band">
-            <h2>Write styles that read like design.</h2>
-            <p>
-              The full language tour takes about ten minutes. Or paste straight into the
-              playground and break things. The errors will keep you company.
-            </p>
-            <div className="hero-ctas">
-              <button type="button" className="btn btn-primary" onClick={() => go("docs")}>
-                Language tour <ArrowIcon />
-              </button>
-              <button type="button" className="btn btn-ghost" onClick={() => go("cheat")}>
-                Skip to the cheat sheet
-              </button>
             </div>
           </div>
         </div>

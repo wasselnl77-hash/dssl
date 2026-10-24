@@ -1,16 +1,34 @@
 import type { Metadata, Viewport } from "next";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { Bricolage_Grotesque, Spline_Sans_Mono } from "next/font/google";
 import "./globals.css";
 import { readEngineInfo } from "@/lib/engine-info";
 
 const engine = readEngineInfo();
 
+// Fonts are fetched once at build time and served from this site, so there is no
+// request to Google at runtime. Bricolage Grotesque does everything a person
+// reads, Spline Sans Mono is only ever code and file names.
+const display = Bricolage_Grotesque({
+  subsets: ["latin"],
+  variable: "--font-display",
+  axes: ["opsz", "wdth"],
+  display: "swap",
+});
+const mono = Spline_Sans_Mono({
+  subsets: ["latin"],
+  variable: "--font-code",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "DSSL: Domain Specific Style Language",
+  metadataBase: new URL("https://dssl-sable.vercel.app"),
+  title: { default: "DSSL: a style language that tells you what you got wrong", template: "%s | DSSL" },
   description: `DSSL is a styling language for the web: design tokens, its own cascade, loud errors and zero specificity wars. The engine is ${engine.gzKb} kB gzipped, with no build step.`,
   keywords: ["DSSL", "CSS alternative", "style language", "design tokens", "web"],
   icons: { icon: "/favicon.svg" },
+  openGraph: { type: "website", siteName: "DSSL", title: "DSSL: a style language that tells you what you got wrong" },
 };
 
 export const viewport: Viewport = {
@@ -21,11 +39,11 @@ export const viewport: Viewport = {
 // The ONLY non-DSSL styling in this app: a pre-paint shim so the very first
 // frame doesn't flash white before the DSSL engine boots (dark-mode respect).
 const prePaint = `
-  html { background: #f5f0e4; }
-  @media (prefers-color-scheme: dark) { html { background: #181310; } }
+  html { background: #f2f0f7; }
+  @media (prefers-color-scheme: dark) { html { background: #130f1b; } }
 `;
 
-// v0.3.2 — performance: the stylesheets ride INSIDE the HTML. The engine's
+// v0.3.2, performance: the stylesheets ride INSIDE the HTML. The engine's
 // auto-boot picks these <style type="text/dssl"> tags up the moment the module
 // executes (right after parse, before first paint), so there is no fetch
 // waterfall and no wait for React hydration. Server-side read also means a
@@ -47,10 +65,10 @@ function dsslInlineStyles(): { name: string; src: string }[] {
 }
 
 // Dev-only interop shim: the engine styles the SSR DOM BEFORE React hydrates
-// (that is the whole point — no FOUC). React 19 then logs one console.error
+// (that is the whole point, no FOUC). React 19 then logs one console.error
 // about extra style attributes and, helpfully, does not patch them. Next's
 // dev overlay ALSO patches console.error (one layer around everything) and
-// counts every error it sees into the "Issues" badge — so a plain filter
+// counts every error it sees into the "Issues" badge, so a plain filter
 // installed here would sit INSIDE Next's collector and the badge would still
 // show "1". This shim instead installs an assignment trap: the moment Next
 // assigns its own wrapper, we capture it and re-publish OUR filter as the
@@ -84,7 +102,7 @@ const hydrationShim = `
       set: function (fn) { inner = fn; trapped = true; }
     });
   } catch (e) {
-    // fallback: plain filter — console noise is still explained away,
+    // fallback: plain filter, console noise is still explained away,
     // though the dev-overlay badge may still count the notice.
     console.error = outer;
   }
@@ -95,7 +113,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" data-dssl-reset suppressHydrationWarning>
+    <html lang="en" className={`${display.variable} ${mono.variable}`} data-dssl-reset suppressHydrationWarning>
       <head>
         <style dangerouslySetInnerHTML={{ __html: prePaint }} />
         {process.env.NODE_ENV !== "production" && (
@@ -109,7 +127,7 @@ export default function RootLayout({
             dangerouslySetInnerHTML={{ __html: src }}
           />
         ))}
-        {/* engine starts downloading with the document — module defer rules
+        {/* engine starts downloading with the document, module defer rules
             mean it executes after parse with the full SSR DOM present */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- type="module" is deferred by spec; the rule cannot see that */}
         <script type="module" src="/dssl/boot.js" />

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import CodeBlock from "../CodeBlock";
 
 function Row({ k, v }: { k: string; v: string }) {
@@ -15,11 +16,10 @@ export default function CheatSheetView() {
   return (
     <div className="wrap">
       <div className="page-head">
-        <div className="kicker">the one-pager</div>
         <h1 className="page-title">Cheat sheet</h1>
         <p className="page-sub">
           Every day-to-day feature of DSSL on one page. When a line here isn&apos;t
-          obvious, the <a href="#/docs"><code>docs</code></a> chapter with the same name
+          obvious, the <Link href="/docs"><code>docs</code></Link> chapter with the same name
           has the long version and a live demo.
         </p>
       </div>
@@ -46,7 +46,7 @@ export default function CheatSheetView() {
           <p className="cheat-p">
             Install: <code>&lt;link rel=&quot;stylesheet/dssl&quot; href=&quot;app.dssl&quot;&gt;</code>{" "}
             + <code>&lt;script type=&quot;module&quot; src=&quot;dssl/boot.js&quot;&gt;</code>.
-            No tokens, layers, or config required — rules land in the{" "}
+            No tokens, layers, or config required, rules land in the{" "}
             <code>components</code> layer by default.
           </p>
         </div>
@@ -73,7 +73,7 @@ column: gap 8 start
 grid: 3
 grid: auto-fill 220
 stack: center        // overlay children
-center: both         // center: x / center: y — the engine guarantees a
+center: both         // center: x / center: y, the engine guarantees a
                      // formatting context, so it can never silently no-op
 place: center        align: center
 cover: fixed         sticky: 0
@@ -120,7 +120,7 @@ hover { .tip { opacity: 1 } }
 &.featured { border-color: color.accent }`} />
           <p className="cheat-p">
             The engine listens to pointer/focus events itself and re-evaluates entering
-            and leaving the state — no CSS involved.
+            and leaving the state, no CSS involved.
           </p>
         </div>
 
@@ -147,10 +147,10 @@ hover { .tip { opacity: 1 } }
           <div className="cheat-list">
             <Row k="later wins" v="source order beats every selector" />
             <Row k="layers trump order" v="tokens < base < components < utilities < pin" />
-            <Row k="(default)" v="your rules are components — layers are opt-in" />
+            <Row k="(default)" v="your rules are components: layers are opt-in" />
             <Row k="@layer utilities { }" v="name a layer when you care" />
             <Row k="pin { } / pin:" v="the one escape hatch, beats everything" />
-            <Row k="inside one block" v="later lines win too — put display: none AFTER row:/column:/grid: (they set display: flex)" />
+            <Row k="inside one block" v="later lines win too, put display: none AFTER row:/column:/grid: (they set display: flex)" />
           </div>
           <p className="cheat-p">No specificity. No <code>!important</code>. Ever.</p>
         </div>
@@ -194,7 +194,7 @@ tokens {
             Deform composes into <code>transform</code>, so one <code>transition</code>{" "}
             tweens it and it works in <code>motion</code> keyframes too.{" "}
             <code>stretch</code> keeps volume; <code>gradient</code> stops take tokens,
-            alpha (<code>color.ink/40</code>) and <code>%</code> positions — a stop that
+            alpha (<code>color.ink/40</code>) and <code>%</code> positions, a stop that
             is not a color fails loud.
           </p>
         </div>
@@ -219,10 +219,10 @@ DSSL.errors                // from the last apply`} />
         <div className="cheat-card">
           <span className="cheat-k">errors</span>
           <p className="cheat-p">
-            Unknown property, unknown token, bad value, unclosed block — all refuse to
+            Unknown property, unknown token, bad value, unclosed block, all refuse to
             compile with <b>file, line, and a did-you-mean</b> over every known property,
             token and motion. In the console, or live in the{" "}
-            <a href="#/playground"><code>playground</code></a> error panel.
+            <Link href="/playground"><code>playground</code></Link> error panel.
           </p>
           <CodeBlock plain code={`.badge {
   colour: red             // ✗ did you mean "color"?

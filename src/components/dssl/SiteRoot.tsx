@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import HomeView from "./views/HomeView";
 import DocsView from "./views/DocsView";
 import CheatSheetView from "./views/CheatSheetView";
@@ -14,27 +16,26 @@ import type { EngineInfo } from "@/lib/engine-info";
 
 export type ViewName = "home" | "docs" | "cheat" | "spec" | "playground" | "changelog" | "bench";
 
-const VIEWS: { name: ViewName; label: string }[] = [
-  { name: "home", label: "Home" },
+/** every section is a real URL now (it used to be #/docs on one page), so each
+ *  gets its own title, can be linked, and is in the HTML a crawler downloads */
+export const VIEW_PATH: Record<ViewName, string> = {
+  home: "/",
+  docs: "/docs",
+  cheat: "/cheat",
+  spec: "/spec",
+  playground: "/playground",
+  changelog: "/changelog",
+  bench: "/bench",
+};
+
+const NAV: { name: ViewName; label: string }[] = [
   { name: "docs", label: "Docs" },
+  { name: "playground", label: "Playground" },
   { name: "cheat", label: "Cheat sheet" },
   { name: "spec", label: "Spec" },
-  { name: "playground", label: "Playground" },
   { name: "changelog", label: "Changelog" },
   { name: "bench", label: "Bench" },
 ];
-
-function viewFromHash(): ViewName {
-  const h = window.location.hash;
-  const m = h.match(/^#\/(\w+)/);
-  const name = m?.[1] as ViewName | undefined;
-  return name && VIEWS.some(v => v.name === name) ? name : "home";
-}
-
-const subscribeHash = (cb: () => void) => {
-  window.addEventListener("hashchange", cb);
-  return () => window.removeEventListener("hashchange", cb);
-};
 
 declare global {
   interface Window {
@@ -64,24 +65,22 @@ export interface DsslApplyResult {
   stats: { rules: number; shadowRules: number; motions: number; tokens: number; mediaQueries: number };
 }
 
-export default function SiteRoot({ info }: { info: EngineInfo }) {
-  // the view IS the hash — derived, never stored twice
-  const view = useSyncExternalStore(
-    subscribeHash,
-    viewFromHash,
-    () => "home" as ViewName,
-  );
-  // v0.3.2: engine boot + stylesheet application moved into the document head
-  // (inline <style type="text/dssl"> + a module script). Styles now land before
-  // first paint instead of after hydration + six sequential fetches.
+export default function SiteRoot({ view, info }: { view: ViewName; info: EngineInfo }) {
+  const router = useRouter();
 
-  // ---- hash router: view IS the hash (bare anchors like #tokens don't re-route) ----
+  // Old links looked like /#/docs. They still work: land here, hop to the real URL.
+  useEffect(() => {
+    const m = window.location.hash.match(/^#\/(\w*)/);
+    if (!m) return;
+    const name = (m[1] || "home") as ViewName;
+    if (name in VIEW_PATH && name !== view) router.replace(VIEW_PATH[name]);
+  }, [router, view]);
 
-  const go = useCallback((v: ViewName) => {
-    window.location.hash = v === "home" ? "" : `#/${v}`;
-    window.DSSL?.signal("nav", null); // close the mobile sheet
-    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-  }, []);
+  // close the mobile sheet and start each page at the top
+  useEffect(() => {
+    window.DSSL?.signal("nav", null);
+    if (!window.location.hash) window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, [view]);
 
   const cycleTheme = useCallback(() => {
     if (!window.DSSL) return;
@@ -103,77 +102,77 @@ export default function SiteRoot({ info }: { info: EngineInfo }) {
 
   return (
     <EngineInfoProvider value={info}>
-    <div className="site" data-view={view}>
-      <header className="nav">
-        <div className="wrap nav-inner">
-          <a href="#/" className="nav-logo" onClick={(e) => { e.preventDefault(); go("home"); }}>
-            <span className="logo-mark">{"§"}</span>
-            DSSL
-          </a>
+      <div className="site" data-view={view}>
+        <a href="#main" className="skip-link">Skip to content</a>
+        <header className="nav">
+          <div className="wrap nav-inner">
+            <Link href="/" className="nav-logo" aria-label="DSSL, home">
+              <span className="logo-mark" aria-hidden="true">{"§"}</span>
+              DSSL
+            </Link>
 
-          <nav className="nav-links" aria-label="Main">
-            {VIEWS.map(v => (
-              <a
-                key={v.name}
-                href={`#/${v.name}`}
-                className={`nav-link nl-${v.name}`}
-                onClick={(e) => { e.preventDefault(); go(v.name); }}
-              >
-                {v.label}
-              </a>
-            ))}
-          </nav>
+            <nav className="nav-links" aria-label="Main">
+              {NAV.map((v) => (
+                <Link
+                  key={v.name}
+                  href={VIEW_PATH[v.name]}
+                  className={`nav-link nl-${v.name}`}
+                  aria-current={view === v.name ? "page" : undefined}
+                >
+                  {v.label}
+                </Link>
+              ))}
+            </nav>
 
-          <div className="nav-side">
-            <a href="#/changelog" className="ver-badge" onClick={(e) => { e.preventDefault(); go("changelog"); }}>v{info.version}</a>
-            <button type="button" className="theme-btn" onClick={cycleTheme} aria-label="Toggle color theme" title="Theme: auto / light / dark">
-              <span className="icon-sun"><SunIcon /></span>
-              <span className="icon-moon"><MoonIcon /></span>
-            </button>
-            <button type="button" className="nav-toggle" onClick={toggleNav} aria-label="Toggle menu">
-              <MenuIcon />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* data-view lives on the ROOT so the nav-active rules can reach the
-          header links — on <main> they never matched (main is a SIBLING of
-          the header, and descendant selectors only look down the tree) */}
-      <main className="main">
-        {view === "home" && <HomeView go={go} />}
-        {view === "docs" && <DocsView />}
-        {view === "cheat" && <CheatSheetView />}
-        {view === "spec" && <SpecView />}
-        {view === "playground" && <PlaygroundView />}
-        {view === "changelog" && <ChangelogView />}
-        {view === "bench" && <BenchView />}
-      </main>
-
-      <footer className="footer">
-        <div className="wrap footer-inner">
-          <div className="footer-col">
-            <div className="footer-note">
-              <strong>DSSL</strong>, the domain specific style language. Built from v0.1 to v{info.version} while
-              building this site: every feature it needed, it grew, and every bug you sent got
-              fixed for real. This page runs on its own engine with no CSS files attached.
-              The engine styles this DOM directly.
-            </div>
-            <div className="footer-fine">
-              © 2026 <strong>DSSL. inc</strong>, named after the product, because naming things
-              is hard.
+            <div className="nav-side">
+              <Link href="/changelog" className="ver-badge" aria-label={`Version ${info.version}, see the changelog`}>
+                v{info.version}
+              </Link>
+              <button type="button" className="theme-btn" onClick={cycleTheme} aria-label="Switch color theme" title="Theme: auto, light or dark">
+                <span className="icon-sun"><SunIcon /></span>
+                <span className="icon-moon"><MoonIcon /></span>
+              </button>
+              <button type="button" className="nav-toggle" onClick={toggleNav} aria-label="Open the menu">
+                <MenuIcon />
+              </button>
             </div>
           </div>
-          <nav className="footer-links" aria-label="Footer">
-            {VIEWS.map(v => (
-              <a key={v.name} href={`#/${v.name}`} className="nav-link" onClick={(e) => { e.preventDefault(); go(v.name); }}>
-                {v.label}
-              </a>
-            ))}
-          </nav>
-        </div>
-      </footer>
-    </div>
+        </header>
+
+        <main className="main" id="main">
+          {view === "home" && <HomeView />}
+          {view === "docs" && <DocsView />}
+          {view === "cheat" && <CheatSheetView />}
+          {view === "spec" && <SpecView />}
+          {view === "playground" && <PlaygroundView />}
+          {view === "changelog" && <ChangelogView />}
+          {view === "bench" && <BenchView />}
+        </main>
+
+        <footer className="footer">
+          <div className="wrap footer-inner">
+            <div className="footer-col">
+              <p className="footer-note">
+                <strong>DSSL</strong> is a style language, built from v0.1 to v{info.version} while building
+                this site. Whatever the site needed, the language grew, and every bug people sent got fixed.
+                This page runs on the engine it describes. No CSS file is attached.
+              </p>
+              <p className="footer-fine">
+                © 2026 <strong>DSSL. inc</strong>, named after the product, because naming things is hard.
+                MIT licensed, with the code on{" "}
+                <a href="https://huggingface.co/EHS-Studio/dssl">Hugging Face</a>.
+              </p>
+            </div>
+            <nav className="footer-links" aria-label="Footer">
+              {NAV.map((v) => (
+                <Link key={v.name} href={VIEW_PATH[v.name]} className="nav-link">
+                  {v.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        </footer>
+      </div>
     </EngineInfoProvider>
   );
 }
