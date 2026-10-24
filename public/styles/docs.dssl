@@ -713,3 +713,153 @@ motion pe-pulse {
   margin: space.4 0 space.1
   scroll-margin-top: 92
 }
+
+// =========================================================================
+// v0.9.0: texture, aura and slider demos
+// =========================================================================
+
+.tx-wall {
+  display: grid
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr))
+  gap: 12
+  justify-self: stretch
+}
+
+// a demo box whose content should span the whole box instead of sitting centred
+.demo-box.wide { justify-content: stretch }
+
+.tx-cell {
+  column: gap 6
+  font-size: 13
+}
+
+.tx {
+  height: 64
+  radius: md
+  background-color: #b8a58a
+  border: 1 solid color.line
+}
+
+// the swatch for each preset is the preset, written as DSSL. This block is generated.
+// <generated: texture swatches. Run scripts/gen-site-vocab.mjs, do not edit by hand>
+.tx-grain { texture: grain }
+.tx-noise { texture: noise }
+.tx-rough { texture: rough }
+.tx-sand { texture: sand }
+.tx-paper { texture: paper }
+.tx-cloud { texture: cloud }
+.tx-concrete { texture: concrete }
+.tx-stone { texture: stone }
+.tx-crumpled { texture: crumpled }
+.tx-glitter { texture: glitter }
+.tx-frost { texture: frost }
+.tx-marble { texture: marble }
+.tx-wood { texture: wood }
+.tx-bark { texture: bark }
+.tx-leather { texture: leather }
+.tx-brushed { texture: brushed }
+.tx-canvas { texture: canvas }
+.tx-linen { texture: linen }
+.tx-denim { texture: denim }
+.tx-carbon { texture: carbon }
+.tx-scanlines { texture: scanlines }
+.tx-halftone { texture: halftone }
+.tx-dots { texture: dots }
+.tx-lines { texture: lines }
+.tx-grid { texture: grid }
+.tx-checker { texture: checker }
+.tx-crosshatch { texture: crosshatch }
+.tx-stripes { texture: stripes }
+.tx-waves { texture: waves }
+.tx-hex { texture: hex }
+// </generated>
+
+// ---- aura: the recipes from the guide, written here exactly as a reader would write them
+behavior fire {
+  aura-glow: #ff7a00 36 pulse 900 flicker 0.35
+  aura-particle: #ffe27a -> #ff8a1f -> rgba(255,40,0,0) count 70 size 8 18 life 650 1100 speed 40 120 dir up spread 40 from top gravity -40 turbulence 70 shape flame glowing behind
+}
+
+behavior ki {
+  aura-glow: #ffe14a 50 pulse 700 depth 0.45 flicker 0.15
+  aura-particle: #fff7b0 -> #ffd21f -> rgba(255,180,0,0) count 90 size 4 12 life 500 900 speed 90 220 dir up spread 55 from edge gravity -120 turbulence 120 shape spark glowing behind
+}
+
+behavior embers {
+  aura-glow: #ff5a1f 22 pulse 2200 flicker 0.2
+  aura-particle: #ffb347 -> #ff4d00 -> rgba(120,10,0,0) count 36 size 2 5 life 1800 3200 speed 20 60 dir up spread 70 from bottom gravity -10 drag 0.4 turbulence 30 shape circle glowing
+}
+
+behavior electric {
+  aura-glow: #6cf 26 flicker 0.85 pulse 260
+  aura-particle: #d8f1ff -> #4db8ff -> rgba(77,184,255,0) count 36 size 3 7 life 140 320 speed 120 320 dir out spread 360 from edge shape spark glowing
+}
+
+behavior snow {
+  aura-particle: #ffffff -> rgba(210,235,255,0) count 90 size 2 6 life 2600 4200 speed 14 42 dir down spread 40 from top turbulence 22 shape circle
+}
+
+.au-stage {
+  display: grid
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))
+  gap: 56
+  padding: 64 24 48
+  background: #0b0a12
+  radius: lg
+  width: 100%
+}
+
+.au {
+  height: 96
+  radius: lg
+  background: #1c1a28
+  color: #d9d4e6
+  display: grid
+  place-items: center
+  font-size: 14
+}
+
+.au-fire { use fire }
+.au-ki { use ki }
+.au-embers { use embers }
+.au-electric { use electric }
+.au-snow { use snow }
+
+// ---- sliders
+.sl-demo {
+  column: gap 34
+  width: 100%
+  padding: 28 24
+  background: #101018
+  radius: lg
+}
+
+.sl-plain {
+  slider: track 6 #445566 radius full, fill #ff7a00, thumb 22 #ffffff, ring 3 #ff7a00, glow #ff7a00 14, ticks 10 #8890a0
+}
+
+.sl-graph {
+  slider: graph 20 45 70 90 60 35 50 80 95 40 60 75, graph-height 52, graph-gap 3, fill #77ccff, track 3 #34445a, thumb 14 #ffffff, shape bar
+}
+
+.sl-diamond {
+  slider: track 10 #2b3040 radius 3, fill #5be2a0, thumb 24 #5be2a0, shape diamond
+  aura-particle: #bfffe0 -> rgba(91,226,160,0) count 40 size 5 life 700 speed 30 70 dir up spread 50 from thumb glowing
+}
+
+.sl-label {
+  color: #a79eba
+  font-size: 13
+  margin: 0 0 6
+}
+
+.doc-list {
+  margin: 0
+  padding-left: 22
+  column: gap 8
+  max-width: 720
+}
+
+.doc-list li {
+  line-height: 1.65
+}

@@ -13,12 +13,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * The frozen lane's restyle is an explicit developer action (signal), not
  * ambient churn, that is the whole point of freeze, and the note says so. */
 
-declare global {
-  interface Window {
-    DSSL?: any;
-  }
-}
-
 const BENCH_SRC = `
 .bench-stage-item {
   padding: 5 10

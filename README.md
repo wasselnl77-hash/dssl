@@ -68,7 +68,7 @@ Both drop a `dssl-engine/` folder next to you: the engine, a starter token set, 
 
 Prefer to click: [dssl-engine.zip](https://dssl-sable.vercel.app/dssl-engine.zip) or [dssl-engine.tar.gz](https://dssl-sable.vercel.app/dssl-engine.tar.gz). Same package, straight from the browser.
 
-Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API): download `dssl-vscode/dssl-vscode-0.8.2.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. An Open VSX listing (so it appears in VSCodium's Extensions tab, searchable) is staged and publishes with one Open VSX token; see `dssl-vscode/PUBLISHING.md`.
+Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API): download `dssl-vscode/dssl-vscode-0.9.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. An Open VSX listing (so it appears in VSCodium's Extensions tab, searchable) is staged and publishes with one Open VSX token; see `dssl-vscode/PUBLISHING.md`.
 
 AI agents and machine reviewers: this repo ships `llms.txt` (dense, structured facts), `AGENTS.md` (how to work on the codebase) and `PARITY.md` (the honest feature matrix against CSS). The site serves the same `llms.txt` at https://dssl-sable.vercel.app/llms.txt
 
@@ -336,6 +336,62 @@ Gradients read like sentences. A stop can be a hex, a color name, a token, an al
 .sw    { gradient: radial circle at 30% 20%, color.card -> color.ink }
 ```
 
+## Texture
+
+`texture:` lays a generated image on top of an element's own background (a colour, a gradient, or
+several layers) and takes it off again cleanly. Thirty presets, ten generators, and a setting for
+everything, so you can make your own:
+
+```dssl
+.card   { background: #c9a66b; texture: wood }
+.poster { background: #e9e2d0; texture: paper, scanlines intensity 0.1 }
+
+behavior old-leather {
+  texture: bump scale 6 depth 4 color #1b1008 color2 #6b4a2b blend overlay
+}
+.sofa { background: #5a3a22; use old-leather }
+```
+
+Presets: grain, noise, rough, sand, paper, cloud, concrete, stone, crumpled, glitter, frost, marble,
+wood, bark, leather, brushed, canvas, linen, denim, carbon, scanlines, halftone, dots, lines, grid,
+checker, crosshatch, stripes, waves, hex. The full list with what each one looks like, and every
+setting, is in the [guide](GUIDE.md). `node scripts/texture-gallery.mjs out.png` renders all of them.
+
+## Aura: light and particles, with no presets
+
+An aura has a glow and particles, and you describe both. Fire, an energy aura, snow and sparks are
+parameters you name yourself with a `behavior`, not presets someone else picked:
+
+```dssl
+behavior fire {
+  aura-glow: #ff7a00 36 pulse 900 flicker 0.35
+  aura-particle: #ffe27a -> #ff8a1f -> rgba(255,40,0,0) count 70 size 8 18 life 650 1100 speed 40 120 dir up spread 40 from top gravity -40 turbulence 70 shape flame glowing behind
+}
+
+.torch { use fire }
+.orb   { aura-glow: color.accent 28 pulse 1600 }
+.spark { glow-particle: #fff 30 out }                  // glowing particles, 30 of them, heading outward
+.both  { aura-glow-particle: #7cf 24 count 40 up }     // a glow and glowing particles in one line
+```
+
+`aura-glow`, `aura-particle`, `glow-particle` and `aura-glow-particle` set the slots; `aura:` sets both
+as `glow ..., particles ...`. One canvas covers the page, only visible elements animate, the whole
+page shares a budget of 1800 particles, and visitors who ask for reduced motion get a still glow.
+Five complete recipes (fire, an energy aura, embers, electric, snow) are in the [guide](GUIDE.md).
+
+## Range sliders
+
+```dssl
+input[type=range] {
+  slider: track 6 color.line radius full, fill color.accent,
+          thumb 24 color.paper, ring 3 color.accent, glow color.accent 14
+}
+```
+
+One description writes both the `::-webkit-slider-*` rules (Chrome, Edge, Safari) and the
+`::-moz-range-*` rules (Firefox). `graph 20 45 70 90 60` puts a histogram behind the track, and
+`aura-particle: ... from thumb` makes particles leave the thumb.
+
 ## Errors that talk back, and warnings
 
 CSS fails silently. DSSL refuses to compile and tells you where and what it expected, with a did-you-mean built from edit distance over every known property, token and motion. Custom properties (`--*`) pass through unvalidated on purpose; the loud checks protect the design vocabulary, not the pressure valve.
@@ -393,6 +449,24 @@ semicolons are required inside it, and DSSL warns if you forget one), and
 360px wide window to 24px on a 1200px wide one. `dssl build --strict` makes
 warnings fail the build, for CI.
 
+## Importing CSS, and the designer (v0.9.0)
+
+```sh
+node cli/dssl.mjs import styles.css -o styles.dssl
+```
+
+converts what is mechanical (semicolons, `px`, `transition` order, `font:`, `@keyframes`,
+`!important` into `pin { }`, `@font-face` and friends into `raw { }`) and reports what it could not
+carry over. The file you get always compiles.
+
+The editor extension has a **designer** (command palette: *DSSL: Open the designer*): sliders and
+pickers for every aura, texture and slider setting, live previews, graphs, and the DSSL it writes,
+compile-checked as you go, with *Insert at cursor* and *Load from selection*. The interactive tools
+live there, in the editor, not on the website.
+
+`dssl check` also warns about text with too little contrast, a focus outline removed with nothing to
+replace it, and tiny tap targets.
+
 ## Performance: freeze, explain, and the cost of live
 
 DSSL is a runtime. It walks the DOM, matches rules, and writes inline styles. That buys live tokens, live signals and live layout, and it costs more than a static stylesheet by design. Three things tip the ledger back:
@@ -422,7 +496,7 @@ const rep = DSSL.explain(document.querySelector('.doc-card'))
 
 The matcher also pre-filters every rule through a cheap class/tag/id gate extracted from the selector's rightmost compound, so a recompute skips obvious non-matches instead of asking the browser rule by rule. The gate only ever says no; anything it does not fully understand falls back to native matching.
 
-## What works today (v0.8.2)
+## What works today (v0.9.0)
 
 - the full selector surface, including `:nth-child`, `:not`, `:is`, `:where`, `:has`
 - flexbox and grid with `row:` / `column:` / `grid:` / `stack:` / `center:` sugar, place words now own an axis (`between` is main-axis, `stretch` is cross-axis) and conflicts warn instead of silently overwriting
@@ -436,6 +510,8 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 - pseudo-elements in any spelling (shadow CSS), themed scrollbars included
 - `raw { }` / `@css { }` for verbatim CSS (`@font-face`, `@keyframes`, `@supports`); unknown at-rules skip their whole block with one clean error
 - `fluid 16 24` sizing sugar on any length property, including `padding-top`, `margin-block` and the other longhands
+- `texture:` (30 presets, 10 generators, your own), `aura-glow` / `aura-particle` / `glow-particle` / `aura-glow-particle` / `aura:` (no presets, you build them), `slider:` (WebKit and Firefox in one line)
+- `dssl import file.css`, lint warnings (contrast, focus, target size), and the editor designer with live previews
 - one cascade across every stylesheet: a sheet loaded later beats an earlier one (fixed in 0.8.2)
 - the CLI: `dssl check` (CI, --json, --strict) and `dssl build` (real CSS from the static subset, also with --strict)
 - compiler warnings for cascade-order footguns and duplicate axis words
@@ -447,18 +523,20 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 
 ## Repo layout
 
-- `public/dssl/` the engine: parser, resolver, engine, boot, and `static.js` (the build target)
+- `public/dssl/` the engine. `parser`, `resolver`, `engine`, `boot`, `index` and `static` (the build target), plus
+  the 0.9.0 modules: `color` (parsing and contrast), `texture` (presets and generators), `aura` (the particle
+  and glow renderer), `slider`, `lint` and `import`
 - `public/styles/` the styles that drive the site
-- `cli/dssl.mjs` the CLI: `check` + `build`, no dependencies
-- `package/` what ships in the download: engine, starter files, usage guide, installers
+- `cli/dssl.mjs` the CLI: `check`, `build` and `import`, no dependencies
+- `package/` and `engine-package/` what ships in the download: engine, starter files, usage guide, installers
 - `src/` the Next.js site (docs, playground, changelog)
-- `scripts/` smoke tests, regression suites, and the headless-browser docs tests
-- `dssl-vscode/` the editor extension (VS Code + VSCodium, bundles the real parser/resolver)
+- `scripts/` regression suites, the headless-browser tests (`lib/` holds the shared browser harness), and release tooling
+- `dssl-vscode/` the editor extension: diagnostics, completions, the designer panel (`media/`), the CSS converter
 - `llms.txt`, `AGENTS.md`, `PARITY.md`, `GUIDE.md` for machine reviewers and contributors
 
 ## Status
 
-v0.8.2, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite, and the docs examples are rendered and asserted in a real browser, so the guide cannot lie. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; when a page must work without JavaScript, build the static subset with `dssl build` or pick another tool for that page. Freeze makes big static pages viable; live interaction is what the engine is for.
+v0.9.0, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite, and the docs examples are rendered and asserted in a real browser, so the guide cannot lie. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; when a page must work without JavaScript, build the static subset with `dssl build` or pick another tool for that page. Freeze makes big static pages viable; live interaction is what the engine is for.
 
 ## License
 

@@ -177,3 +177,11 @@
   color: color.ink
   font-weight: 700
 }
+
+.pg-note {
+  padding: 8 14
+  font-size: 13.5
+  color: color.ink
+  background: color.ink/6
+  border-bottom: 1 solid color.line
+}

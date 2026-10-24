@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # Publishes the DSSL extension to Open VSX (the registry VSCodium searches).
 #
-# Token resolution order: $1 | $OPENVSX_TOKEN | /home/z/.openvsx_token
+# Token resolution order: $1 | $OPENVSX_TOKEN | the file named by $OPENVSX_TOKEN_FILE
 # The token is never echoed and never lands in a tracked file.
 set -uo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/dssl-vscode"
 
 TOKEN="${OPENVSX_TOKEN:-}"
-if [ -z "$TOKEN" ] && [ -f /home/z/.openvsx_token ]; then
-  TOKEN="$(tr -d '[:space:]' < /home/z/.openvsx_token)"
+if [ -z "$TOKEN" ] && [ -n "${OPENVSX_TOKEN_FILE:-}" ] && [ -f "$OPENVSX_TOKEN_FILE" ]; then
+  TOKEN="$(tr -d '[:space:]' < "$OPENVSX_TOKEN_FILE")"
 fi
 if [ $# -ge 1 ] && [ -n "$1" ]; then
   TOKEN="$(printf '%s' "$1" | tr -d '[:space:]')"
 fi
 if [ -z "$TOKEN" ]; then
-  echo "error: no Open VSX token (pass as arg 1, set OPENVSX_TOKEN, or write /home/z/.openvsx_token)" >&2
+  echo "error: no Open VSX token (pass it as arg 1, set OPENVSX_TOKEN, or point OPENVSX_TOKEN_FILE at a file that holds it)" >&2
   exit 1
 fi
 if [ ${#TOKEN} -lt 16 ]; then

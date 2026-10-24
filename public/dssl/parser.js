@@ -1,6 +1,6 @@
 /* =========================================================================
- * DSSL — Domain Specific Style Language
- * parser.js — tokenizer + parser for the braces syntax
+ * DSSL - Domain Specific Style Language
+ * parser.js - tokenizer + parser for the braces syntax
  *
  * Line-oriented parser:
  *   - blocks open with `header {` and close with `}`
@@ -18,27 +18,27 @@ export const STATE_WORDS = new Set([
   'placeholder-shown', 'read-only', 'read-write', 'enabled',
   'indeterminate', 'first-child', 'last-child', 'only-child',
   'first-of-type', 'last-of-type', 'link', 'visited',
-  'seen', // v0.4.0 — engine-native: fires once when the element enters the viewport
+  'seen', // v0.4.0 - engine-native: fires once when the element enters the viewport
 ]);
 
-// v0.5.0 — exported so the resolver can validate the `::name` half whenever a
+// v0.5.0 - exported so the resolver can validate the `::name` half whenever a
 // full selector (.card::before) carries a pseudo-element. The resolver splits
-// those into element + pseudo and routes them into shadow CSS — previously a
+// those into element + pseudo and routes them into shadow CSS - previously a
 // top-level `.card::before { }` compiled ok and then matched NOTHING.
 export const PSEUDO_ELEMENTS = new Set([
   'before', 'after', 'placeholder', 'selection', 'marker',
   'first-line', 'first-letter', 'backdrop', 'file-selector-button',
-  // v0.7.2 — ::part() rides the shadow-CSS pipeline (a document stylesheet
+  // v0.7.2 - ::part() rides the shadow-CSS pipeline (a document stylesheet
   // CAN style shadow parts of custom elements). ::slotted() is accepted by
   // the parser but rejected by the resolver with a loud explanation: it only
   // exists inside a shadow tree, which is not a place DSSL styles.
   'part', 'slotted',
 ]);
 
-// v0.4.2 — vendor pseudo-elements pass through verbatim (::-webkit-scrollbar
+// v0.4.2 - vendor pseudo-elements pass through verbatim (::-webkit-scrollbar
 // and friends). The DOM gives you no other way to reach native scrollbars,
 // so they ride the same shadow-CSS exception as ::before/::after. The name
-// may carry trailing state (::hover, :horizontal) — it is emitted as-is.
+// may carry trailing state (::hover, :horizontal) - it is emitted as-is.
 export const VENDOR_PSEUDO = /^-(webkit|moz|ms)-/;
 
 /** find index of first top-level occurrence of `ch` (skips strings + parens) */
@@ -113,7 +113,7 @@ function stripComments(src) {
     if (c === '"' || c === "'") { q = c; out += c; continue; }
     if (c === '/' && n === '/') {
       // v0.7.1 bugfix: this handler used to emit its own '\n' AND rewind so
-      // the main loop emitted the same newline again — every // comment
+      // the main loop emitted the same newline again - every // comment
       // doubled a line, and every line number after the first comment
       // drifted +1 (diagnostics pointed one line late). The newline is now
       // emitted exactly once by the main loop.
@@ -156,13 +156,13 @@ export function parse(source, file = 'inline.dssl') {
     if (h.startsWith('@container')) return { kind: 'container', query: h.slice(10).trim() };
     if (h.startsWith('@signal ')) return { kind: 'signal', expr: h.slice(8).trim() };
     if (h.startsWith('@')) {
-      // v0.8.0 — unknown at-rules are skipped WHOLE (balanced braces). They
+      // v0.8.0 - unknown at-rules are skipped WHOLE (balanced braces). They
       // used to error and then keep parsing inside their block, so the inner
       // rules leaked out unconditionally: `@supports (display:grid) { .a { … } }
-      // applied .a everywhere. The block is now dropped in its entirety —
+      // applied .a everywhere. The block is now dropped in its entirety -
       // and raw { } is the documented escape hatch for CSS DSSL has no sugar
       // for yet (@font-face, @keyframes, @supports, @import…).
-      err(line, `unknown at-rule "${h.split(' ')[0]}"`, 'the whole block is skipped — for verbatim CSS like @font-face / @keyframes / @supports, wrap it in raw { }');
+      err(line, `unknown at-rule "${h.split(' ')[0]}"`, 'the whole block is skipped - for verbatim CSS like @font-face / @keyframes / @supports, wrap it in raw { }');
       return { kind: 'bogus' };
     }
     if (h.startsWith('::')) {
@@ -198,7 +198,7 @@ export function parse(source, file = 'inline.dssl') {
 
       if (open !== -1) {
         const header = rest.slice(0, open).trim();
-        // v0.7.2 — declarations and a nested block sharing one line:
+        // v0.7.2 - declarations and a nested block sharing one line:
         // `.card { background: red; hover { ... } }`. Everything before the
         // header used to be swallowed whole into it, so `background: red`
         // silently became part of a selector named "background: red; hover"
@@ -234,9 +234,9 @@ export function parse(source, file = 'inline.dssl') {
     }
   };
 
-  /** v0.8.0 — what happens right after a block header opens.
+  /** v0.8.0 - what happens right after a block header opens.
    *  - raw { } (top level): capture the block body VERBATIM as node.css and
-   *    return the remainder of the chunk — or enter multi-line capture mode
+   *    return the remainder of the chunk - or enter multi-line capture mode
    *    (returns '' with rawCapture armed).
    *  - bogus (unknown at-rule / pseudo-element): skip the whole balanced
    *    block so its content can never leak into the parent.
@@ -246,7 +246,7 @@ export function parse(source, file = 'inline.dssl') {
   const openBlock = (meta, node, rest, open, line) => {
     if (meta.kind === 'raw') {
       if (stack.length > 1) {
-        err(line, 'raw { } must be top-level — it drops verbatim CSS into the page stylesheet', 'move it out of the enclosing block');
+        err(line, 'raw { } must be top-level - it drops verbatim CSS into the page stylesheet', 'move it out of the enclosing block');
         const close = matchBrace(rest, open + 1);
         return close === -1 ? '' : rest.slice(close + 1);
       }
@@ -303,13 +303,13 @@ export function parse(source, file = 'inline.dssl') {
       if (!part) continue;
       const colon = scanFor(part, ':');
       if (colon === -1) {
-        // `use behavior-name` — keyword declaration with a name argument
+        // `use behavior-name` - keyword declaration with a name argument
         const useMatch = part.match(/^use\s+([A-Za-z][\w-]*)$/);
         if (useMatch) {
           stack[stack.length - 1].children.push({ kind: 'decl', prop: 'use', value: useMatch[1], line });
           continue;
         }
-        // valueless semantic property (e.g. `truncate`) — resolver decides if legal
+        // valueless semantic property (e.g. `truncate`) - resolver decides if legal
         if (/^[a-z][a-z0-9-]*$/i.test(part)) {
           stack[stack.length - 1].children.push({ kind: 'decl', prop: part.toLowerCase(), value: '', line });
         } else {
@@ -320,9 +320,9 @@ export function parse(source, file = 'inline.dssl') {
       const prop = part.slice(0, colon).trim().toLowerCase();
       const value = part.slice(colon + 1).trim();
       if (!prop) { err(line, 'declaration is missing a property name'); continue; }
-      // v0.7.0 — numeric token keys. `tokens { space { 9: 96 } }` is legal:
+      // v0.7.0 - numeric token keys. `tokens { space { 9: 96 } }` is legal:
       // the built-in spacing scale stops at 8, and real pages need 9, 10, 12…
-      // Numbers are keys ONLY inside a tokens subtree — anywhere else a bare
+      // Numbers are keys ONLY inside a tokens subtree - anywhere else a bare
       // numeric property is a typo, and the error now says exactly that
       // instead of the old "not a valid property name" shrug.
       if (/^[0-9]+(\.[0-9]+)?$/.test(prop)) {
@@ -331,10 +331,10 @@ export function parse(source, file = 'inline.dssl') {
           continue;
         }
         err(line, `"${prop}" is not a valid property name`,
-          'numeric names are token keys only inside tokens { } — e.g. tokens { space { 9: 96 } } — and then referenced as space.9; property names must start with a letter');
+          'numeric names are token keys only inside tokens { } - e.g. tokens { space { 9: 96 } } - and then referenced as space.9; property names must start with a letter');
         continue;
       }
-      // v0.4.0: dotted custom properties are legal — `--color.accent: …` is
+      // v0.4.0: dotted custom properties are legal - `--color.accent: …` is
       // scoped-token sugar (resolver maps it to the engine's token variable)
       if (!/^(-{1,2}[a-z][a-z0-9.-]*|[a-z][a-z0-9-]*)$/i.test(prop)) {
         err(line, `"${prop}" is not a valid property name`,
@@ -380,7 +380,7 @@ export function parse(source, file = 'inline.dssl') {
   });
   if (buf.trim()) processChunk(buf, bufLine);
   if (rawCapture) {
-    err(lines.length, 'the raw { } block was never closed with "}"', 'every "{" needs a matching "}" — the CSS captured so far is discarded');
+    err(lines.length, 'the raw { } block was never closed with "}"', 'every "{" needs a matching "}" - the CSS captured so far is discarded');
   }
 
   if (stack.length > 1) {

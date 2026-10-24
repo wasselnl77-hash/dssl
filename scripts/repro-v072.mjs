@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Reproduces every compiler-level claim from the external agent review (0.7.2 cycle).
-import { parse } from '/home/z/my-project/public/dssl/parser.js';
-import { resolve } from '/home/z/my-project/public/dssl/resolver.js';
+import { parse } from '../public/dssl/parser.js';
+import { resolve } from '../public/dssl/resolver.js';
 
 let fails = 0;
 function show(name, source, opts = {}) {

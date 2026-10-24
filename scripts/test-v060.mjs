@@ -1,11 +1,11 @@
-/* v0.6.0 tests — the deform family + gradient tools + pass-through:
+/* v0.6.0 tests - the deform family + gradient tools + pass-through:
  *  1-4   bend / bend-y / bend-up / fold / stretch / bend-around parse + loud errors
  *  5     composeDeform: 3D bake, edge-pinned pivots, squash & stretch, base transform
  *  6     arcLayout: radius math, angle spread, degenerate cases
  *  7     motion keyframes carry composed transforms + transformOrigin
  *  8-11  gradient / gradient-text / gradient-flow: arrow + comma stops, tokens, alpha, positions
  *  12    transition bend/stretch/fold aliases land on transform
- *  13    pointer-events: none — the transparent-overlay sibling feature
+ *  13    pointer-events: none - the transparent-overlay sibling feature
  *  14    deform props inside pseudo blocks stay LOUD (no DOM handle)
  *  15    all six site stylesheets chained through the token registry
  */
@@ -16,7 +16,7 @@ import { composeDeform, arcLayout } from '../public/dssl/utils.js';
 let pass = 0, fail = 0;
 const check = (name, cond, extra = '') => {
   if (cond) { pass++; console.log(`  ok  ${name}`); }
-  else { fail++; console.log(`FAIL  ${name}${extra ? '  — ' + extra : ''}`); }
+  else { fail++; console.log(`FAIL  ${name}${extra ? '  - ' + extra : ''}`); }
 };
 
 function compile(src) {
@@ -85,7 +85,7 @@ console.log('4. bend-around');
   check('4 ±170 cap is LOUD', cap.errors.length === 1 && /±170/.test(cap.errors[0].message), JSON.stringify(cap.errors));
 }
 
-console.log('5. composeDeform — one transform to rule them all');
+console.log('5. composeDeform - one transform to rule them all');
 {
   let c = composeDeform({ bend: 20 }, '', { h: 100 });
   check('5 bend = perspective rotateX', c.transform === 'perspective(900px) rotateX(20deg)', c.transform);
@@ -112,7 +112,7 @@ console.log('5. composeDeform — one transform to rule them all');
     'perspective(900px) rotateX(20deg) translateY(-40px) rotateX(15deg) translateY(40px) scaleX(1.2) scaleY(0.8333)', c.transform);
 }
 
-console.log('6. arcLayout — bend-around math');
+console.log('6. arcLayout - bend-around math');
 {
   const a = arcLayout(5, 400, 40);
   check('6 radius from chord + angle', Math.abs(a.R - 200 / Math.sin(20 * Math.PI / 180)) < 0.01, a.R);
@@ -143,7 +143,7 @@ console.log('7. motions: bend keyframes compose into transform frames');
   check('7 fold pins the pivot via origin', f1.props.transformOrigin === '50% 0%', JSON.stringify(f1.props));
 }
 
-console.log('8. gradient — arrow + comma stops');
+console.log('8. gradient - arrow + comma stops');
 {
   const { doc, errors } = compile(`
     .a { gradient: linear 135, #ff0055 -> #00d4ff }
@@ -162,7 +162,7 @@ console.log('8. gradient — arrow + comma stops');
   check('8 comma-only stops', declOf(doc, '.f', 'background-image') === 'linear-gradient(180deg, cyan, magenta)', declOf(doc, '.f', 'background-image'));
 }
 
-console.log('9. gradient — tokens, alpha, loud errors');
+console.log('9. gradient - tokens, alpha, loud errors');
 {
   const { doc, errors } = compile(`
     tokens { color { flame: #ff5533 } }
@@ -224,7 +224,7 @@ console.log('12. transition aliases: bend/stretch/fold ride transform');
   check('12 all three became transform', (t.match(/transform \d+ms/g) || []).length === 3, t);
 }
 
-console.log('13. pointer-events — transparent overlays stop eating selection');
+console.log('13. pointer-events - transparent overlays stop eating selection');
 {
   const { doc, errors } = compile(`
     .veil { pointer-events: none }

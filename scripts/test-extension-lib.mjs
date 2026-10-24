@@ -1,4 +1,4 @@
-/* test-extension-lib.mjs — functional smoke for the editor extension lib.
+/* test-extension-lib.mjs - functional smoke for the editor extension lib.
  * Confirms the bundled engine copy (lib/engine) + analysis.js still agree:
  * diagnostics, did-you-mean, completions, and the v0.7.2 cascade fix all
  * behave through the exact code the .vsix ships. Run before packaging. */

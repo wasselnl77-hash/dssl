@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import CodeBlock from "../CodeBlock";
 import { PlayIcon } from "../icons";
+import vocab from "@/lib/vocab.json";
 
 const SIDE = [
   { head: "start here", id: "start", label: "Quickstart: 3 steps" },
@@ -21,6 +22,10 @@ const SIDE = [
   { head: null, id: "motion", label: "Motion" },
   { head: null, id: "deform", label: "Deform: bend & stretch" },
   { head: null, id: "gradients", label: "Gradient tools" },
+  { head: null, id: "texture", label: "Texture" },
+  { head: null, id: "aura", label: "Aura: light and particles" },
+  { head: null, id: "sliders", label: "Range sliders" },
+  { head: null, id: "designer", label: "Designer, import and lint" },
   { head: null, id: "errors", label: "Errors" },
   { head: null, id: "api", label: "JS API" },
   { head: null, id: "performance", label: "Performance: freeze & explain" },
@@ -733,6 +738,195 @@ motion wobble {
                 automatically, a gradient at 100% has nowhere to slide.
               </p>
             </div>
+          </section>
+
+          <section className="doc-block" id="texture">
+            <h2 className="section-title">Texture</h2>
+            <p className="doc-lead">
+              <code>texture:</code> lays a generated image on top of whatever background an element
+              already has: a plain colour, a gradient, or several layers. The author&apos;s background is
+              never replaced, and removing the texture puts it back exactly as it was. There are{" "}
+              {vocab.presets.length} presets. They are not magic: each is a stored combination of a few
+              generators and settings, so anything a preset does you can write yourself.
+            </p>
+            <CodeBlock file="texture.dssl" code={`.card   { background: #c9a66b; texture: wood }
+.sheet  { background: linear-gradient(135deg, #ff7a00, #7a1fff); texture: grain intensity 0.6 }
+.poster { background: #e9e2d0; texture: paper, scanlines intensity 0.1 }   // a comma stacks layers
+
+// your own: start from a generator, name it with a behavior
+behavior old-leather {
+  texture: bump scale 6 depth 4 color #1b1008 color2 #6b4a2b blend overlay
+}
+.sofa { background: #5a3a22; use old-leather }`} />
+            <div className="demo-box wide">
+              <div className="tx-wall">
+                {vocab.presets.map((pr) => (
+                  <div className="tx-cell" key={pr.name} title={pr.doc}>
+                    <div className={`tx tx-${pr.name}`} />
+                    <span>{pr.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <p className="doc-lead fine-print">
+              Every swatch above is a plain box with one rule, like <code>.tx-marble {"{"} texture: marble {"}"}</code>,
+              over the same tan colour. Hover a swatch for what it is meant to look like.
+            </p>
+            <h3 className="doc-h3">Settings</h3>
+            <p className="doc-lead">Settings go after the name, in any order. Only write the ones you want to change.</p>
+            <table className="tbl">
+              <thead><tr><th>setting</th><th>what it does</th></tr></thead>
+              <tbody>
+                {vocab.textureKeys.map((k) => (
+                  <tr key={k.key}><td><code>{k.key}</code></td><td>{k.doc}</td></tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="tbl-note">
+              Generators: {vocab.generators.map((g) => <code key={g}>{g} </code>)}
+              Colours can be tokens and follow them, in dark mode too. <code>animate</code> makes film grain
+              shimmer, and stands still for visitors who ask for reduced motion. Textures are SVG filters and
+              gradients, drawn once and cached. Inside an aura, <code>texture(grain)</code> makes the light and
+              the particles grainy.
+            </p>
+            <div className="note note-warn">
+              <b>Runtime only.</b> Texture is an engine feature, so <code>dssl build</code> leaves it in the
+              runtime and says so in its report.
+            </div>
+          </section>
+
+          <section className="doc-block" id="aura">
+            <h2 className="section-title">Aura: light and particles</h2>
+            <p className="doc-lead">
+              An aura is a glow and particles around an element. <b>There are no presets.</b> Fire, an energy
+              aura, snow and sparks are all parameters, and you name your own with a <code>behavior</code>.
+              That is the point: you get the knobs, not someone else&apos;s idea of fire. Each kind of layer lives
+              in its own slot, so rules stack through the cascade like anything else.
+            </p>
+            <table className="tbl">
+              <thead><tr><th>property</th><th>what it sets</th></tr></thead>
+              <tbody>
+                <tr><td><code>aura-glow</code></td><td>the glow slot, a soft light around the element</td></tr>
+                <tr><td><code>aura-particle</code></td><td>the particles slot (also spelled <code>aura-particles</code>)</td></tr>
+                <tr><td><code>glow-particle</code></td><td>the particles slot, every particle glowing (also <code>glow-particles</code>)</td></tr>
+                <tr><td><code>aura-glow-particle</code></td><td>both slots at once, settings shared</td></tr>
+                <tr><td><code>aura</code></td><td>both slots, written as <code>glow ..., particles ...</code>; replaces what was there</td></tr>
+              </tbody>
+            </table>
+            <p className="tbl-note"><code>aura-glow: none</code> clears only the glow. <code>aura: none</code> clears both.</p>
+            <CodeBlock file="aura.dssl" code={`.orb { aura-glow: color.accent 28 pulse 1600 }                      // colour, then radius
+.hot { aura-particle: #ffd24a -> #ff6a00 -> rgba(255,40,0,0) 60 up } // colour stops, count, direction
+.big { aura: glow #ff7a00 30 flicker 0.3, particles #fd0 count 60 shape flame glowing behind }`} />
+            <p className="doc-lead">
+              The first colour and number are positional (a glow&apos;s colour and radius, a particle&apos;s colours
+              and count); everything else is a named setting. Colour stops are joined with <code>-&gt;</code> and
+              blend along a particle&apos;s life. These are the five recipes from the guide, running live. Copy
+              one, change it, rename it.
+            </p>
+            <div className="demo-box">
+              <div className="au-stage">
+                <div className="au au-fire">fire</div>
+                <div className="au au-ki">ki</div>
+                <div className="au au-embers">embers</div>
+                <div className="au au-electric">electric</div>
+                <div className="au au-snow">snow</div>
+              </div>
+            </div>
+            <CodeBlock file="fire.dssl" code={`behavior fire {
+  aura-glow: #ff7a00 36 pulse 900 flicker 0.35
+  aura-particle: #ffe27a -> #ff8a1f -> rgba(255,40,0,0) count 70 size 8 18 life 650 1100
+                 speed 40 120 dir up spread 40 from top gravity -40 turbulence 70
+                 shape flame glowing behind
+}
+
+.torch { use fire }
+.blue  { use fire; aura-glow: #3a7bff 36 pulse 900 flicker 0.35 }   // change one thing at the use site`} />
+            <h3 className="doc-h3">Glow settings</h3>
+            <table className="tbl">
+              <thead><tr><th>setting</th><th>what it does</th></tr></thead>
+              <tbody>{vocab.glowKeys.map((k) => (<tr key={k.key}><td><code>{k.key}</code></td><td>{k.doc}</td></tr>))}</tbody>
+            </table>
+            <h3 className="doc-h3">Particle settings</h3>
+            <table className="tbl">
+              <thead><tr><th>setting</th><th>what it does</th></tr></thead>
+              <tbody>{vocab.particleKeys.map((k) => (<tr key={k.key}><td><code>{k.key}</code></td><td>{k.doc}</td></tr>))}</tbody>
+            </table>
+            <h3 className="doc-h3">How it behaves</h3>
+            <ul className="doc-list">
+              <li><b>Where it draws.</b> One transparent canvas covers the page and never catches the pointer. The glow is drawn only outside the element; <code>behind</code> does the same for particles, so flames lick out from behind a box instead of crossing its face.</li>
+              <li><b>Only what is seen.</b> Hidden, off-screen or removed elements emit nothing, and when the last aura goes the loop stops.</li>
+              <li><b>Budget.</b> At most 1800 particles are alive across the page, shared fairly. Glows are painted once and re-lit each frame: 40 pulsing glows cost under a millisecond.</li>
+              <li><b>Reduced motion.</b> A still glow and no particles. Add <code>essential</code> to a layer that must keep moving.</li>
+              <li><b>States.</b> <code>hover {"{"} aura-particle: ... {"}"}</code> works; moving away lets what is alive finish.</li>
+              <li><b>Limits.</b> Runtime only (<code>dssl build</code> reports it), and a light glow on a light page looks like paint, because it adds light.</li>
+            </ul>
+          </section>
+
+          <section className="doc-block" id="sliders">
+            <h2 className="section-title">Range sliders</h2>
+            <p className="doc-lead">
+              A range input is styled through vendor pseudo-elements, and every engine has its own:{" "}
+              <code>::-webkit-slider-runnable-track</code> and <code>::-webkit-slider-thumb</code> for Chrome,
+              Edge, Safari and Opera, <code>::-moz-range-track</code>, <code>::-moz-range-thumb</code> and{" "}
+              <code>::-moz-range-progress</code> for Firefox. <code>slider:</code> writes both sets from one
+              description.
+            </p>
+            <CodeBlock file="slider.dssl" code={`input.volume {
+  slider: track 6 #445566 radius full, fill #ff7a00,
+          thumb 22 #fff, ring 3 #ff7a00, glow #ff7a00 14, ticks 10 #8890a0
+}
+
+input.price {                      // a histogram: the bars colour themselves as the value passes them
+  slider: graph 20 45 70 90 60 35 50 80 95 40 60 75, graph-height 52, graph-gap 3,
+          fill #77ccff, track 3 #34445a, thumb 14 #fff, shape bar
+}
+
+input.mood {                       // particles leave the thumb, wherever the value is
+  slider: track 10 #2b3040 radius 3, fill #5be2a0, thumb 24 #5be2a0, shape diamond
+  aura-particle: #bfffe0 -> rgba(91,226,160,0) count 40 life 700 speed 30 70 dir up from thumb glowing
+}`} />
+            <div className="demo-box">
+              <div className="sl-demo">
+                <div><p className="sl-label">ring, glow and ticks</p><input className="sl-plain" type="range" defaultValue={60} aria-label="demo slider with ring, glow and ticks" /></div>
+                <div><p className="sl-label">a histogram slider</p><input className="sl-graph" type="range" defaultValue={40} aria-label="demo histogram slider" /></div>
+                <div><p className="sl-label">a diamond thumb that sheds particles</p><input className="sl-diamond" type="range" defaultValue={70} aria-label="demo slider with particles" /></div>
+              </div>
+            </div>
+            <table className="tbl">
+              <thead><tr><th>setting</th><th>form</th></tr></thead>
+              <tbody>{vocab.sliderClauses.map((c) => (<tr key={c.key}><td><code>{c.key}</code></td><td><code>{c.form}</code></td></tr>))}</tbody>
+            </table>
+            <p className="tbl-note">
+              Settings are separated by commas, and a leftover word is an error, not noise. The fill and the bars
+              follow the value through <code>--dssl-p</code>, which the engine keeps current (set{" "}
+              <code>input.value</code> from JavaScript, then call <code>DSSL.refresh()</code>). The WebKit and Blink
+              rules are tested in Chrome. The Firefox rules are generated but have not been run in Firefox yet.
+            </p>
+          </section>
+
+          <section className="doc-block" id="designer">
+            <h2 className="section-title">Designer, import and lint</h2>
+            <p className="doc-lead">
+              The interactive tools live in the editor, not on this site. The VS Code extension has a{" "}
+              <b>designer</b> (command palette: <i>DSSL: Open the designer</i>): a slider or picker for every aura,
+              texture and slider setting, live previews drawn by the same renderer the engine uses, graphs, and the
+              DSSL it writes, checked by the real compiler as you edit. <i>Insert at cursor</i> puts it in your file
+              and <i>Load from selection</i> reads an existing declaration back into the controls.
+            </p>
+            <CodeBlock file="terminal" code={`node cli/dssl.mjs import styles.css -o styles.dssl    # CSS to DSSL, and a report of what could not carry over`} />
+            <p className="doc-lead">
+              The importer drops semicolons, turns <code>16px</code> into <code>16</code>, rewrites{" "}
+              <code>transition</code> and <code>font:</code>, turns <code>@keyframes</code> into a <code>motion</code>,
+              moves <code>!important</code> into <code>pin {"{"} {"}"}</code>, and keeps <code>@font-face</code>,{" "}
+              <code>@supports</code> and <code>@import</code> in a <code>raw {"{"} {"}"}</code> block. Anything DSSL
+              rejects is commented out and listed, so the file you get always compiles.
+            </p>
+            <p className="doc-lead">
+              <code>dssl check</code> also warns about text with too little contrast, a focus outline removed with
+              nothing to replace it, and tap targets under 24px. They never fail a build unless you pass{" "}
+              <code>--strict</code>. The linter found four real contrast failures in this site&apos;s own stylesheets
+              the day it was written.
+            </p>
           </section>
 
           <section className="doc-block" id="errors">

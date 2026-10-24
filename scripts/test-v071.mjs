@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* test-v071.mjs — v0.7.1 regression: comment line numbers.
+/* test-v071.mjs - v0.7.1 regression: comment line numbers.
  * The extension's test suite caught it: every `//` comment doubled a newline
  * in the stripped source, so every line number after the first comment
  * drifted +1 and diagnostics pointed one line late. Block comments were
@@ -16,7 +16,7 @@ const ok = (cond, name) => {
   else { failed++; console.log(`FAIL  ${name}`); }
 };
 
-console.log('1 — comment placements keep true line numbers');
+console.log('1 - comment placements keep true line numbers');
 {
   const cases = [
     ['leading', '// c\n.a {\n  x: 1\n}', 3],
@@ -37,7 +37,7 @@ console.log('1 — comment placements keep true line numbers');
   }
 }
 
-console.log('2 — errors and warnings carry honest lines after comments');
+console.log('2 - errors and warnings carry honest lines after comments');
 {
   const src = '// header comment\n.nav-links {\n  display: none\n  column: gap 2\n}\n.bad {\n  background: colr.accent\n}\n';
   // lines 1-based: display=3, column=4, colr=7
@@ -49,7 +49,7 @@ console.log('2 — errors and warnings carry honest lines after comments');
   ok(err && err.line === 7, `misspelled token error on its own line (got ${err && err.line}, want 7)`);
 }
 
-console.log('3 — the real site stylesheets: spot-check line honesty');
+console.log('3 - the real site stylesheets: spot-check line honesty');
 {
   // parse a real stylesheet that opens with a comment block and verify a
   // known rule lands where it lives on disk

@@ -1,5 +1,5 @@
 /* =========================================================================
- * DSSL — index.js — public API + auto-boot
+ * DSSL - index.js - public API + auto-boot
  *
  *   import '/dssl/index.js'        // or <script type="module" src="/dssl/index.js">
  *
@@ -19,7 +19,7 @@ import { resolve, DEFAULT_TOKENS } from './resolver.js';
 import { toCSS as docToCSS } from './static.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.8.2';
+export const VERSION = '0.9.0';
 
 let counter = 0;
 const engines = new Map();
@@ -49,20 +49,20 @@ function reportErrors(errors, file) {
   try {
     console.groupCollapsed(`%c[DSSL] ${errors.length} issue(s) in ${file}`, 'color:#b3372e;font-weight:bold');
     for (const e of errors) {
-      console.warn(`${e.file || ''}${e.file ? ':' : ''}${e.line ?? ''} — ${e.message}${e.hint ? `\n    did you mean "${e.hint}"?` : ''}`);
+      console.warn(`${e.file || ''}${e.file ? ':' : ''}${e.line ?? ''} - ${e.message}${e.hint ? `\n    did you mean "${e.hint}"?` : ''}`);
     }
     console.groupEnd();
   } catch { /* very old browsers */ }
 }
 
-// v0.7.0 — warnings compile fine but are probably not what you meant.
+// v0.7.0 - warnings compile fine but are probably not what you meant.
 // Non-fatal by contract (ok stays ok), loud by promise.
 function reportWarnings(warnings, file) {
   if (!warnings || !warnings.length) return;
   try {
     console.groupCollapsed(`%c[DSSL] ${warnings.length} warning(s) in ${file}`, 'color:#8a6d1a;font-weight:bold');
     for (const w of warnings) {
-      console.warn(`${w.file || ''}${w.file ? ':' : ''}${w.line ?? ''} — ${w.message}${w.hint ? `\n    ${w.hint}` : ''}`);
+      console.warn(`${w.file || ''}${w.file ? ':' : ''}${w.line ?? ''} - ${w.message}${w.hint ? `\n    ${w.hint}` : ''}`);
     }
     console.groupEnd();
   } catch { /* very old browsers */ }
@@ -118,7 +118,7 @@ export function apply(source, opts = {}) {
 }
 
 /** Fetch and apply one or more .dssl files, in order.
- *  v0.3.2: files are fetched IN PARALLEL but applied in the order given —
+ *  v0.3.2: files are fetched IN PARALLEL but applied in the order given -
  *  the old sequential await chain made six stylesheets cost six round-trips. */
 export async function load(urls, opts = {}) {
   const list = Array.isArray(urls) ? urls : [urls];
@@ -144,15 +144,15 @@ export async function load(urls, opts = {}) {
   return results;
 }
 
-/** v0.8.0 — the exit lane: compile a DSSL source string to a real CSS
+/** v0.8.0 - the exit lane: compile a DSSL source string to a real CSS
  *  stylesheet (tokens → custom properties, states → :hover, @media as-is,
  *  layers → @layer, motions → @keyframes, raw { } verbatim). Returns
- *  { css, report } — report counts what was emitted and what stays
+ *  { css, report } - report counts what was emitted and what stays
  *  engine-only (@signal rules, animate: and friends). */
 export function toCSS(source, opts = {}) {
   const file = opts.file || 'inline.dssl';
   const result = compile(source, file);
-  const built = docToCSS(result.doc, { file, banner: opts.banner });
+  const built = docToCSS(result.doc, { file, banner: opts.banner, version: VERSION });
   return { ...built, ok: result.ok, errors: result.errors, warnings: result.warnings };
 }
 
@@ -163,7 +163,7 @@ export function replay(selector) { for (const e of engines.values()) e.replay(se
 export function errors() { return lastErrors; }
 export function version() { return VERSION; }
 
-// v0.7.0 — freeze()/unfreeze() every engine: the whole page stops reacting
+// v0.7.0 - freeze()/unfreeze() every engine: the whole page stops reacting
 // (observers, media, state events, overlap heartbeat) and keeps its resolved
 // look for free. Explicit API calls still drain. Returns combined stats.
 export function freeze() {
@@ -177,7 +177,7 @@ export function unfreeze() {
   return stats.length === 1 ? stats[0] : stats;
 }
 
-// v0.7.0 — explain(el): matched rules, source file/line, winning declaration
+// v0.7.0 - explain(el): matched rules, source file/line, winning declaration
 // per property, and the pseudo-element rules touching the element. Prints a
 // readable group to the console (quiet: true for pure data) and returns it.
 export function explain(el, opts = {}) {
@@ -188,7 +188,7 @@ export function explain(el, opts = {}) {
   if (opts.quiet !== true) {
     try {
       const elDesc = el.tagName ? el.tagName.toLowerCase() + (el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : '') : 'element';
-      console.groupCollapsed(`%c[DSSL] explain <${elDesc}> — ${rep.matched.length} rule(s) matched`, 'color:#2d5a3d;font-weight:bold');
+      console.groupCollapsed(`%c[DSSL] explain <${elDesc}> - ${rep.matched.length} rule(s) matched`, 'color:#2d5a3d;font-weight:bold');
       for (const m of rep.matched) {
         console.log(`#${m.id} ${m.sel}  (${m.layer})  ${m.file || 'inline'}:${m.line}${m.states.length ? '  states: ' + m.states.join(',') : ''}`);
       }
@@ -218,7 +218,7 @@ if (typeof window !== 'undefined') {
   const boot = async () => {
     try {
       const links = [...document.querySelectorAll('link[rel="stylesheet/dssl"]')];
-      // v0.7.2 — inline DSSL blocks also work as <script type="text/dssl">
+      // v0.7.2 - inline DSSL blocks also work as <script type="text/dssl">
       // (some editors highlight/parse those better than an unknown style type)
       const inlines = [...document.querySelectorAll('style[type="text/dssl"], script[type="text/dssl"]')];
 
@@ -238,7 +238,7 @@ if (typeof window !== 'undefined') {
         }
       }
     } finally {
-      // always announce readiness — even when there was nothing to auto-load
+      // always announce readiness - even when there was nothing to auto-load
       window.dispatchEvent(new CustomEvent('dssl-ready', { detail: { version: VERSION } }));
     }
   };

@@ -81,7 +81,7 @@ gallery {
 .chip-x { center: x }
 .chip-y { center: y }
 
-// ------------------- v0.4.0 — power tools -------------------
+// ------------------- v0.4.0 - power tools -------------------
 
 // stagger: choreograph the children's animations
 .feature-grid-v4 {
@@ -189,7 +189,7 @@ assert(doc.rules.some(r => r.sel === ':root' && r.signals.length === 1), 'signal
 assert(doc.rules.some(r => r.layer === 'utilities' && r.sel === '.mt-0'), 'layer assignment');
 assert(doc.rules.some(r => r.layer === 'pin' && r.sel === '.hero-title'), 'pin layer');
 assert(doc.rules.some(r => r.sel === 'gallery' && r.decls.some(d => String(d.value).includes('minmax(220px'))), 'grid sugar');
-// v0.3.2: repeat() regression — the count must stay an integer, tracks may px
+// v0.3.2: repeat() regression - the count must stay an integer, tracks may px
 const fg = doc.rules.find(r => r.sel === '.feature-grid');
 assert(fg && fg.decls.some(d => d.prop === 'grid-template-columns' && d.value === 'repeat(4, 1fr)'), `repeat(4, 1fr) stays integer (got: ${fg?.decls.find(d => d.prop === 'grid-template-columns')?.value})`);
 assert(fg && fg.decls.some(d => d.prop === 'gap' && d.value === 'var(--dssl-space-4)') === false, 'gap: 24 resolved (not token)');
@@ -198,7 +198,7 @@ const span2 = doc.rules.find(r => r.sel === '.span-2');
 assert(span2 && span2.decls.some(d => d.value === 'span 2'), `grid-column: span 2 unitless (got: ${span2?.decls[0]?.value})`);
 const autoGrid = doc.rules.find(r => r.sel === '.auto-grid');
 assert(autoGrid && autoGrid.decls.some(d => d.value === 'repeat(auto-fill, minmax(200px, 1fr))'), `repeat(auto-fill, minmax) works (got: ${autoGrid?.decls[0]?.value})`);
-// v0.3.4: center: primitive — alignment pair, engine promotes the context
+// v0.3.4: center: primitive - alignment pair, engine promotes the context
 const chip = doc.rules.find(r => r.sel === '.icon-chip');
 assert(chip && chip.decls.some(d => d.prop === 'place-items' && d.value === 'center center'), `center: expands to place-items center center`);
 assert(chip && chip.decls.some(d => d.prop === 'place-content' && d.value === 'center center'), `center: expands to place-content center center`);

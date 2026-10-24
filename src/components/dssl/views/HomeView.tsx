@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import CodeBlock from "../CodeBlock";
 import { useEngineInfo } from "../engine-info";
-import type { DsslError } from "../SiteRoot";
 
 /* The hero is the language itself. This editor feeds the real engine that is
    styling the page you are looking at: change the accent token and the whole
@@ -55,6 +54,7 @@ const PARTS = [
   ["Motion in four words", "animate: rise-in 400 snap both. Add seen and stagger to reveal a grid on scroll. Reduced motion is respected by default."],
   ["Behaviors", "Name a pattern once, like a focus ring or a chip, and use it anywhere with one line."],
   ["Loud errors", "Unknown property, unknown token, bad value. Each one names the file and line and suggests a fix."],
+  ["Texture, aura and sliders", "Thirty textures, light and particles with no presets (you build the fire), and one-line range sliders. The VS Code extension has a designer with sliders and live previews."],
   ["A JavaScript bridge", "DSSL.signal restyles live, DSSL.replay reruns motion, DSSL.compile powers tools like the VS Code extension."],
 ];
 

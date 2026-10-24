@@ -104,6 +104,31 @@ animate: pop 400 snap both`} />
           </p>
         </div>
 
+        {/* ---------------------------------------------- texture, aura, slider */}
+        <div className="cheat-card">
+          <span className="cheat-k">texture, aura, slider</span>
+          <CodeBlock plain code={`texture: wood                      // 30 presets; stacks with commas
+texture: noise scale 3 color #123 blend multiply   // or your own
+
+aura-glow: #ff7a00 30 pulse 900 flicker 0.3
+aura-particle: #fd0 -> #f60 -> rgba(255,40,0,0) 60 up
+glow-particle: #fff 30 out         // glowing particles
+aura-glow-particle: #7cf 24 count 40 up
+aura: glow #f80 30, particles #fd0 count 60   // both slots
+aura-glow: none                    // clears one slot; aura: none clears both
+
+behavior fire { aura-glow: ... aura-particle: ... }   // aura has no presets
+.torch { use fire }
+
+slider: track 6 #456 radius full, fill #f80, thumb 22 #fff, ring 3 #f80
+slider: graph 20 45 70 90 60, graph-height 52   // a histogram slider`} />
+          <p className="cheat-p">
+            Runtime features: <code>dssl build</code> leaves them out and says so. Aura draws on one
+            canvas, stills under reduced motion, and shares a budget of 1800 particles. Open the designer
+            in the VS Code extension to build all three with sliders.
+          </p>
+        </div>
+
         {/* ---------------------------------------------- states */}
         <div className="cheat-card">
           <span className="cheat-k">states & selectors</span>

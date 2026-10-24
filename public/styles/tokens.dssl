@@ -23,11 +23,11 @@ tokens {
     paper: #f2f0f7
     card: #ffffff
     ink: #1a1426
-    muted: #655d77
+    muted: #5d5570
     line: #dcd7e6
     accent: #d1006f
     accent-ink: #ffffff
-    ok: #17794f
+    ok: #126a44
     err: #c2261d
     tape: #ffd23f
     tape-ink: #2b2200
@@ -39,7 +39,7 @@ tokens {
     code-prop: #a9c6ff
     code-str: #ffd98a
     code-num: #e5a6ff
-    code-com: #8c82a3
+    code-com: #a79dbf
   }
   radius {
     sm: 4
@@ -88,7 +88,7 @@ behavior palette-dark {
       code-prop: #a9c6ff
       code-str: #ffd98a
       code-num: #e5a6ff
-      code-com: #8c82a3
+      code-com: #a79dbf
     }
   }
 }
@@ -116,9 +116,9 @@ behavior palette-light {
       paper: #f2f0f7
       card: #ffffff
       ink: #1a1426
-      muted: #655d77
+      muted: #5d5570
       line: #dcd7e6
-      ok: #17794f
+      ok: #126a44
       err: #c2261d
       tape: #ffd23f
       tape-ink: #2b2200
@@ -130,7 +130,7 @@ behavior palette-light {
       code-prop: #a9c6ff
       code-str: #ffd98a
       code-num: #e5a6ff
-      code-com: #8c82a3
+      code-com: #a79dbf
     }
   }
 }

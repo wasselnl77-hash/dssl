@@ -1,5 +1,5 @@
 /* =========================================================================
- * DSSL v0.7.0 — speed (gates + freeze), selectors, warnings, numeric keys
+ * DSSL v0.7.0 - speed (gates + freeze), selectors, warnings, numeric keys
  * Run: node scripts/test-v070.mjs
  * ========================================================================= */
 
@@ -22,7 +22,7 @@ const compile = (src, file = 'test.dssl') => {
   return { ...doc, errors: [...errors, ...doc.errors] };
 };
 
-console.log('1 — numeric token keys');
+console.log('1 - numeric token keys');
 {
   const doc = compile('tokens { space { 9: 96 } }\n.a { padding: space.9 }');
   ok(doc.errors.length === 0, 'numeric token key compiles clean: ' + JSON.stringify(doc.errors));
@@ -44,7 +44,7 @@ console.log('1 — numeric token keys');
   ok(dec.errors.length === 0 && dec.tokens['space.12'] === '160', 'multi-digit keys work');
 }
 
-console.log('2 — display ordering linter');
+console.log('2 - display ordering linter');
 {
   const w = (src) => compile(src).warnings || [];
   const nav = w('.nav-links { display: none; column: gap space.2 }');
@@ -53,19 +53,19 @@ console.log('2 — display ordering linter');
   ok(nav[0] && nav[0].message.includes('display: none'), 'warning names the dead line');
   ok(nav[0] && nav[0].line === 1, 'warning points at the shorthand line');
 
-  ok(w('.nav-links { column: gap 2; display: none }').length === 0, 'explicit display after the shorthand is intentional — silent');
-  ok(w('.nav-links { display: none } .nav-links.open { column: gap 2 }').length === 0, 'cross-rule overrides are the cascade — silent');
-  ok(w('.x { display: flex; row: center }').length === 0, 'shorthand that agrees with the explicit display — silent');
-  ok(w('.x { display: none; display: flex }').length === 0, 'explicit vs explicit is the documented model — silent');
+  ok(w('.nav-links { column: gap 2; display: none }').length === 0, 'explicit display after the shorthand is intentional - silent');
+  ok(w('.nav-links { display: none } .nav-links.open { column: gap 2 }').length === 0, 'cross-rule overrides are the cascade - silent');
+  ok(w('.x { display: flex; row: center }').length === 0, 'shorthand that agrees with the explicit display - silent');
+  ok(w('.x { display: none; display: flex }').length === 0, 'explicit vs explicit is the documented model - silent');
   ok(w('.menu { display: none; column: gap 2 } .other { display: block; stack: center }').length === 2, 'grid:/stack: expansions warn too');
   ok(w('.x { column: gap 2; display: none }').length === 0, 'reverse order never warns (state-toggle pattern)');
 
   // warning does not block compilation and does not leak into errors
   const doc = compile('.a { display: none; column: gap 2 }');
-  ok(doc.errors.length === 0, 'warnings are not errors — ok stays ok');
+  ok(doc.errors.length === 0, 'warnings are not errors - ok stays ok');
 }
 
-console.log('3 — structural selectors compile and ride native matching');
+console.log('3 - structural selectors compile and ride native matching');
 {
   const doc = compile(`
 .card:nth-child(2) { color: red }
@@ -86,12 +86,12 @@ console.log('3 — structural selectors compile and ride native matching');
   ok(sels.includes('.list .item:nth-child(odd)'), 'nested + nth-child combines');
 }
 
-console.log('4 — gateFor: the cheap necessary conditions');
+console.log('4 - gateFor: the cheap necessary conditions');
 {
   const g = (sel) => gateFor(sel);
   ok(g('.a') !== null && g('.a')[0].classes.includes('a'), 'single class gate');
   ok(g('.a.b:hover')[0].classes.join(',') === 'a,b', 'multi-class compound keeps both');
-  ok(g('div span')[0].tag === 'SPAN', 'rightmost compound is the gate — tag only');
+  ok(g('div span')[0].tag === 'SPAN', 'rightmost compound is the gate - tag only');
   ok(g('div > .item')[0].classes.includes('item') && g('div > .item')[0].tag === null, 'child combinator gates the right side');
   ok(g('#hero.x')[0].id === 'hero' && g('#hero.x')[0].classes.includes('x'), 'id + class');
   ok(g('li:nth-child(2)')[0].tag === 'LI', 'nth-child: parens stripped, tag kept');
@@ -116,10 +116,10 @@ console.log('4 — gateFor: the cheap necessary conditions');
   ok(g('section .card.x') !== null && g('section .card.x')[0].classes.join(',') === 'card,x', 'deep descendant gates the leaf');
 }
 
-console.log('5 — freeze/unfreeze/explain exist as API surface');
+console.log('5 - freeze/unfreeze/explain exist as API surface');
 {
   const eng = await import('../public/dssl/index.js').catch(() => null);
-  // index.js touches window at import — in node it skips the boot branch but
+  // index.js touches window at import - in node it skips the boot branch but
   // the exports still exist. If the import failed entirely, report it.
   ok(eng !== null, 'index.js imports cleanly in node (no syntax errors)');
   if (eng) {
@@ -135,7 +135,7 @@ console.log('5 — freeze/unfreeze/explain exist as API surface');
   ok(Array.isArray(r.warnings), 'resolve() returns a warnings array');
 }
 
-console.log('6 — the six site stylesheets still compile (registry chained)');
+console.log('6 - the six site stylesheets still compile (registry chained)');
 {
   const files = ['tokens.dssl', 'site.dssl', 'home.dssl', 'docs.dssl', 'playground.dssl', 'changelog.dssl'];
   const { readFileSync } = await import('node:fs');

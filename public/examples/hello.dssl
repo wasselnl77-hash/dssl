@@ -1,4 +1,4 @@
-// hello.dssl — a tiny starter stylesheet
+// hello.dssl - a tiny starter stylesheet
 // bare numbers are px, hover is a nested state, /14 at the end of a color is alpha
 
 body {

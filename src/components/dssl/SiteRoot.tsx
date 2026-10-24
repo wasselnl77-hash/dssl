@@ -37,34 +37,6 @@ const NAV: { name: ViewName; label: string }[] = [
   { name: "bench", label: "Bench" },
 ];
 
-declare global {
-  interface Window {
-    DSSL?: {
-      load: (urls: string[], opts?: { reset?: boolean }) => Promise<unknown>;
-      apply: (src: string, opts?: { name?: string; scope?: string; replace?: boolean }) => DsslApplyResult;
-      compile?: (src: string) => DsslApplyResult;
-      signal: (n: string, v: string | null) => void;
-      getSignal?: (n: string) => string | undefined;
-      replay: (sel?: string) => void;
-      refresh: () => void;
-      version: string;
-    };
-  }
-}
-
-export interface DsslError {
-  file?: string;
-  line?: number;
-  message: string;
-  hint?: string;
-}
-
-export interface DsslApplyResult {
-  ok: boolean;
-  errors: DsslError[];
-  stats: { rules: number; shadowRules: number; motions: number; tokens: number; mediaQueries: number };
-}
-
 export default function SiteRoot({ view, info }: { view: ViewName; info: EngineInfo }) {
   const router = useRouter();
 

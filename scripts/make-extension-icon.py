@@ -32,6 +32,7 @@ d.text((x, y), glyph, font=font, fill=PARCHMENT)
 # brass baseline accent under the glyph
 d.rounded_rectangle([36, SIZE - 26, SIZE - 36, SIZE - 20], radius=3, fill=BRASS)
 
-out = "/home/z/my-project/dssl-vscode/icon.png"
+import os
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dssl-vscode", "icon.png")
 img.save(out, "PNG")
 print("wrote", out, img.size)

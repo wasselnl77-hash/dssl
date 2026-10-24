@@ -7,9 +7,8 @@ STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
 mkdir -p "$STAGE/dssl-engine/dssl" "$STAGE/dssl-engine/styles" "$STAGE/dssl-engine/examples" "$STAGE/dssl-engine/cli"
-cp "$ROOT"/public/dssl/boot.js "$ROOT"/public/dssl/index.js "$ROOT"/public/dssl/engine.js \
-   "$ROOT"/public/dssl/parser.js "$ROOT"/public/dssl/resolver.js "$ROOT"/public/dssl/static.js "$ROOT"/public/dssl/utils.js \
-   "$STAGE/dssl-engine/dssl/"
+# every engine module, by glob: a new file under public/dssl/ can never be left out of the package
+cp "$ROOT"/public/dssl/*.js "$STAGE/dssl-engine/dssl/"
 cp "$ROOT/cli/dssl.mjs" "$STAGE/dssl-engine/cli/"
 cp "$ROOT/public/styles/tokens.dssl" "$STAGE/dssl-engine/styles/"
 cp "$ROOT/engine-package/USAGE.md" "$ROOT/engine-package/install.sh" "$STAGE/dssl-engine/"

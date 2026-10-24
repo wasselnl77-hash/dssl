@@ -1,4 +1,4 @@
-/* v0.5.0 regression tests — the review complaints, verbatim scenarios:
+/* v0.5.0 regression tests - the review complaints, verbatim scenarios:
  *  1. ".card::before { } compiles ok: true and then matches nothing" → now a real shadow rule
  *  2. animate has no infinite → infinite + alternate accepted, WAAPI spec carries them
  *  3. quoted-only font names in tokens → bare names pass in font-family + font.* tokens
@@ -11,7 +11,7 @@ import { resolve } from '../public/dssl/resolver.js';
 let pass = 0, fail = 0;
 const check = (name, cond, extra = '') => {
   if (cond) { pass++; console.log(`  ok  ${name}`); }
-  else { fail++; console.log(`FAIL  ${name}${extra ? '  — ' + extra : ''}`); }
+  else { fail++; console.log(`FAIL  ${name}${extra ? '  - ' + extra : ''}`); }
 };
 
 function compile(src) {
@@ -194,7 +194,7 @@ console.log(`\n${pass} passed, ${fail} failed`);
 
 console.log(`${pass} passed, ${fail} failed`);
 
-// 12. overlap policy — the "nothing below 100% opacity overlaps" feature
+// 12. overlap policy - the "nothing below 100% opacity overlaps" feature
 {
   const { doc, errors } = compile(`
     body { overlap: auto }
@@ -216,13 +216,13 @@ console.log(`${pass} passed, ${fail} failed`);
   const dead = compile('.card { overlap: nevr }');
   check('12 nothing emitted on error', dead.doc.rules.length === 0);
 
-  // site.dssl now carries the global switch — regression-guard it
+  // site.dssl now carries the global switch - regression-guard it
   const fs = await import('node:fs');
   const site = fs.readFileSync(new URL('../public/styles/site.dssl', import.meta.url).pathname, 'utf8');
   check('12 site.dssl body opts in', /overlap:\s*auto/.test(site));
 }
 
-// 13. the escape math (overlapNudge) — pure function, no DOM needed
+// 13. the escape math (overlapNudge) - pure function, no DOM needed
 {
   const { overlapNudge } = await import('../public/dssl/engine.js');
   const box = (l, t, r, b) => ({ left: l, top: t, right: r, bottom: b });

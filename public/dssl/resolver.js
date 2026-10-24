@@ -1,5 +1,5 @@
 /* =========================================================================
- * DSSL — resolver.js
+ * DSSL - resolver.js
  * Walks the parsed tree and produces flat, engine-ready rules:
  *
  *   rule = {
@@ -7,7 +7,7 @@
  *     media: [query],                // all must match
  *     signals: [{name, op, value}],  // JS-driven conditions
  *     containers: [query],           // container-query conditions
- *     layer, order,                  // cascade: (layer, order) — no specificity
+ *     layer, order,                  // cascade: (layer, order) - no specificity
  *     decls: [{prop, value} | special],
  *     file, line
  *   }
@@ -18,7 +18,13 @@
  * ========================================================================= */
 
 import { levenshtein, didYouMean, composeDeform } from './utils.js';
-// v0.5.0 — the resolver validates the `::name` half of full selectors so a
+// 0.9.0: the three new styling families. Each is a pure module, so the compiler
+// can validate their words (with did-you-mean) without a DOM.
+import { parseTexture } from './texture.js';
+import { parseAura } from './aura.js';
+import { parseSlider, sliderCss } from './slider.js';
+import { lintRules } from './lint.js';
+// v0.5.0 - the resolver validates the `::name` half of full selectors so a
 // typo like .card::befor is a LOUD error, never a silently dead rule.
 import { PSEUDO_ELEMENTS, VENDOR_PSEUDO, STATE_WORDS } from './parser.js';
 
@@ -45,7 +51,7 @@ export const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,
   'serif,sans-serif,monospace,cursive,fantasy,system-ui,ui-sans-serif,ui-monospace,ui-serif,ui-rounded,' +
   'system-ui,-apple-system,Roboto,Helvetica,Arial,Menlo,Consolas,SFMono-Regular,Liberation-Mono,Inter,Noto-Sans,Ubuntu,Cantarell,Oxygen,Fira-Sans,Droid-Sans,' +
   'border-box,content-box,padding-box,fill-box,stroke-box,view-box,' +
-  // v0.8.0 — the background repeat/attachment words the url() fix exposed:
+  // v0.8.0 - the background repeat/attachment words the url() fix exposed:
   // `background: url(a.png) no-repeat` was a false error because "no-repeat"
   // was missing while "repeat" existed
   'no-repeat,repeat-x,repeat-y,space,round,scroll,local,' +
@@ -63,12 +69,12 @@ export const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,
   'isolate,plaintext,sideways,upright,mixed,ltr,rtl,transform,auto,' +
   '-webkit-box,-webkit-inline-box,' +
   'thin,thick,medium,separate,collapse,vertical,horizontal,balance,pretty,orphans,' +
-  // v0.5.0 — hyphens: manual used to be rejected ("unknown value") even though
+  // v0.5.0 - hyphens: manual used to be rejected ("unknown value") even though
   // the property existed; plus the rendering keywords people actually type.
   'manual,pixelated,crisp-edges,optimizeSpeed,optimizeLegibility,geometricPrecision,' +
   'flex-start,flex-end,self-start,self-end,snap-block,snap-inline').split(','));
 
-const UNITLESS_PROPS = new Set([
+export const UNITLESS_PROPS = new Set([
   'opacity', 'line-height', 'z-index', 'font-weight', 'flex-grow', 'flex-shrink',
   'flex', 'order', 'scale', 'widows', 'orphans', 'column-count', 'aspect-ratio',
   'animation-iteration-count', 'flood-opacity', 'fill-opacity', 'stop-opacity',
@@ -77,20 +83,20 @@ const UNITLESS_PROPS = new Set([
   'grid-row', 'grid-column', 'grid-area',
 ]);
 
-// v0.7.2 — time properties: a bare number is milliseconds, never px, and
+// v0.7.2 - time properties: a bare number is milliseconds, never px, and
 // never unitless (both used to emit values the browser silently rejected).
 // transition-delay/animation-delay used to sit in UNITLESS_PROPS, which is
 // why `transition-delay: 200` shipped as invalid unitless 200.
 const TIME_PROPS = new Set([
   'transition-delay', 'transition-duration', 'animation-delay', 'animation-duration',
-  // v0.8.0 — the animation shorthand takes bare numbers as ms too:
+  // v0.8.0 - the animation shorthand takes bare numbers as ms too:
   // `animation: spin 1s infinite` is fine, but `animation: ghost 400` used
   // to become "ghost 400px" (invalid). 400 → 400ms, matching animate:.
   'animation',
 ]);
 
 // A practical whitelist of standard CSS properties (loud errors beat silent ones)
-const KNOWN_PROPS = new Set(('all,appearance,accent-color,align-content,align-items,align-self,align-tracks,aspect-ratio,' +
+export const KNOWN_PROPS = new Set(('all,appearance,accent-color,align-content,align-items,align-self,align-tracks,aspect-ratio,' +
   'backdrop-filter,backface-visibility,background,background-attachment,background-blend-mode,background-clip,background-color,background-image,background-origin,background-position,background-repeat,background-size,' +
   'block-size,border,border-block,border-block-color,border-block-end,border-block-end-color,border-block-end-style,border-block-end-width,border-block-start,border-block-start-color,border-block-start-style,border-block-start-width,border-block-style,border-block-width,' +
   'border-bottom,border-bottom-color,border-bottom-left-radius,border-bottom-right-radius,border-bottom-style,border-bottom-width,' +
@@ -129,7 +135,7 @@ export const DEFAULT_TOKENS = {
   'font.mono': 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
 };
 
-const EASINGS = {
+export const EASINGS = {
   snap: 'cubic-bezier(0.2, 0.9, 0.3, 1)',
   smooth: 'cubic-bezier(0.4, 0, 0.2, 1)',
   bounce: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
@@ -153,7 +159,7 @@ const PLACE_WORDS = {
 
 const IDENT_RE = /^-?(?:[A-Za-z_]|--[A-Za-z_])[A-Za-z0-9_.\\-]*/;
 
-// functions whose numeric arguments are NOT lengths — numbers stay bare
+// functions whose numeric arguments are NOT lengths - numbers stay bare
 const UNITLESS_FN = new Set(('oklch,oklab,lab,lch,hsl,hsla,rgb,rgba,hwb,color,color-mix,light-dark,' +
   'brightness,saturate,contrast,grayscale,sepia,invert,opacity,' +
   'scale,scalex,scaley,scalez,scale3d,steps,cubic-bezier,linear,radial,conic').split(','));
@@ -166,6 +172,19 @@ const LENGTH_FN = new Set('calc,min,max,clamp,round,mod,rem,abs,sign,hypot,pow,s
  *   - token references become var(--dssl-…), `token/NN` becomes color-mix
  *   - unknown identifiers are errors (with did-you-mean)
  */
+/** split a selector list at top-level commas (not inside :is(...) and friends) */
+function splitTopLevel(sel) {
+  const out = []; let depth = 0, cur = '';
+  for (const ch of String(sel)) {
+    if (ch === '(' || ch === '[') depth++;
+    if (ch === ')' || ch === ']') depth--;
+    if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+
 function resolveValue(raw, ctx) {
   let out = '';
   let i = 0;
@@ -210,7 +229,7 @@ function resolveValue(raw, ctx) {
 
       if (ident.startsWith('--')) { out += ident; continue; } // custom property
 
-      // function call — resolve the inside
+      // function call - resolve the inside
       if (raw[i] === '(') {
         let depth = 1, j = i + 1;
         while (j < n && depth > 0) {
@@ -224,7 +243,7 @@ function resolveValue(raw, ctx) {
         }
         const inner = raw.slice(i + 1, j - 1);
         const fname = ident.toLowerCase();
-        // v0.8.0 — url() is atomic. The validator used to tokenize INSIDE it,
+        // v0.8.0 - url() is atomic. The validator used to tokenize INSIDE it,
         // so `url(a.png)` raised "unknown value a.png" (quoted urls worked
         // only because strings were already consumed whole). CSS allows the
         // unquoted form; DSSL passes it through untouched now.
@@ -233,7 +252,7 @@ function resolveValue(raw, ctx) {
           i = j;
           continue;
         }
-        // v0.3.2 fix: repeat(COUNT, tracks) — the leading count is an integer,
+        // v0.3.2 fix: repeat(COUNT, tracks) - the leading count is an integer,
         // never a length. `repeat(4, 1fr)` used to become `repeat(4px, 1fr)`,
         // which the browser rejected and the whole grid silently collapsed.
         if (fname === 'repeat') {
@@ -243,7 +262,7 @@ function resolveValue(raw, ctx) {
             i = j;
             continue;
           }
-          // auto-fill / auto-fit / nested weirdness — fall through to generic
+          // auto-fill / auto-fit / nested weirdness - fall through to generic
         }
         // color-ish functions keep bare numbers bare; calc-family gets px
         const innerUnitless = UNITLESS_FN.has(fname) ? true : LENGTH_FN.has(fname) ? false : ctx.unitless;
@@ -274,7 +293,7 @@ function resolveValue(raw, ctx) {
         continue;
       }
 
-      // v0.5.0 — font names are proper nouns: JetBrains Mono, IBM Plex Serif.
+      // v0.5.0 - font names are proper nouns: JetBrains Mono, IBM Plex Serif.
       // In font-family values and font.* tokens, bare multi-word names pass
       // through instead of demanding quotes. Everywhere else stays loud.
       if (ctx.bareIdents && /^[A-Za-z][A-Za-z0-9_-]*$/.test(ident)) {
@@ -295,8 +314,8 @@ function resolveValue(raw, ctx) {
       const hex = raw.slice(i, j);
       out += hex;
       i = j;
-      // v0.7.2 — alpha on a raw hex color: #ff0000/50 used to become
-      // #ff0000/50px (the bare number got the generic px treatment) — invalid
+      // v0.7.2 - alpha on a raw hex color: #ff0000/50 used to become
+      // #ff0000/50px (the bare number got the generic px treatment) - invalid
       // CSS, silently dropped by the browser. Tokens always had /NN via
       // color-mix; raw hex now gets the same treatment.
       const am = raw.slice(i).match(/^\s*\/\s*([0-9.]+)\s*%?/);
@@ -312,7 +331,7 @@ function resolveValue(raw, ctx) {
   return out;
 }
 
-/** paren-aware split on the `->` arrow — gradient stops use it as a separator */
+/** paren-aware split on the `->` arrow - gradient stops use it as a separator */
 function splitArrow(s) {
   const out = [];
   let cur = '', depth = 0, q = null;
@@ -329,7 +348,7 @@ function splitArrow(s) {
   return out;
 }
 
-/** split on a top-level separator (parens-aware) — commas inside fn() survive */
+/** split on a top-level separator (parens-aware) - commas inside fn() survive */
 function topSplit(str, sep) {
   const out = [];
   let cur = '', depth = 0;
@@ -345,12 +364,12 @@ function topSplit(str, sep) {
 
 function findToken(tokens, ident) {
   if (tokens.has(ident)) return ident;
-  // try progressive dot paths (a.b.c defined, user typed a.b.c — exact only, plus flat fallback)
+  // try progressive dot paths (a.b.c defined, user typed a.b.c - exact only, plus flat fallback)
   if (ident.includes('.')) {
     const parts = ident.split('.');
     for (let k = parts.length - 1; k > 0; k--) {
       const key = parts.slice(0, k).join('.');
-      if (tokens.has(key)) return key; // hmm — partial match would change meaning; require exact
+      if (tokens.has(key)) return key; // hmm - partial match would change meaning; require exact
     }
   }
   return null;
@@ -363,7 +382,7 @@ function findToken(tokens, ident) {
 const len = (raw, ctx) => resolveValue(raw, { ...ctx, unitless: false });
 const num = (raw, ctx) => resolveValue(raw, { ...ctx, unitless: true });
 
-// v0.6.0 — the deform family speaks degrees, not lengths: bare numbers are
+// v0.6.0 - the deform family speaks degrees, not lengths: bare numbers are
 // angles and `20deg` is accepted for people with CSS muscle memory.
 const degNum = (raw, what, ctx) => {
   const t = String(raw).trim();
@@ -372,16 +391,16 @@ const degNum = (raw, what, ctx) => {
     ctx.errors.push({
       file: ctx.file, line: ctx.line,
       message: `${what} takes a bare number of degrees`,
-      hint: `try  ${what}: 20  or  ${what}: -12  — bare numbers are degrees here`,
+      hint: `try  ${what}: 20  or  ${what}: -12  - bare numbers are degrees here`,
     });
     return null;
   }
   return parseFloat(m[1]);
 };
 
-/** v0.6.0 — shared grammar for gradient / gradient-text: kind · prefix · stops.
+/** v0.6.0 - shared grammar for gradient / gradient-text: kind · prefix · stops.
  *  Stops may be arrow-joined (`a -> b -> c`) or comma-joined (`linear 135, a, b`);
- *  the prefix is whatever the grammar calls direction/shape — everything else is a stop. */
+ *  the prefix is whatever the grammar calls direction/shape - everything else is a stop. */
 // Stops are colors by construction, so a bare word that is not a color name is
 // a typo the browser would only mutter about at apply time. Say it NOW instead.
 const COLOR_WORDS = new Set(('black,silver,gray,white,maroon,red,purple,fuchsia,green,lime,olive,yellow,navy,blue,teal,aqua,' +
@@ -431,7 +450,7 @@ function buildGradient(v, ctx) {
     ctx.errors.push({
       file: ctx.file, line: ctx.line,
       message: `gradient needs at least two stops`,
-      hint: 'try  gradient: linear 135, #ff0055 -> #00d4ff  — commas work too: linear 135, #ff0055, #00d4ff',
+      hint: 'try  gradient: linear 135, #ff0055 -> #00d4ff  - commas work too: linear 135, #ff0055, #00d4ff',
     });
     return null;
   }
@@ -472,7 +491,7 @@ function buildGradient(v, ctx) {
         ctx.errors.push({
           file: ctx.file, line: ctx.line,
           message: `"${head}" is not a conic gradient prefix`,
-          hint: 'use  from <angle>  and/or  at <position> — try conic from 45 at center, …',
+          hint: 'use  from <angle>  and/or  at <position> - try conic from 45 at center, …',
         });
         return null;
       }
@@ -504,9 +523,9 @@ function buildGradient(v, ctx) {
 
 function parseFlexWords(value, ctx, dir) {
   const out = [{ prop: 'display', value: 'flex' }, { prop: 'flex-direction', value: dir }];
-  // v0.8.0 — axis roles. Every place word used to write BOTH axes, so
+  // v0.8.0 - axis roles. Every place word used to write BOTH axes, so
   // `row: gap 8 between center` (the guide's own example) compiled to
-  // justify-content: space-between followed by justify-content: center —
+  // justify-content: space-between followed by justify-content: center -
   // and center won, bunching everything in the middle. Words now declare
   // the axis they are actually about: distribution words (between/around/
   // evenly) own the main axis, stretch/baseline own the cross axis, and
@@ -537,8 +556,8 @@ function parseFlexWords(value, ctx, dir) {
       const axisWarn = (prop, prev) => {
         ctx.warnings = ctx.warnings || [];
         ctx.warnings.push(prev === a
-          ? { file: ctx.file, line: ctx.line, message: `"${a}" is written twice in ${dir} — the second copy wins`, hint: `drop the duplicate; one distribution word + one alignment word is the whole grammar` }
-          : { file: ctx.file, line: ctx.line, message: `two words in ${dir} write ${prop}: "${a}" overrides "${prev}"`, hint: `later words win — drop one, or reorder so the distribution word comes first` });
+          ? { file: ctx.file, line: ctx.line, message: `"${a}" is written twice in ${dir} - the second copy wins`, hint: `drop the duplicate; one distribution word + one alignment word is the whole grammar` }
+          : { file: ctx.file, line: ctx.line, message: `two words in ${dir} write ${prop}: "${a}" overrides "${prev}"`, hint: `later words win - drop one, or reorder so the distribution word comes first` });
       };
       let wrote = false;
       if (role === 'main' || (role === 'both' && !mainSet)) {
@@ -556,9 +575,9 @@ function parseFlexWords(value, ctx, dir) {
         ctx.warnings.push({
           file: ctx.file, line: ctx.line,
           message: mainSet === a || crossSet === a
-            ? `"${a}" is written twice in ${dir} — both axes already came from it`
+            ? `"${a}" is written twice in ${dir} - both axes already came from it`
             : `"${a}" has nowhere to go: justify-content came from "${mainSet}", align-items came from "${crossSet}"`,
-          hint: 'one distribution word + one alignment word is the whole grammar — the extra word is dropped',
+          hint: 'one distribution word + one alignment word is the whole grammar - the extra word is dropped',
         });
       }
       continue;
@@ -568,7 +587,7 @@ function parseFlexWords(value, ctx, dir) {
   return out;
 }
 
-// v0.6.0 — deform members all land in the transform channel, so asking for
+// v0.6.0 - deform members all land in the transform channel, so asking for
 // `transition: 200 snap bend` should just work and mean transform.
 const DEFORM_TO_TRANSFORM = {
   bend: 'transform', 'bend-y': 'transform', 'bend-up': 'transform',
@@ -586,7 +605,7 @@ const SEMANTIC = {
   column: (v, ctx) => parseFlexWords(v, ctx, 'column'),
   grid(v, ctx) {
     const atoms = v.split(/\s+/).filter(Boolean);
-    // v0.7.2 — `grid: 3 gap 12` (the documented form) used to die: the gap
+    // v0.7.2 - `grid: 3 gap 12` (the documented form) used to die: the gap
     // atoms were fed into grid-template-columns → "3px gap 12px", invalid.
     // gap and rows are now first-class words of the shorthand.
     let gap = null, rows = null;
@@ -598,7 +617,7 @@ const SEMANTIC = {
     }
     let cols;
     if (!rest.length) {
-      ctx.errors.push({ file: ctx.file, line: ctx.line, message: 'grid needs columns', hint: 'grid: 3 · grid: auto-fill 200 · grid: 200px 1fr — optionally with gap N and rows N' });
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: 'grid needs columns', hint: 'grid: 3 · grid: auto-fill 200 · grid: 200px 1fr - optionally with gap N and rows N' });
       cols = 'none';
     } else if (rest.length === 1 && /^[0-9]+$/.test(rest[0])) {
       cols = `repeat(${rest[0]}, 1fr)`;
@@ -629,7 +648,7 @@ const SEMANTIC = {
     }
     return [{ prop: 'place-items', value: `${p[0]} ${p[1]}` }, { prop: 'place-content', value: `${p[0]} ${p[1]}` }];
   },
-  // v0.3.4 — the one-word centering primitive, because "how do I center this
+  // v0.3.4 - the one-word centering primitive, because "how do I center this
   // thing" is the first question everyone asks. Emits the alignment pair only;
   // the ENGINE guarantees a formatting context for alignment declarations
   // (inline elements → inline-grid, blocks → grid), so `center:` can never
@@ -716,7 +735,7 @@ const SEMANTIC = {
       { prop: 'white-space', value: 'nowrap' },
     ];
   },
-  // v0.4.0 — the accessibility classic: visually hidden, still announced by
+  // v0.4.0 - the accessibility classic: visually hidden, still announced by
   // screen readers. One word instead of nine lines of clip folklore.
   'visually-hidden'() {
     return [
@@ -731,7 +750,7 @@ const SEMANTIC = {
       { prop: 'border', value: '0' },
     ];
   },
-  // v0.4.0 — transition grew per-property specs. Each comma part is
+  // v0.4.0 - transition grew per-property specs. Each comma part is
   //   duration [easing] [property]     (property omitted → all)
   // The one-value form keeps working exactly as before:
   //   transition: 200 snap
@@ -745,7 +764,7 @@ const SEMANTIC = {
       const atoms = part.split(/\s+/);
       const dur = atoms[0];
       if (!/^\d*\.?\d+(ms|s)?$/.test(dur)) {
-        // v0.8.0 — the CSS habit is property-first (`transition: color .2s
+        // v0.8.0 - the CSS habit is property-first (`transition: color .2s
         // ease`). That used to be a generic "not a time" error and the part
         // silently dropped. The error now REWRITES the value into the DSSL
         // order (time · easing · property) so the fix is a copy-paste.
@@ -757,11 +776,11 @@ const SEMANTIC = {
           ctx.errors.push({
             file: ctx.file, line: ctx.line,
             message: `transition: the CSS form (property first) is not DSSL`,
-            hint: `write  transition: ${msOut}${easeAtom ? ' ' + easeAtom : ''}${propAtom ? ' ' + propAtom : ''}  — time first, easing, property last`,
+            hint: `write  transition: ${msOut}${easeAtom ? ' ' + easeAtom : ''}${propAtom ? ' ' + propAtom : ''}  - time first, easing, property last`,
           });
           continue;
         }
-        ctx.errors.push({ file: ctx.file, line: ctx.line, message: `transition duration "${dur}" is not a time`, hint: 'order is duration · easing · property — try 200 or 0.2s' });
+        ctx.errors.push({ file: ctx.file, line: ctx.line, message: `transition duration "${dur}" is not a time`, hint: 'order is duration · easing · property - try 200 or 0.2s' });
         continue;
       }
       const ms = /^\d+$/.test(dur) ? dur + 'ms' : dur;
@@ -801,15 +820,15 @@ const SEMANTIC = {
       }
       if (EASINGS[a]) { spec.easing = EASINGS[a]; continue; }
       if (['both', 'forwards', 'backwards', 'none', 'auto'].includes(a)) { spec.fill = a; continue; }
-      // v0.5.0 — looping: `infinite` runs forever, `alternate` ping-pongs.
-      // animate: pulse 1600 infinite alternate  — was impossible before.
+      // v0.5.0 - looping: `infinite` runs forever, `alternate` ping-pongs.
+      // animate: pulse 1600 infinite alternate  - was impossible before.
       if (a === 'infinite') { spec.iterations = Infinity; continue; }
       if (['alternate', 'alternate-reverse', 'reverse', 'normal'].includes(a)) { spec.direction = a; continue; }
       ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown animate part "${a}"`, hint: didYouMean(a, Object.keys(EASINGS).concat(['both', 'forwards', 'backwards', 'infinite', 'alternate'])) });
     }
     return [{ prop: '@animate', value: spec }];
   },
-  // v0.4.0 — choreography: a parent with `stagger: 60` offsets each element
+  // v0.4.0 - choreography: a parent with `stagger: 60` offsets each element
   // child's animation delay by its DOM position. Pairs with `seen` + `animate`
   // on the children: grids and lists cascade in as they scroll into view.
   stagger(v, ctx) {
@@ -822,7 +841,7 @@ const SEMANTIC = {
     const ms = t.endsWith('s') && !t.endsWith('ms') ? parseFloat(t) * 1000 : parseFloat(t);
     return [{ prop: '@stagger', value: ms }];
   },
-  // v0.5.0 — overlap policy. CSS can stack transparent things all day and say
+  // v0.5.0 - overlap policy. CSS can stack transparent things all day and say
   // nothing; DSSL refuses. `deny` makes the element always yield out of any
   // overlap; `auto` yields only while the element sits below 100% opacity.
   // Both inherit down the tree, so `body { overlap: auto }` is the site-wide
@@ -842,7 +861,7 @@ const SEMANTIC = {
   },
 
   /* ---------------------------------------------------------------- *
-   * v0.6.0 — the deform family: bend, bend-y, bend-up, fold, stretch,
+   * v0.6.0 - the deform family: bend, bend-y, bend-up, fold, stretch,
    * bend-around. All are engine-native (@-props) that compose into the
    * transform channel, so `transition: 200 snap transform` tweens them
    * and `:active { bend: 14 }` makes a button visibly flex under the
@@ -859,7 +878,7 @@ const SEMANTIC = {
     if (Math.abs(n) > 170) {
       ctx.errors.push({
         file: ctx.file, line: ctx.line,
-        message: `bend-around caps at ±170° — past that the arc folds back on itself`,
+        message: `bend-around caps at ±170° - past that the arc folds back on itself`,
         hint: 'try 30..120 for a visible arc',
       });
       return [];
@@ -882,7 +901,7 @@ const SEMANTIC = {
       ctx.errors.push({
         file: ctx.file, line: ctx.line,
         message: `stretch: ${m[1]} would flatten the element to nothing`,
-        hint: 'use a factor above 0 — 1.2 is a gentle pull, 2 is cartoonish',
+        hint: 'use a factor above 0 - 1.2 is a gentle pull, 2 is cartoonish',
       });
       return [];
     }
@@ -891,11 +910,11 @@ const SEMANTIC = {
     return [{ prop: '@stretch', value: { factor: f, axis } }];
   },
 
-  /* v0.6.0 — gradient tools. `gradient` replaces the CSS function soup with
+  /* v0.6.0 - gradient tools. `gradient` replaces the CSS function soup with
    * kind · prefix · stop -> stop; stops may be colors, tokens, alpha mixes
    * (ink/40) and carry a trailing % position. gradient-text clips the same
    * gradient into the glyphs. gradient-flow loops background-position so a
-   * gradient drifts forever — one line instead of keyframe folklore. */
+   * gradient drifts forever - one line instead of keyframe folklore. */
   gradient(v, ctx) {
     const img = buildGradient(v, ctx);
     return img ? [{ prop: 'background-image', value: img }] : [];
@@ -940,10 +959,10 @@ const SEMANTIC = {
   },
 };
 
-/* v0.8.0 — fluid sizing sugar. `fluid: 16, 24` keeps working (font-size),
+/* v0.8.0 - fluid sizing sugar. `fluid: 16, 24` keeps working (font-size),
  * and now any length-ish property takes it inline: `font-size: fluid 16 24`.
  * Both compile to a clamp() that scales linearly between the viewport bounds
- * (360px and 1200px by default) — the formula everyone writes by hand and
+ * (360px and 1200px by default) - the formula everyone writes by hand and
  * gets wrong. */
 const FLUID_PROPS = new Set(('font-size,width,height,inline-size,block-size,min-width,max-width,min-height,max-height,' +
   'gap,row-gap,column-gap,padding,margin,inset,top,right,bottom,left,' +
@@ -989,14 +1008,59 @@ function buildFluidParts(parts, ctx, prop = 'font-size') {
 }
 
 /* ------------------------------------------------------------------ *
- * resolveDecl — one declaration → zero or more engine decls
+ * 0.9.0: texture, aura and slider
+ *
+ * All three validate their own vocabulary in their own module. Here they only
+ * get hooks: how to report an error on this line, how to turn a colour word
+ * into CSS (tokens, alpha and all), and how to suggest a correction.
+ * ------------------------------------------------------------------ */
+
+function styleHooks(ctx) {
+  return {
+    error: (message, hint) => ctx.errors.push({ file: ctx.file, line: ctx.line, message, hint: hint || undefined }),
+    color: (word) => {
+      const before = ctx.errors.length;
+      const css = resolveValue(word, { ...ctx, unitless: false, bareIdents: false });
+      return ctx.errors.length > before ? null : css;
+    },
+    suggest: (word, list) => { const h = didYouMean(word, list); return h ? `did you mean "${h}"?` : null; },
+  };
+}
+
+SEMANTIC.texture = function texture(v, ctx) {
+  const layers = parseTexture(v, styleHooks(ctx));
+  if (layers === null) return [];
+  return [{ prop: '@texture', value: layers.length ? layers : null }];
+};
+
+function auraDecls(prop, v, ctx) {
+  const r = parseAura(prop, v, styleHooks(ctx));
+  if (!r) return [];
+  const out = [];
+  // an empty list or none clears the slot; undefined means this property does not touch it
+  if (r.glow !== undefined) out.push({ prop: '@aura-glow', value: r.glow && r.glow.length ? r.glow : null });
+  if (r.particles !== undefined) out.push({ prop: '@aura-particles', value: r.particles && r.particles.length ? r.particles : null });
+  return out;
+}
+for (const name of ['aura', 'aura-glow', 'aura-particle', 'aura-particles', 'glow-particle', 'glow-particles', 'aura-glow-particle', 'aura-glow-particles']) {
+  SEMANTIC[name] = (v, ctx) => auraDecls(name, v, ctx);
+}
+
+SEMANTIC.slider = function slider(v, ctx) {
+  const spec = parseSlider(v, styleHooks(ctx));
+  if (!spec) return [];
+  return [{ prop: '@slider', value: spec }];
+};
+
+/* ------------------------------------------------------------------ *
+ * resolveDecl - one declaration → zero or more engine decls
  * ------------------------------------------------------------------ */
 
 function resolveDecl(prop, value, ctx) {
   const errors = ctx.errors;
   const ctx2 = { ...ctx, prop, errors, warnings: ctx.warnings };
 
-  // v0.8.0 — !important does not exist in DSSL. It used to fall through as a
+  // v0.8.0 - !important does not exist in DSSL. It used to fall through as a
   // value: the compiler said "unknown value important" AND still emitted
   // `red !important`, which the browser then silently dropped as an invalid
   // inline value. Now: one loud error, nothing emitted, and the pin { }
@@ -1004,14 +1068,14 @@ function resolveDecl(prop, value, ctx) {
   if (hasImportant(value)) {
     errors.push({
       file: ctx.file, line: ctx.line,
-      message: `!important does not exist in DSSL — "${prop}: ${String(value).replace(/\s*!\s*important\s*/i, '')}" was NOT applied`,
-      hint: 'the cascade is (layer, order) and later wins — put the rule in pin { } when it genuinely must win',
+      message: `!important does not exist in DSSL - "${prop}: ${String(value).replace(/\s*!\s*important\s*/i, '')}" was NOT applied`,
+      hint: 'the cascade is (layer, order) and later wins - put the rule in pin { } when it genuinely must win',
     });
     return [];
   }
 
   if (prop.startsWith('--')) {
-    // v0.4.0 — scoped tokens. Dotted names are token re-declarations:
+    // v0.4.0 - scoped tokens. Dotted names are token re-declarations:
     //   .danger { --color.accent: color.err }
     // sets --dssl-color-accent ON the element, and custom properties inherit,
     // so every var() reference in the subtree re-resolves. Plain names
@@ -1025,7 +1089,7 @@ function resolveDecl(prop, value, ctx) {
   const sem = SEMANTIC[prop];
   if (sem) return sem(value, ctx2);
 
-  // v0.8.0 — the animation shorthand passes through (it is legal CSS), but
+  // v0.8.0 - the animation shorthand passes through (it is legal CSS), but
   // bare motion names must not pay the generic unknown-value tax: "spin"
   // used to error with the surreal suggestion "did you mean span?". Motion
   // names pass silently here and a dedicated warning in the final loop says
@@ -1034,7 +1098,7 @@ function resolveDecl(prop, value, ctx) {
     return [{ prop, value: resolveValue(value, { ...ctx2, unitless: UNITLESS_PROPS.has(prop), bareIdents: true }) }];
   }
 
-  // v0.8.0 — inline fluid sugar on any length-ish property:
+  // v0.8.0 - inline fluid sugar on any length-ish property:
   // font-size: fluid 16 24  →  clamp(16px, calc(16px + 0.952vw), 24px)
   const fluidM = /^fluid\s+([\s\S]+)$/.exec(String(value).trim());
   if (fluidM && FLUID_PROPS.has(prop)) {
@@ -1052,7 +1116,7 @@ function resolveDecl(prop, value, ctx) {
   return [{ prop, value: resolveValue(value, { ...ctx2, unitless: UNITLESS_PROPS.has(prop), bareIdents: prop === 'font-family' }) }];
 }
 
-/** string-aware !important scan — quoted content: "!important" must not trip it */
+/** string-aware !important scan - quoted content: "!important" must not trip it */
 function hasImportant(v) {
   const s = String(v);
   let q = null;
@@ -1115,11 +1179,11 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   const errors = [];
   const rules = [];
   const shadowRules = [];
-  const raws = []; // v0.8.0 — raw { } / @css { } verbatim passthrough blocks
+  const raws = []; // v0.8.0 - raw { } / @css { } verbatim passthrough blocks
   const motions = {};
   const behaviors = {};
-  // v0.7.0 — compile-time warnings: things that compile and run but are
-  // probably not what the author meant. Separate from errors — ok stays ok —
+  // v0.7.0 - compile-time warnings: things that compile and run but are
+  // probably not what the author meant. Separate from errors - ok stays ok -
   // but the engine prints them loudly so nobody debugs cascade order by hand
   // ever again.
   const warnings = [];
@@ -1155,7 +1219,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       } else if (node.kind === 'motion') {
         motions[node.name] = node;
       } else {
-        // v0.8.0 — defensive `|| []`: a malformed tree can throw from here
+        // v0.8.0 - defensive `|| []`: a malformed tree can throw from here
         // and take the whole stylesheet down (the @font-face crash report).
         // The parser now skips unknown at-rules whole, but the guard stays.
         for (const child of (node.children || [])) if (child.kind !== 'decl') prepass([child]);
@@ -1194,7 +1258,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           continue;
         }
         const props = {};
-        const deform = {};   // v0.6.0 — bend/stretch/fold in keyframes compose into transform
+        const deform = {};   // v0.6.0 - bend/stretch/fold in keyframes compose into transform
         const DEFORM_KEY = { '@bend': 'bend', '@bend-y': 'bendY', '@fold': 'fold', '@bend-up': 'bendUp' };
         for (const d of child.children) {
           if (d.kind !== 'decl') continue;
@@ -1216,7 +1280,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
             deform.fold !== undefined || deform.bendUp !== undefined) {
           // no box exists at resolve time, so edge-pinned members ride a
           // transformOrigin keyframe property instead of baked translates.
-          // Presence (not truthiness) — `bend: 0` in a frame is a real reset.
+          // Presence (not truthiness) - `bend: 0` in a frame is a real reset.
           const c = composeDeform(deform, props.transform || '', null);
           props.transform = c.transform;
           if (c.origin) props.transformOrigin = c.origin;
@@ -1238,7 +1302,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
     for (const key of keys) {
       const raw = tokenMap.get(key);
       const prop = '--dssl-' + key.replace(/\./g, '-');
-      // font.* tokens hold font stacks — proper nouns, not keywords (v0.5.0)
+      // font.* tokens hold font stacks - proper nouns, not keywords (v0.5.0)
       decls.push({ prop, value: resolveValue(raw, { ...ctxBase, prop: key, bareIdents: /^font/.test(key) }) });
     }
     if (!decls.length) return null;
@@ -1257,11 +1321,11 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   /* ---- main recursive walk ---- */
 
   const walk = (children, ctx, ctxRule) => {
-    // v0.7.2 — parent-first flush. Two real bugs lived here. (1) A nested
+    // v0.7.2 - parent-first flush. Two real bugs lived here. (1) A nested
     // block (hover { }, @media, a nested selector) was emitted BEFORE the
     // parent's own declarations got their cascade order, so `background: red`
     // on the parent always beat `hover { background: red }` nested inside it
-    // — the exact pattern the docs taught, and the external review's headline
+    // - the exact pattern the docs taught, and the external review's headline
     // finding. (2) media/container/signal/layer blocks flushed with the
     // PARENT context, dropping the condition or layer entirely: a nested
     // `@media dark` was silently unconditional AND sorted before base.
@@ -1291,7 +1355,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           }
           const resolved = resolveDecl(node.prop, node.value, { file, line: node.line, errors, warnings, tokens: tokenMap, tokenNames: tokenNames(), prop: node.prop, unitless: false });
           for (const r of resolved) {
-            // v0.7.0 — remember WHICH source property wrote a display value,
+            // v0.7.0 - remember WHICH source property wrote a display value,
             // so the ordering linter can tell an explicit "display:" from a
             // shorthand that expanded into one (column: → display: flex).
             if (r.prop === 'display' && node.prop !== 'display') r.via = node.prop;
@@ -1302,7 +1366,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
         case 'selector': {
           if (/^[a-zA-Z][a-zA-Z0-9-]*$/.test(node.sel) && ctx.sel) {
             const near = didYouMean(node.sel.toLowerCase(), [...STATE_WORDS]);
-            if (near) warnings.push({ file, line: node.line, message: `"${node.sel}" compiled as a descendant selector ("${combine(ctx.sel, node.sel)}")`, hint: `if you meant the state, it is spelled "${near}" — this block currently styles descendants called <${node.sel}>` });
+            if (near) warnings.push({ file, line: node.line, message: `"${node.sel}" compiled as a descendant selector ("${combine(ctx.sel, node.sel)}")`, hint: `if you meant the state, it is spelled "${near}" - this block currently styles descendants called <${node.sel}>` });
           }
           flushPending(node.line);
           const sel = ctx.sel === '' ? node.sel : combine(ctx.sel, node.sel);
@@ -1319,14 +1383,14 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           }
           flushPending(node.line);
           const childCtx = { ...ctx, sel: ctx.sel + ':' + node.name };
-          // v0.7.2 — the arrow is motion/gradient-stop syntax; inside a seen
+          // v0.7.2 - the arrow is motion/gradient-stop syntax; inside a seen
           // block it compiled into an inline style the browser rejects, so the
           // element just sat at its base style forever. Say so, loudly, and
           // point at the two real patterns (final value, or a motion).
           if (node.name === 'seen') {
             for (const d of node.children) {
               if (d.kind === 'decl' && typeof d.value === 'string' && d.value.includes('->')) {
-                errors.push({ file, line: d.line, message: `"${d.prop}: ${d.value}" — the -> arrow is motion syntax and does nothing inside seen { }`, hint: 'write the final style (seen { opacity: 1 }) or attach a motion (seen { animate: rise-in 400 })' });
+                errors.push({ file, line: d.line, message: `"${d.prop}: ${d.value}" - the -> arrow is motion syntax and does nothing inside seen { }`, hint: 'write the final style (seen { opacity: 1 }) or attach a motion (seen { animate: rise-in 400 })' });
               }
             }
           }
@@ -1383,13 +1447,13 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
             if (d.kind !== 'decl') { errors.push({ file, line: d.line, message: 'only declarations may appear inside a pseudo-element block (v0.2)' }); continue; }
             if (d.prop === 'content' && d.value === '') { srule.decls.push({ prop: 'content', value: '""', line: d.line }); continue; }
             const resolved = resolveDecl(d.prop, d.value, { file, line: d.line, errors, warnings, tokens: tokenMap, tokenNames: tokenNames(), prop: d.prop, unitless: false });
-            // v0.5.0 — engine-native properties have no pseudo-element story:
+            // v0.5.0 - engine-native properties have no pseudo-element story:
             // there is no DOM handle to nudge, animate, stack or stagger. They
             // used to leak into the shadow sheet as junk CSS the browser
-            // silently dropped — exactly the silence this language refuses.
+            // silently dropped - exactly the silence this language refuses.
             for (const r of resolved) {
               if (r.prop.startsWith('@')) {
-                errors.push({ file, line: d.line, message: `"${d.prop}" is engine-native and has no meaning on ::${node.name} — a pseudo-element has no DOM handle`, hint: 'put it on the element itself, not inside the pseudo block' });
+                errors.push({ file, line: d.line, message: `"${d.prop}" is engine-native and has no meaning on ::${node.name} - a pseudo-element has no DOM handle`, hint: 'put it on the element itself, not inside the pseudo block' });
                 continue;
               }
               srule.decls.push({ ...r, line: d.line });
@@ -1409,7 +1473,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           break;
         }
         case 'raw': {
-          // v0.8.0 — verbatim CSS escape hatch (@font-face, @keyframes,
+          // v0.8.0 - verbatim CSS escape hatch (@font-face, @keyframes,
           // @supports, @import, @property…). The parser captured the body
           // untouched; it rides the same document stylesheet as the
           // pseudo-element rules and survives `dssl build` verbatim.
@@ -1445,23 +1509,23 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   function flush(sub, ctx, line) {
     if (!sub.decls.length) return;
     if (!ctx.sel) {
-      errors.push({ file, line, message: 'declarations must live inside a selector', hint: 'top-level blocks are tokens, behavior, motion, @layer, @media… — or a selector like .card' });
+      errors.push({ file, line, message: 'declarations must live inside a selector', hint: 'top-level blocks are tokens, behavior, motion, @layer, @media… - or a selector like .card' });
       return;
     }
-    // v0.5.0 — the pseudo-element trap fix. A full selector like `.card::before`
+    // v0.5.0 - the pseudo-element trap fix. A full selector like `.card::before`
     // used to compile ok and then match NOTHING: inline styles can never reach
     // pseudo-elements. Now the selector is split into element + pseudo halves
-    // and the rule rides the shadow-CSS pipeline — exactly what the nested
+    // and the rule rides the shadow-CSS pipeline - exactly what the nested
     // form (`.card { ::before { } }`) always did. Both forms are now one thing.
     const ps = analyzePseudo(ctx.sel);
     if (ps.mode === 'all') {
       // parity with the nested path: bare `content:` becomes content: ""
-      // v0.5.0 — and engine-native properties fail loud here too (see the
+      // v0.5.0 - and engine-native properties fail loud here too (see the
       // nested pseudo path): no DOM handle means no nudge, animate or stack.
       const decls = [];
       for (const d of sub.decls) {
         if (d.prop && d.prop.startsWith('@')) {
-          errors.push({ file, line, message: `"${d.prop}" is engine-native and has no meaning on ::${ps.parts[0].pseudo.split(/[\s:(]/)[0]} — a pseudo-element has no DOM handle`, hint: 'put it on the element itself, not inside the pseudo rule' });
+          errors.push({ file, line, message: `"${d.prop}" is engine-native and has no meaning on ::${ps.parts[0].pseudo.split(/[\s:(]/)[0]} - a pseudo-element has no DOM handle`, hint: 'put it on the element itself, not inside the pseudo rule' });
           continue;
         }
         decls.push(d.prop === 'content' && d.value === '' ? { ...d, value: '""' } : d);
@@ -1480,7 +1544,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           errors.push({
             file, line,
             message: '::slotted() only exists inside a shadow tree, and DSSL styles the light DOM',
-            hint: 'style the slotted element itself with a normal selector — it IS reachable from the page',
+            hint: 'style the slotted element itself with a normal selector - it IS reachable from the page',
           });
           continue;
         }
@@ -1492,7 +1556,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           });
           continue;
         }
-        // v0.5.0 — parity with the nested path: if every declaration was
+        // v0.5.0 - parity with the nested path: if every declaration was
         // rejected (engine-native props, bad values), emit NOTHING rather
         // than an empty ghost rule that matches and styles zero things.
         if (!decls.length) continue;
@@ -1505,8 +1569,24 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       return;
     }
     if (ps.mode === 'mixed') {
-      errors.push({ file, line, message: `selector list mixes pseudo-element and plain selectors: "${ctx.sel}"`, hint: 'split it into two rules — one for the pseudo-element, one for the rest' });
+      errors.push({ file, line, message: `selector list mixes pseudo-element and plain selectors: "${ctx.sel}"`, hint: 'split it into two rules - one for the pseudo-element, one for the rest' });
       return;
+    }
+    // 0.9.0: slider. One description becomes the base decls on the input (put FIRST so the
+    // author's own declarations in the same rule win) and one shadow rule per vendor pseudo.
+    const sliderDecl = sub.decls.find((d) => d.prop === '@slider');
+    if (sliderDecl && sliderDecl.value) {
+      const css = sliderCss(sliderDecl.value);
+      sub.decls.unshift(...css.base.map((d) => ({ ...d, line })));
+      for (const part of splitTopLevel(ctx.sel)) {
+        for (const sh of css.shadow) {
+          shadowRules.push({
+            id: ruleId++, sel: part, pseudo: sh.pseudo,
+            media: ctx.media, signals: ctx.signals, containers: ctx.containers,
+            layer: ctx.layer, order: order++, decls: sh.decls.map((d) => ({ ...d, line })), file, line,
+          });
+        }
+      }
     }
     warnDisplayClash(sub.decls);
     rules.push({
@@ -1517,15 +1597,15 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
     });
   }
 
-  /* v0.7.0 — the ordering linter. Within one rule, later wins; that is the
+  /* v0.7.0 - the ordering linter. Within one rule, later wins; that is the
    * whole cascade model. But "column: gap 2" quietly expanding into
    * display: flex after an explicit "display: none" reads like a menu
-   * toggle and behaves like a bug report — a real reviewer lost an evening
+   * toggle and behaves like a bug report - a real reviewer lost an evening
    * to exactly this ("their own source comments warn about this, but it
    * should be a compiler warning, not a comment"). Agreed. When a
    * shorthand's expansion clobbers an explicit display written earlier in
    * the SAME rule, say so at compile time. Cross-rule overrides are the
-   * documented cascade at work, not an accident — no warning there. */
+   * documented cascade at work, not an accident - no warning there. */
   function warnDisplayClash(decls) {
     let explicit = null;
     for (const d of decls) {
@@ -1534,7 +1614,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       if (explicit && explicit.value !== d.value && warnings.length < 400) {
         warnings.push({
           file, line: d.line,
-          message: `"${d.via}:" expands to display: ${d.value}, which overrides the earlier "display: ${explicit.value}" (line ${explicit.line}) in the same rule — later wins, so the earlier one is dead`,
+          message: `"${d.via}:" expands to display: ${d.value}, which overrides the earlier "display: ${explicit.value}" (line ${explicit.line}) in the same rule - later wins, so the earlier one is dead`,
           hint: `if the override is intended, delete the dead line; otherwise put "${d.via}:" first, or move the display you want to win AFTER it`,
         });
       }
@@ -1557,7 +1637,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           errors.push({
             file, line: d.line,
             message: `unknown motion "${d.value.motion}"`,
-            hint: didYouMean(d.value.motion, Object.keys(motions)) || `define it first:  motion ${d.value.motion} { from { } to { } }  — then "animate: ${d.value.motion} 400" runs it`,
+            hint: didYouMean(d.value.motion, Object.keys(motions)) || `define it first:  motion ${d.value.motion} { from { } to { } }  - then "animate: ${d.value.motion} 400" runs it`,
           });
           d.value.broken = true;
         } else {
@@ -1565,7 +1645,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           d.value.essential = m.essential;
         }
       }
-      // v0.8.0 — the animation shorthand is CSS passthrough, so a motion
+      // v0.8.0 - the animation shorthand is CSS passthrough, so a motion
       // name that matches nothing used to be a SILENT no-op (no @keyframes
       // can exist in DSSL). Warn with the whole story; if the keyframes come
       // from raw { } or another stylesheet, the warning says it can be ignored.
@@ -1575,21 +1655,24 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
         if (words.length && !named) {
           warnings.push({
             file, line: d.line,
-            message: `animation "${d.value}" references no motion defined in this sheet — it will not run`,
-            hint: `motions are defined with  motion name { from { } to { } }  and run with  animate: name 400  — @keyframes does not exist in DSSL; raw { } can carry verbatim keyframes`,
+            message: `animation "${d.value}" references no motion defined in this sheet - it will not run`,
+            hint: `motions are defined with  motion name { from { } to { } }  and run with  animate: name 400  - @keyframes does not exist in DSSL; raw { } can carry verbatim keyframes`,
           });
         }
       }
     }
   }
 
-  // v0.8.0 — pre-parse EVERY motion (not just referenced ones) so the static
+  // v0.8.0 - pre-parse EVERY motion (not just referenced ones) so the static
   // emitter can turn the whole motion vocabulary into real @keyframes.
   const motionFrames = {};
   for (const name of Object.keys(motions)) {
     const m = parseMotion(name);
     if (m && m.frames.length) motionFrames[name] = m;
   }
+
+  // 0.9.0: the lint pass. Warnings only, so ok stays ok; `dssl check --strict` makes them fatal.
+  try { warnings.push(...lintRules({ rules, tokenMap, file })); } catch { /* a lint bug must never break a compile */ }
 
   const mediaQueries = new Set();
   for (const r of [...rules, ...shadowRules]) r.media.forEach(q => mediaQueries.add(q));
@@ -1603,10 +1686,10 @@ function combine(parent, child) {
   return parent + ' ' + child;
 }
 
-/* v0.5.0 — where does a selector carry a pseudo-element?
- *   'none'  — plain selector, inline-style path
- *   'all'   — every comma-part has one: { parts: [{ el, pseudo }] } → shadow CSS
- *   'mixed' — some parts have one, some don't → loud error (split the list)
+/* v0.5.0 - where does a selector carry a pseudo-element?
+ *   'none'  - plain selector, inline-style path
+ *   'all'   - every comma-part has one: { parts: [{ el, pseudo }] } → shadow CSS
+ *   'mixed' - some parts have one, some don't → loud error (split the list)
  * The `::` scan is string- and paren-aware so [data-x="::a"] can't false-hit. */
 function analyzePseudo(sel) {
   // top-level comma split

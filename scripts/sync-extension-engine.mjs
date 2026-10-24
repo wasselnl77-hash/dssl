@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* sync-extension-engine.mjs — copy the real compiler into the editor
+/* sync-extension-engine.mjs - copy the real compiler into the editor
  * extension so diagnostics in the editor are the SAME errors the browser
  * shows. Run after any engine change, before packaging the .vsix. */
 import { copyFileSync, readFileSync } from 'node:fs';
@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const files = ['parser.js', 'resolver.js', 'utils.js'];
+// the resolver imports the others, so the editor needs every one of them
+const files = ['parser.js', 'resolver.js', 'utils.js', 'color.js', 'texture.js', 'aura.js', 'slider.js', 'lint.js', 'import.js'];
 
 for (const f of files) {
   const src = path.join(root, 'public', 'dssl', f);

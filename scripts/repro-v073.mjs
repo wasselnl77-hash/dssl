@@ -1,4 +1,4 @@
-/* repro-v073.mjs — reproduce every claim from the 2026-10-23 Claude review
+/* repro-v073.mjs - reproduce every claim from the 2026-10-23 Claude review
  * of v0.7.2 before touching any code. Green = the bug exists as reported. */
 import { parse, STATE_WORDS } from '../public/dssl/parser.js';
 import { resolve } from '../public/dssl/resolver.js';

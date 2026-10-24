@@ -5,7 +5,7 @@
 - Site (docs, playground, changelog, bench): https://dssl-sable.vercel.app
 - Repo + full docs in the README: https://huggingface.co/EHS-Studio/dssl
 - Install: `curl -fsSL https://dssl-sable.vercel.app/install.sh | sh` (or the zip: https://dssl-sable.vercel.app/dssl-engine.zip)
-- Version: 0.8.2 (engine), MIT license
+- Version: 0.9.0 (engine), MIT license
 - Feature matrix vs CSS: see PARITY.md in the repo
 - For agents working ON the codebase: see AGENTS.md in the repo
 
@@ -49,6 +49,14 @@ DSSL.explain(el, { quiet: true })  // matched rules, file/line, winning decls pe
 DSSL.replay(sel) / DSSL.refresh() / DSSL.errors() / DSSL.version
 ```
 
+## 0.9.0: texture, aura, sliders, lint, import
+- `texture: grain` layers a generated image ON TOP of an element's own background (colour, gradient or several layers). 30 presets (grain, noise, rough, sand, paper, cloud, concrete, stone, crumpled, glitter, frost, marble, wood, bark, leather, brushed, canvas, linen, denim, carbon, scanlines, halftone, dots, lines, grid, checker, crosshatch, stripes, waves, hex) and 10 generators (noise, bump, lines, dots, grid, checker, weave, carbon, waves, hex) with settings: scale, intensity, contrast, threshold, octaves, seed, stretch x y, depth, light, angle, thickness, radius, softness, contour, animate, type, blend, color, color2, invert. Comma stacks layers. Runtime-only (`dssl build` leaves it in and reports it).
+- Aura has NO presets. `aura-glow: <color> <radius> [intensity|pulse|depth|flicker|texture(...)|seed|essential]`, `aura-particle: <color -> color ...> <count> [size|life|speed|dir|spread|gravity|drag|turbulence|from|shape|grow|glowing|behind|blend|texture(...)|seed|essential]`, `glow-particle` (particles that glow), `aura-glow-particle` (both slots), `aura: glow ..., particles ...` (replaces both; `aura: none` clears both, `aura-glow: none` only the glow). Name your own with `behavior fire { ... }` then `use fire`. One canvas over the page, 1800 particle budget, still glow under reduced motion, runtime-only.
+- `slider: track 6 color.line radius full, fill color.accent, thumb 24 color.paper, ring 3 color.accent, glow color.accent 14, ticks 10, graph 20 45 70` writes the ::-webkit-slider-* and ::-moz-range-* rules together for `input[type=range]`. The engine keeps `--dssl-p` (value 0..1) on the input. Firefox rules are generated but untested.
+- Lint warnings (never errors; `dssl check --strict` makes them fatal): text contrast under 4.5:1 (3:1 for large text), a removed focus outline with no focus-visible replacement, tap targets under 24px.
+- `dssl import styles.css -o styles.dssl` converts CSS to DSSL and reports what could not carry over; the output always compiles.
+- The editor extension has a designer panel (sliders, live previews, graphs, DSSL output, Insert and Load from selection), completions for the new vocabulary, and a CSS converter command.
+
 ## CLI (v0.8.0)
 
 ```sh
@@ -62,4 +70,4 @@ Wait for the `dssl-ready` event on `window` before measuring layout: the engine 
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. Install `dssl-vscode/dssl-vscode-0.8.2.vsix` from the repo files. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. Install `dssl-vscode/dssl-vscode-0.9.0.vsix` from the repo files. Source lives in `dssl-vscode/` in the repo.

@@ -1,4 +1,4 @@
-/* DSSL — utils.js — tiny shared helpers */
+/* DSSL - utils.js - tiny shared helpers */
 
 export function levenshtein(a, b) {
   if (a === b) return 0;
@@ -34,13 +34,13 @@ export function didYouMean(word, candidates) {
 }
 
 /* ------------------------------------------------------------------ *
- * v0.6.0 — the deform family (bend / bend-y / bend-up / fold / stretch)
+ * v0.6.0 - the deform family (bend / bend-y / bend-up / fold / stretch)
  *
  * These are engine-native properties (`@bend`, …) that compose into ONE
  * transform string, so transitions and WAAPI tween them like any other
  * transform. Edge-pinned members (fold plants the top edge, bend-up plants
  * the bottom edge) bake their pivot into the transform with the classic
- * translate · rotate · translate trick — that way they never fight a user
+ * translate · rotate · translate trick - that way they never fight a user
  * transform-origin. In keyframe mode there is no box yet, so they emit a
  * transformOrigin for WAAPI instead.
  * ------------------------------------------------------------------ */
@@ -50,10 +50,10 @@ const r4 = (v) => Math.round(v * 1e4) / 1e4;
 
 /**
  * Compose deform parts (+ optional base transform) into a transform string.
- *   d    — { bend, bendY, stretch, stretchAxis, fold, bendUp } numbers, 0 = off
- *   base — an existing transform string to run after the deform parts, or ''
- *   box  — { h } element height for edge-pinned pivots; null in keyframe mode
- * Returns { transform, origin } — origin is only set in keyframe mode.
+ *   d    - { bend, bendY, stretch, stretchAxis, fold, bendUp } numbers, 0 = off
+ *   base - an existing transform string to run after the deform parts, or ''
+ *   box  - { h } element height for edge-pinned pivots; null in keyframe mode
+ * Returns { transform, origin } - origin is only set in keyframe mode.
  */
 export function composeDeform(d, base, box) {
   const parts = [];
@@ -71,7 +71,7 @@ export function composeDeform(d, base, box) {
     if (h > 0) parts.push(`translateY(${r2(h / 2)}px)`, `rotateX(${d.bendUp}deg)`, `translateY(${r2(-h / 2)}px)`);
     else { parts.push(`rotateX(${d.bendUp}deg)`); origin = '50% 100%'; }
   }
-  if (d.stretch && d.stretch !== 1) {   // squash & stretch — volume stays constant
+  if (d.stretch && d.stretch !== 1) {   // squash & stretch - volume stays constant
     const inv = r4(1 / d.stretch);
     parts.push(d.stretchAxis === 'vertical'
       ? `scaleY(${d.stretch}) scaleX(${inv})`
@@ -83,7 +83,7 @@ export function composeDeform(d, base, box) {
 }
 
 /**
- * v0.6.0 — bend-around: lay n children along a circular arc.
+ * v0.6.0 - bend-around: lay n children along a circular arc.
  * Positive deg wraps the row around an invisible ball (a dome, ends dip);
  * negative deg opens it into a smile (ends rise). Returns the pivot radius
  * R (px, measured from each child's center) and one rotation angle per

@@ -1,4 +1,4 @@
-/* test-v073.mjs — one assertion per fix in the 0.8.0 "the exit drop".
+/* test-v073.mjs - one assertion per fix in the 0.8.0 "the exit drop".
  * Source: the 2026-10-23 Claude review (5 bugs) + wishlist items 1/3/4/6/8.
  * Every claim was reproduced first (scripts/repro-v073.mjs), these assert the
  * fixes and the new features against the real compiler. */
@@ -14,7 +14,7 @@ import { VERSION } from '../public/dssl/index.js';
 let pass = 0, fail = 0;
 const ok = (name, cond, extra) => {
   if (cond) { pass++; console.log(`  ok  ${name}`); }
-  else { fail++; console.log(`FAIL  ${name}${extra ? ' — ' + extra : ''}`); }
+  else { fail++; console.log(`FAIL  ${name}${extra ? ' - ' + extra : ''}`); }
 };
 
 const compileDoc = (src, file = 't.dssl') => {
@@ -141,7 +141,7 @@ const lastVal = (decls, prop) => decls.filter(d => d.prop === prop).pop()?.value
   ok('7d. the fluid: 16, 24 form still works', val(declsOf(legacy.doc), 'font-size') === 'clamp(16px, calc(12.571px + 0.952vw), 24px)');
 }
 
-/* ---- feature: toCSS — the exit lane ---- */
+/* ---- feature: toCSS - the exit lane ---- */
 {
   const src = `tokens { color { ink: #16161d } }
 @layer utilities { .toolbar { row: gap 8 between center } }

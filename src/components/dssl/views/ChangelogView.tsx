@@ -12,6 +12,26 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.9.0",
+    date: "growth phase · the surface drop",
+    title: "Texture, aura and range sliders, and a designer in the editor.",
+    why: "a request for fire. The honest answer was that a language should give you the knobs and not someone else's idea of fire, so aura has no presets at all, texture has thirty, and the interactive tools went into the editor instead of onto this site.",
+    kind: "spec",
+    body:
+      "texture: lays a generated image on top of an element's own background without replacing it, and takes it off cleanly. There are thirty presets (grain, paper, marble, wood, carbon, halftone and so on), but each is only a stored combination of ten generators and a handful of settings, so anything a preset does you can write yourself. Aura is light and particles around an element. It has no presets: aura-glow, aura-particle, glow-particle, aura-glow-particle and aura: take colour, radius, count, size, life, speed, direction, gravity, turbulence, shape and more, and you name your own fire or energy aura with a behavior block. One canvas covers the page, only visible elements animate, the page shares a budget of 1800 particles, and visitors who ask for reduced motion get a still glow. slider: styles a range input through the WebKit and Firefox pseudo-elements at once, with ticks, a glowing thumb and a histogram track whose bars colour themselves as the value passes them. dssl import converts existing CSS and reports what could not carry over, and the compiler now warns about low contrast, a removed focus outline and tiny tap targets. The designer in the VS Code extension has a slider or picker for every setting, live previews drawn by the real renderer, graphs, and the DSSL it writes, compile-checked as you edit. Writing real-browser tests for all of it found nine bugs, which were fixed before release: aura-glow: none also wiped the particles, a reduced-motion glow redrew sixty times a second, every glow was re-blurred every frame (eleven milliseconds for forty of them, now under one), freeze stopped aura but not the texture shimmer, a typo in an aura was swallowed as a colour, a slider clause with a leftover word was silently ignored, dssl build said nothing about the aura it dropped, the package and the extension copied a hardcoded list of engine files and would have crashed on the new modules, and the importer threw on a stray at sign. The new lint also found four real contrast failures in this site's own stylesheets.",
+    code: `// aura has no presets: you write fire
+behavior fire {
+  aura-glow: #ff7a00 36 pulse 900 flicker 0.35
+  aura-particle: #ffe27a -> #ff8a1f -> rgba(255,40,0,0) count 70 size 8 18 life 650 1100
+                 speed 40 120 dir up spread 40 from top gravity -40 turbulence 70
+                 shape flame glowing behind
+}
+
+.torch { use fire }
+.card  { background: #c9a66b; texture: wood }
+input  { slider: track 6 #445566 radius full, fill #ff7a00, thumb 22 #fff, ring 3 #ff7a00 }`,
+  },
+  {
     version: "v0.8.2",
     date: "growth phase · the rebuild",
     title: "Rebuilding the website on its own engine found a cascade bug.",

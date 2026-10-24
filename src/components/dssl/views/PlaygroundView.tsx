@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DsslError, DsslApplyResult } from "../SiteRoot";
+import { decodeShare, encodeShare, MAX_SHARE_URL, shareFromHash } from "@/lib/share";
 
 const PRESETS: Record<string, { label: string; src: string }> = {
   cards: {
@@ -247,6 +247,7 @@ export default function PlaygroundView() {
   const [engineReady, setEngineReady] = useState(false);
   const [preset, setPreset] = useState("cards");
   const [hot, setHot] = useState(false);
+  const [shareNote, setShareNote] = useState("");
 
   const run = useCallback((src: string) => {
     if (!window.DSSL) return;
@@ -268,9 +269,37 @@ export default function PlaygroundView() {
 
   useEffect(() => {
     if (!engineReady) return;
-    const t = setTimeout(() => run(PRESETS.cards.src), 0);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    (async () => {
+      // a link like /playground#s=... carries the whole stylesheet
+      const packed = shareFromHash(window.location.hash);
+      const shared = packed ? await decodeShare(packed) : null;
+      if (cancelled) return;
+      if (shared !== null && editorRef.current) {
+        editorRef.current.value = shared;
+        setShareNote("Loaded from a shared link.");
+        run(shared);
+      } else {
+        run(PRESETS.cards.src);
+        if (packed) setShareNote("That link could not be read, so the default is loaded.");
+      }
+    })();
+    return () => { cancelled = true; };
   }, [engineReady, run]);
+
+  const copyLink = async () => {
+    if (!editorRef.current) return;
+    const packed = await encodeShare(editorRef.current.value);
+    const url = `${window.location.origin}${window.location.pathname}#s=${packed}`;
+    if (url.length > MAX_SHARE_URL) { setShareNote("That stylesheet is too long for a link. Copy the text instead."); return; }
+    window.history.replaceState(null, "", `#s=${packed}`);
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareNote("Link copied.");
+    } catch {
+      setShareNote("The link is in the address bar. Copy it from there.");
+    }
+  };
 
   const onEdit = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -321,8 +350,10 @@ export default function PlaygroundView() {
                   <option key={k} value={k}>{p.label}</option>
                 ))}
               </select>
+              <button type="button" className="doc-btn btn-sm" onClick={copyLink}>Copy link</button>
             </div>
           </div>
+          {shareNote && <div className="pg-note" role="status">{shareNote}</div>}
           <textarea
             ref={editorRef}
             className="pg-editor"

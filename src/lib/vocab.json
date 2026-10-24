@@ -1,0 +1,396 @@
+{
+  "presets": [
+    {
+      "name": "grain",
+      "doc": "fine film grain, neutral on any colour"
+    },
+    {
+      "name": "noise",
+      "doc": "coarser static"
+    },
+    {
+      "name": "rough",
+      "doc": "gritty relief, like a rough cast wall"
+    },
+    {
+      "name": "sand",
+      "doc": "warm fine sand grains"
+    },
+    {
+      "name": "paper",
+      "doc": "soft paper fibre with a little unevenness"
+    },
+    {
+      "name": "cloud",
+      "doc": "big soft cloudy variation"
+    },
+    {
+      "name": "concrete",
+      "doc": "pitted concrete"
+    },
+    {
+      "name": "stone",
+      "doc": "carved stone with broad relief"
+    },
+    {
+      "name": "crumpled",
+      "doc": "crumpled foil or paper, big creases"
+    },
+    {
+      "name": "glitter",
+      "doc": "sparse bright sparkles"
+    },
+    {
+      "name": "frost",
+      "doc": "fine icy crystals"
+    },
+    {
+      "name": "marble",
+      "doc": "veined marble"
+    },
+    {
+      "name": "wood",
+      "doc": "long wood grain, along x (use angle 90 for vertical)"
+    },
+    {
+      "name": "bark",
+      "doc": "rough vertical bark"
+    },
+    {
+      "name": "leather",
+      "doc": "pebbled leather"
+    },
+    {
+      "name": "brushed",
+      "doc": "brushed metal, fine lines along x"
+    },
+    {
+      "name": "canvas",
+      "doc": "artist canvas weave"
+    },
+    {
+      "name": "linen",
+      "doc": "loose linen weave with slubs"
+    },
+    {
+      "name": "denim",
+      "doc": "diagonal twill, blue by default"
+    },
+    {
+      "name": "carbon",
+      "doc": "carbon fibre twill"
+    },
+    {
+      "name": "scanlines",
+      "doc": "CRT scanlines"
+    },
+    {
+      "name": "halftone",
+      "doc": "newsprint dots"
+    },
+    {
+      "name": "dots",
+      "doc": "a plain dot grid"
+    },
+    {
+      "name": "lines",
+      "doc": "diagonal hairlines"
+    },
+    {
+      "name": "grid",
+      "doc": "a square grid, like graph paper"
+    },
+    {
+      "name": "checker",
+      "doc": "checkerboard"
+    },
+    {
+      "name": "crosshatch",
+      "doc": "crossed hairlines"
+    },
+    {
+      "name": "stripes",
+      "doc": "bold diagonal stripes"
+    },
+    {
+      "name": "waves",
+      "doc": "soft repeating waves"
+    },
+    {
+      "name": "hex",
+      "doc": "honeycomb"
+    }
+  ],
+  "generators": [
+    "noise",
+    "bump",
+    "lines",
+    "dots",
+    "grid",
+    "checker",
+    "weave",
+    "carbon",
+    "waves",
+    "hex"
+  ],
+  "textureKeys": [
+    {
+      "key": "scale",
+      "doc": "feature size in px: how big the grains, cells or lines are",
+      "words": 1
+    },
+    {
+      "key": "intensity",
+      "doc": "how strong the layer is, 0 to 1 (more than 1 over-drives it)",
+      "words": 1
+    },
+    {
+      "key": "contrast",
+      "doc": "noise contrast: 1 is as generated, higher is harsher",
+      "words": 1
+    },
+    {
+      "key": "threshold",
+      "doc": "noise cut-off: only values above it show (glitter uses a high one)",
+      "words": 1
+    },
+    {
+      "key": "contour",
+      "doc": "draw thin lines where the noise crosses the threshold, instead of a plain cut: veins, rings, contours",
+      "words": 1
+    },
+    {
+      "key": "octaves",
+      "doc": "noise detail layers, 1 is smooth, 5 is rough",
+      "words": 1
+    },
+    {
+      "key": "seed",
+      "doc": "a different random pattern with the same look",
+      "words": 1
+    },
+    {
+      "key": "stretch",
+      "doc": "stretch noise features along x and y, e.g. stretch 40 1 for wood grain",
+      "words": 2
+    },
+    {
+      "key": "depth",
+      "doc": "bump height: how deep the relief looks",
+      "words": 1
+    },
+    {
+      "key": "light",
+      "doc": "bump light direction in degrees",
+      "words": 1
+    },
+    {
+      "key": "angle",
+      "doc": "direction of lines and patterns, in degrees",
+      "words": 1
+    },
+    {
+      "key": "thickness",
+      "doc": "line or grid-line width in px",
+      "words": 1
+    },
+    {
+      "key": "radius",
+      "doc": "dot size as a fraction of the cell",
+      "words": 1
+    },
+    {
+      "key": "softness",
+      "doc": "how soft the edges of dots and lines are",
+      "words": 1
+    },
+    {
+      "key": "animate",
+      "doc": "milliseconds per shimmer step (film-grain flicker); 0 is still",
+      "words": 1
+    },
+    {
+      "key": "type",
+      "doc": "noise flavour: fractal is clouds, turbulence is veins",
+      "words": 1
+    },
+    {
+      "key": "blend",
+      "doc": "how the layer mixes with what is under it",
+      "words": 1
+    },
+    {
+      "key": "color",
+      "doc": "the main colour (dark end of noise, ink of lines and dots)",
+      "words": 1
+    },
+    {
+      "key": "color2",
+      "doc": "the second colour (light end of noise, background cell of patterns)",
+      "words": 1
+    },
+    {
+      "key": "invert",
+      "doc": "swap the two colours",
+      "words": 0
+    }
+  ],
+  "glowKeys": [
+    {
+      "key": "color",
+      "doc": "the light colour (default: the element's text colour)"
+    },
+    {
+      "key": "radius",
+      "doc": "how far the glow reaches, in px"
+    },
+    {
+      "key": "intensity",
+      "doc": "brightness, 1 is normal"
+    },
+    {
+      "key": "pulse",
+      "doc": "milliseconds for one breath in and out; 0 is steady"
+    },
+    {
+      "key": "depth",
+      "doc": "how deep the pulse goes, 0 to 1"
+    },
+    {
+      "key": "flicker",
+      "doc": "random flicker, like a flame: 0 is steady, 1 is wild"
+    },
+    {
+      "key": "seed",
+      "doc": "a different random flicker with the same look"
+    },
+    {
+      "key": "texture",
+      "doc": "texture(grain scale 2): break the light up with a texture"
+    },
+    {
+      "key": "essential",
+      "doc": "keep animating even when the visitor prefers reduced motion"
+    }
+  ],
+  "particleKeys": [
+    {
+      "key": "color",
+      "doc": "colours over a particle's life: color #ff0 -> #f60 -> transparent"
+    },
+    {
+      "key": "count",
+      "doc": "how many particles are alive at once"
+    },
+    {
+      "key": "size",
+      "doc": "diameter in px: size 4, or size 10 4 (start and end of a random range)"
+    },
+    {
+      "key": "life",
+      "doc": "how long one lives, in ms: life 900, or life 600 1200"
+    },
+    {
+      "key": "speed",
+      "doc": "px per second: speed 60, or speed 30 90"
+    },
+    {
+      "key": "dir",
+      "doc": "where they head: up, down, left, right, out, in, or degrees (-90 is up)"
+    },
+    {
+      "key": "spread",
+      "doc": "how wide the fan of directions is, in degrees"
+    },
+    {
+      "key": "gravity",
+      "doc": "px/s squared; negative pulls up (flames), positive down (snow)"
+    },
+    {
+      "key": "drag",
+      "doc": "air resistance: how fast particles slow down"
+    },
+    {
+      "key": "turbulence",
+      "doc": "random sideways wobble, px/s"
+    },
+    {
+      "key": "from",
+      "doc": "where they are born: edge, bottom, top, left, right, center, corners, thumb (range sliders)"
+    },
+    {
+      "key": "shape",
+      "doc": "circle, spark, square, ring, star, flame, smoke or line"
+    },
+    {
+      "key": "grow",
+      "doc": "size at the end of life as a multiple of the start: 0.2 shrinks, 3 swells"
+    },
+    {
+      "key": "blend",
+      "doc": "add makes overlapping particles brighter, normal just stacks them"
+    },
+    {
+      "key": "glowing",
+      "doc": "soft glowing particles that add light"
+    },
+    {
+      "key": "behind",
+      "doc": "draw only outside the element's box, as if the element hid them"
+    },
+    {
+      "key": "seed",
+      "doc": "a different random pattern with the same look"
+    },
+    {
+      "key": "texture",
+      "doc": "texture(grain): grainy particles"
+    },
+    {
+      "key": "essential",
+      "doc": "keep animating even when the visitor prefers reduced motion"
+    }
+  ],
+  "sliderClauses": [
+    {
+      "key": "track",
+      "form": "track [height] [color] [radius <n>|full]"
+    },
+    {
+      "key": "fill",
+      "form": "fill <color> | fill none"
+    },
+    {
+      "key": "thumb",
+      "form": "thumb <size> [color]"
+    },
+    {
+      "key": "shape",
+      "form": "shape circle | square | diamond | pill | bar"
+    },
+    {
+      "key": "ring",
+      "form": "ring <width> <color>"
+    },
+    {
+      "key": "glow",
+      "form": "glow <color> <radius>"
+    },
+    {
+      "key": "ticks",
+      "form": "ticks <count> [color] [length]"
+    },
+    {
+      "key": "graph",
+      "form": "graph <v1> <v2> ... (each 0 to 100)"
+    },
+    {
+      "key": "graph-height",
+      "form": "graph-height <px>"
+    },
+    {
+      "key": "graph-gap",
+      "form": "graph-gap <px>"
+    }
+  ]
+}

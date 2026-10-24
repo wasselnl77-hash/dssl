@@ -1,4 +1,4 @@
-// v0.6.0 quick smoke — deform family + gradient tools compile cleanly
+// v0.6.0 quick smoke - deform family + gradient tools compile cleanly
 import { compile } from '../public/dssl/index.js';
 
 const src = `

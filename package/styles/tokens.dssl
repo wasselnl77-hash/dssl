@@ -1,9 +1,9 @@
 // =========================================================================
-// tokens.dssl — DSSL's own design tokens
-// v0.3.3 "The Classic Edition": a print-era look — parchment paper, ink,
+// tokens.dssl - DSSL's own design tokens
+// v0.3.3 "The Classic Edition": a print-era look - parchment paper, ink,
 // oxblood accent, serif display type, squared corners, hairline rules.
 // The dark palette lives in a behavior and is `use`d by both the system
-// preference and the manual theme signal — define once, apply twice.
+// preference and the manual theme signal - define once, apply twice.
 // =========================================================================
 
 tokens {

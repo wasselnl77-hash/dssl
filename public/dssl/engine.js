@@ -1,10 +1,10 @@
 /* =========================================================================
- * DSSL — engine.js
+ * DSSL - engine.js
  * The style engine. No CSS output for regular rules: DSSL matches selectors
  * against the live DOM itself and applies winning declarations directly to
  * elements (inline style), running its own cascade:
  *
- *     cascade = (layer, source order)   — no specificity, ever
+ *     cascade = (layer, source order)   - no specificity, ever
  *     layers:  tokens < base < components < utilities < pin
  *
  * States (hover/focus/active/…) are implemented by the engine with event
@@ -15,11 +15,15 @@
  * Web Animations API, and `stagger:` choreographs children's delays.
  *
  * Pseudo-elements (::before/::after/…) cannot be expressed inline, so they
- * are the one thing compiled to real CSS in a shadow <style> tag — using the
+ * are the one thing compiled to real CSS in a shadow <style> tag - using the
  * same tokens via var().
  * ========================================================================= */
 
 import { composeDeform, arcLayout } from './utils.js';
+// 0.9.0: texture layers, aura (light and particles) and the range-slider helper
+import { buildTexture } from './texture.js';
+import { AuraManager, resolveLayer } from './aura.js';
+import { parseColor } from './color.js';
 
 const LAYER_RANK = { tokens: 0, base: 1, components: 2, utilities: 3, pin: 4 };
 
@@ -53,10 +57,10 @@ export function assignGlobalOrder(bundlesInLoadOrder) {
   }
 }
 
-// v0.3.4 — alignment implies a formatting context.
+// v0.3.4 - alignment implies a formatting context.
 // place-items / place-content / align-* / justify-* only arrange children
 // inside flex or grid containers. On a plain <span> or <button> they used to
-// silently do nothing — which is exactly how the feature icons, the theme
+// silently do nothing - which is exactly how the feature icons, the theme
 // toggle and the token dots ended up pinned top-left inside their circles.
 // The language promises loud failures over silent ones, so when a winning
 // declaration asks for alignment but the element has no layout context, the
@@ -69,21 +73,21 @@ const ALIGN_PROPS = new Set([
 ]);
 const HAS_CONTEXT_RE = /^(flex|inline-flex|grid|inline-grid)$/;
 
-/* v0.4.1 — shorthand/longhand coexistence cannot survive inline.
+/* v0.4.1 - shorthand/longhand coexistence cannot survive inline.
  *
  * A var()-pending shorthand (`border: 1px solid var(--c)`) and an overriding
  * longhand of the same family (`border-color: color-mix(... var(--i) ...)`)
  * cannot coexist in one inline declaration block: the CSSOM silently expands
  * the shorthand into EMPTY longhands and the border vanishes. The old
  * wipe-and-rewrite engine masked this by restoring the shorthand on every
- * recompute (and flickering the border on every hover — part of the twitch);
+ * recompute (and flickering the border on every hover - part of the twitch);
  * the diffing engine exposed it permanently (veto badges lost their border).
  *
  * The language's answer is a merge, at the CSSOM boundary: when a winning
  * set holds a family shorthand AND one of its longhands, the longhand's
  * value is folded into the shorthand's grammar slot (border) or the
  * shorthand is expanded positionally (padding/margin/gap), and the longhand
- * is dropped — the block never holds both. Unhandled pairs fail LOUDLY. */
+ * is dropped - the block never holds both. Unhandled pairs fail LOUDLY. */
 const BORDER_STYLES = new Set(['none', 'hidden', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset']);
 const BORDER_WIDTH_RE = /^(0|[\d.]+(?:px|em|rem|%|pt|ch|vw|vh)|thin|medium|thick)$/i;
 
@@ -98,7 +102,7 @@ function foldIntoBorder(shVal, lhVal) {
     else color.push(t);
   }
   if (color.length) color[0] = lhVal;      // replace the color slot (later cascade wins)
-  else color.push(lhVal);                  // shorthand had no color slot — append
+  else color.push(lhVal);                  // shorthand had no color slot - append
   return [...width, ...style, ...color].join(' ');
 }
 
@@ -136,6 +140,25 @@ function parseSizeQuery(q) {
   return { min, max };
 }
 
+/** split a CSS list at top-level commas, so rgba(1,2,3) and var(--x, 4) stay whole */
+function splitList(value) {
+  const out = []; let depth = 0, cur = '';
+  for (const ch of String(value)) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+/** a list of exactly n entries: the author's, cycled the way CSS cycles them, or the default */
+function expandList(value, n, dflt) {
+  const items = value ? splitList(value) : [];
+  if (!items.length) return Array.from({ length: n }, () => dflt);
+  return Array.from({ length: n }, (_, i) => items[i % items.length]);
+}
+
 export class DsslEngine {
   constructor({ scope = null, name = 'global', reset = false } = {}) {
     this.name = name;
@@ -157,11 +180,11 @@ export class DsslEngine {
     this.shadowStyle = null;
     this.seq = 0;                          // bundle insertion order
     this.lastApply = 0;
-    this.seenSet = new WeakSet();          // v0.4.0 — elements that entered the viewport
-    this.staggerEls = new Map();           // v0.4.0 — element → stagger delay (ms)
+    this.seenSet = new WeakSet();          // v0.4.0 - elements that entered the viewport
+    this.staggerEls = new Map();           // v0.4.0 - element → stagger delay (ms)
     this.io = null;                        // IntersectionObserver backing `seen`
-    this.naturalDisplay = new WeakMap();   // v0.4.1 — element → display without our promotion
-    // v0.5.0 — overlap policy. CSS lets transparent things stack silently;
+    this.naturalDisplay = new WeakMap();   // v0.4.1 - element → display without our promotion
+    // v0.5.0 - overlap policy. CSS lets transparent things stack silently;
     // DSSL measures real boxes and shoves the transparent side out along the
     // shortest escape axis, through the separate `translate` channel (so it
     // composes with transforms and WAAPI instead of fighting them).
@@ -171,12 +194,148 @@ export class DsslEngine {
     this.nudgedEls = new Set();            // elements currently carrying a nudge
     this._overlapRaf = 0;
     this._overlapDirty = false;
-    this._hasInfiniteAnims = false;        // infinite loops never 'finish' — heartbeat keeps watch
-    // v0.6.0 — bend-around arcs a container's children along a circle;
+    this._hasInfiniteAnims = false;        // infinite loops never 'finish' - heartbeat keeps watch
+    // v0.6.0 - bend-around arcs a container's children along a circle;
     // gradient-flow loops background-position through WAAPI.
     this.arcMap = new Map();               // container → degrees
     this.arcPrev = new Map();              // container → Map(child → {t, o}) last written
     this.gflowWarned = new WeakSet();      // elements already told they have nothing to flow
+    // 0.9.0
+    this.aura = null;                      // AuraManager, created the first time something asks for an aura
+    this._colorProbe = null;               // hidden element used to resolve var(--token) colours
+    this._colorCache = new Map();          // css colour text -> {r,g,b,a}; cleared on every full recompute
+    this._texCache = new Map();            // texture spec + colours -> built CSS pieces
+    this.sliderEls = new Map();            // range input -> its input listener
+    this.texAnims = new WeakMap();         // element -> running texture-shimmer Animation
+    this.texEls = new Set();               // elements that have one, so freeze() can stop them all
+  }
+
+  /* ------------------------------------------------------------ *
+   * 0.9.0: colours, texture, aura, slider
+   * ------------------------------------------------------------ */
+
+  /** CSS colour text (including var(--dssl-...), color-mix and oklch) to {r,g,b,a} */
+  resolveColorCss(css) {
+    if (!css) return null;
+    const hit = this._colorCache.get(css);
+    if (hit !== undefined) return hit;
+    let c = parseColor(css);
+    if (!c) {
+      try {
+        if (!this._colorProbe) {
+          const pr = document.createElement('span');
+          pr.setAttribute('aria-hidden', 'true');
+          pr.setAttribute('data-dssl-probe', '');
+          pr.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;width:0;height:0;';
+          (document.body || document.documentElement).appendChild(pr);
+          this._colorProbe = pr;
+        }
+        const pr = this._colorProbe;
+        pr.style.color = '';
+        pr.style.color = css;
+        if (pr.style.color) c = parseColor(getComputedStyle(pr).color);
+      } catch { c = null; }
+    }
+    this._colorCache.set(css, c);
+    return c;
+  }
+
+  /**
+   * texture: put generated layers ON TOP of whatever background the author wrote.
+   * Handles all three ways an author writes one: `background: ...` (shorthand),
+   * `background-image: ...`, or just a colour. `owned` is the property map the
+   * engine is about to write; this edits it in place.
+   */
+  composeTexture(el, owned, layers) {
+    const rc = (css) => this.resolveColorCss(css);
+    const key = JSON.stringify(layers.map((l) => [l, rc(l.color), rc(l.color2)]));
+    let tex = this._texCache.get(key);
+    if (!tex) {
+      tex = buildTexture(layers, rc);
+      if (this._texCache.size > 120) this._texCache.clear();
+      this._texCache.set(key, tex);
+    }
+    if (!tex.count) return null;
+    const sh = owned.get('background');
+    const img = owned.get('background-image');
+    const blendUser = owned.get('background-blend-mode');
+    const texBlends = tex.blend.split(', ');
+    if (sh) {
+      // the author wrote the shorthand: texture layers go first, their value stays the last layer(s)
+      const userLayers = splitList(sh.value).length;
+      const texShort = tex.parts.map((p) => `${p.image} ${p.position} / ${p.size} ${p.repeat}`).join(', ');
+      owned.set('background', { value: `${texShort}, ${sh.value}`, imp: sh.imp });
+      owned.delete('background-image');
+      owned.set('background-blend-mode', { value: [...texBlends, ...expandList(blendUser && blendUser.value, userLayers, 'normal')].join(', '), imp: sh.imp });
+      return tex;
+    }
+    const userLayers = img ? splitList(img.value).length : 0;
+    const imp = img ? img.imp : '';
+    const get = (name) => (owned.get(name) || {}).value;
+    const join = (texList, name, dflt) => [...texList.split(/,(?![^(]*\))/).map((x) => x.trim()), ...(userLayers ? expandList(get(name), userLayers, dflt) : [])].join(', ');
+    owned.set('background-image', { value: tex.image + (img ? ', ' + img.value : ''), imp });
+    owned.set('background-size', { value: join(tex.size, 'background-size', 'auto'), imp });
+    owned.set('background-position', { value: join(tex.position, 'background-position', '0% 0%'), imp });
+    owned.set('background-repeat', { value: join(tex.repeat, 'background-repeat', 'repeat'), imp });
+    owned.set('background-blend-mode', { value: [...texBlends, ...(userLayers ? expandList(get('background-blend-mode'), userLayers, 'normal') : [])].join(', '), imp });
+    return tex;
+  }
+
+  /** film-grain shimmer: step the texture layers' positions every `ms`, stills when reduced motion asks */
+  applyTextureShimmer(el, tex, ms, userLayerCount) {
+    const prev = this.texAnims.get(el);
+    const want = ms > 0 && tex && !(this.reducedMotion && this.reducedMotion.matches) && el.animate;
+    if (!want) { if (prev) { try { prev.cancel(); } catch { } this.texAnims.delete(el); } this.texEls.delete(el); return; }
+    const n = tex.parts.length;
+    const frames = [];
+    let seed = 7;
+    const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let f = 0; f < 6; f++) {
+      const pos = tex.parts.map((p) => `${Math.round(r() * (p.tile || 64))}px ${Math.round(r() * (p.tile || 64))}px`);
+      for (let u = 0; u < userLayerCount; u++) pos.push('0% 0%');
+      frames.push({ backgroundPosition: pos.join(', ') });
+    }
+    if (prev) { try { prev.cancel(); } catch { } }
+    const a = el.animate(frames, { duration: ms * frames.length, iterations: Infinity, easing: 'steps(1, jump-end)' });
+    this.texAnims.set(el, a);
+    this.texEls.add(el);
+  }
+
+  auraManager() {
+    if (!this.aura) this.aura = new AuraManager({ reducedMotion: this.reducedMotion });
+    return this.aura;
+  }
+
+  applyAura(el, glow, particles) {
+    const hasAny = (glow && glow.length) || (particles && particles.length);
+    if (!hasAny) { if (this.aura) this.aura.remove(el); return; }
+    let fallback = { r: 255, g: 255, b: 255, a: 1 };
+    try { fallback = parseColor(getComputedStyle(el).color) || fallback; } catch { }
+    const rc = (css) => this.resolveColorCss(css);
+    const g = (glow || []).map((l) => resolveLayer(l, rc, fallback));
+    const p = (particles || []).map((l) => resolveLayer(l, rc, fallback));
+    this.auraManager().set(el, g, p);
+  }
+
+  /** range inputs: keep --dssl-p (the value as 0..1) current so the track fill and graph can follow it */
+  applySlider(el, spec) {
+    const known = this.sliderEls.has(el);
+    if (!spec) {
+      if (known) { el.removeEventListener('input', this.sliderEls.get(el)); this.sliderEls.delete(el); el.style.removeProperty('--dssl-p'); }
+      return;
+    }
+    if (el.tagName !== 'INPUT' || el.type !== 'range') {
+      if (!this._warnedSlider) this._warnedSlider = new WeakSet();
+      if (!this._warnedSlider.has(el)) { this._warnedSlider.add(el); console.info(`[DSSL] slider: on <${el.tagName.toLowerCase()}> does nothing, it styles <input type="range">`); }
+      return;
+    }
+    const sync = () => {
+      const mn = el.min === '' ? 0 : Number(el.min), mx = el.max === '' ? 100 : Number(el.max);
+      const p = (Number(el.value) - mn) / ((mx - mn) || 1);
+      el.style.setProperty('--dssl-p', String(Math.max(0, Math.min(1, p))));
+    };
+    if (!known) { el.addEventListener('input', sync); this.sliderEls.set(el, sync); }
+    sync();
   }
 
   /* ------------------------------------------------------------ *
@@ -211,7 +370,7 @@ export class DsslEngine {
         rules.push(r); // scoped engines map :root rules onto the scope element
       }
       shadowRules.push(...b.shadowRules);
-      // v0.8.0 — raw { } verbatim CSS rides the same document stylesheet
+      // v0.8.0 - raw { } verbatim CSS rides the same document stylesheet
       if (b.raws) raws.push(...b.raws);
     }
     this.rules = rules;
@@ -248,7 +407,7 @@ export class DsslEngine {
     const doc = this.scope ? this.scope : document.documentElement;
 
     // --- element state events ---
-    // v0.7.0 — every listener is registered in this._listeners so freeze()
+    // v0.7.0 - every listener is registered in this._listeners so freeze()
     // can detach the whole reactive surface and unfreeze() re-arm it.
     if (!this._listeners) this._listeners = [];
     const on = (type, fn) => {
@@ -263,11 +422,11 @@ export class DsslEngine {
     on('pointerdown', (e) => this.stateEvent('active', e.target));
     on('pointerup', (e) => this.stateEvent('active', e.target));
     on('pointercancel', (e) => this.stateEvent('active', e.target));
-    // v0.7.2 — form-state events. checked/indeterminate live on properties
+    // v0.7.2 - form-state events. checked/indeterminate live on properties
     // the pointer and focus listeners never see: unchecking with Space went
     // stale, and programmatic el.checked = true never restyled until focus
     // moved. change bubbles, so delegation reaches it. toggle does NOT
-    // bubble — a capture-phase listener on document still catches it on the
+    // bubble - a capture-phase listener on document still catches it on the
     // way down. Note for docs: programmatic property writes fire no event at
     // all; dispatch a bubbling change event after setting .checked.
     on('change', (e) => {
@@ -285,8 +444,8 @@ export class DsslEngine {
 
     // --- DOM mutations ---
     const mo = new MutationObserver((muts) => {
-      if (this.frozen) return; // v0.7.0 — a frozen engine sees a snapshot, not a live page
-      if (this._applying) return; // our own style writes — ignore
+      if (this.frozen) return; // v0.7.0 - a frozen engine sees a snapshot, not a live page
+      if (this._applying) return; // our own style writes - ignore
       const batch = new Set();
       let fullSweep = false;
       for (const m of muts) {
@@ -294,9 +453,9 @@ export class DsslEngine {
           if (m.attributeName === 'style') continue;
           if (m.target === document.documentElement && m.attributeName.startsWith('data-dssl')) continue;
           batch.add(m.target);
-          // class/attr changes can affect descendant rules — include small subtrees.
+          // class/attr changes can affect descendant rules - include small subtrees.
           // v0.3.3: when the changed element owns a HUGE subtree (view root flips
-          // like data-view on the site shell), don't skip the descendants — a full
+          // like data-view on the site shell), don't skip the descendants - a full
           // debounced sweep keeps every descendant rule honest. Skipping is what
           // left the nav highlight stuck on the boot-time view after SPA routing.
           if (m.target.querySelectorAll) {
@@ -313,7 +472,7 @@ export class DsslEngine {
           if (m.removedNodes) m.removedNodes.forEach(n => {
             if (n.nodeType !== 1) return;
             this.touched.delete(n);
-            this.overlapEls.delete(n);   // v0.5.0 — dropped policies must not pin the pass
+            this.overlapEls.delete(n);   // v0.5.0 - dropped policies must not pin the pass
             this.nudgedEls.delete(n);
             if (n.querySelectorAll) n.querySelectorAll('*').forEach(k => {
               this.touched.delete(k);
@@ -344,7 +503,7 @@ export class DsslEngine {
       const m = origMql(query);
       if (!m._dsslWired) {
         m._dsslWired = true;
-        // v0.7.0 — the frozen guard lives HERE (not at attach time) so the
+        // v0.7.0 - the frozen guard lives HERE (not at attach time) so the
         // same listener serves both modes: freeze() needs no bookkeeping.
         try { m.addEventListener('change', () => { if (!this.frozen) this.scheduleComputeAll(); }); } catch { /* old browsers */ }
       }
@@ -362,8 +521,8 @@ export class DsslEngine {
     this.io = this.makeSeenObserver();
 
     // --- container tracking via ResizeObserver ---
-    // v0.4.1: the callback goes through the coalescing scheduler, and — more
-    // importantly — computeElement now skips no-op style writes. The old
+    // v0.4.1: the callback goes through the coalescing scheduler, and - more
+    // importantly - computeElement now skips no-op style writes. The old
     // wipe-and-rewrite could change an observed container's size mid-cycle,
     // which re-fired this observer, which recomputed and rewrote again… a
     // feedback loop the user experienced as the whole UI "twitching". An
@@ -372,7 +531,7 @@ export class DsslEngine {
   }
 
   /* ------------------------------------------------------------ *
-   * v0.7.0 — freeze/unfreeze internals + the seen observer factory
+   * v0.7.0 - freeze/unfreeze internals + the seen observer factory
    * ------------------------------------------------------------ */
 
   makeSeenObserver() {
@@ -389,10 +548,10 @@ export class DsslEngine {
     }, { threshold: 0.08, rootMargin: '0px 0px -6% 0px' });
   }
 
-  /* v0.5.0 — overlap heartbeat. Drains catch layout changes, but transform
+  /* v0.5.0 - overlap heartbeat. Drains catch layout changes, but transform
    * animations drift boxes every frame without any drain. Infinite loops
    * never fire `finish`, so a lazy 400ms pulse re-checks while they run.
-   * v0.7.0 — extracted so freeze()/unfreeze() can stop and restart it. */
+   * v0.7.0 - extracted so freeze()/unfreeze() can stop and restart it. */
   startOverlapTimer() {
     if (this._overlapTimer) clearInterval(this._overlapTimer);
     this._overlapTimer = setInterval(() => {
@@ -407,14 +566,14 @@ export class DsslEngine {
   freezeNotice() {
     if (this._freezeTold) return;
     this._freezeTold = true;
-    console.info(`[DSSL] engine "${this.name}" is frozen — ambient restyling is off; DSSL.unfreeze() re-arms it`);
+    console.info(`[DSSL] engine "${this.name}" is frozen - ambient restyling is off; DSSL.unfreeze() re-arms it`);
   }
 
   stateEvent(state, target) {
     if (!target || target.nodeType !== 1) return;
     const batch = new Set();
 
-    // the element that just entered/left the state — and its ancestors,
+    // the element that just entered/left the state - and its ancestors,
     // because hover/focus-within rules can style them too
     let node = target;
     while (node && node.nodeType === 1 && this.inScope(node)) {
@@ -422,12 +581,12 @@ export class DsslEngine {
       node = node.parentElement;
     }
 
-    // v0.7.2 — candidate collection is no longer page-wide. The external
+    // v0.7.2 - candidate collection is no longer page-wide. The external
     // review measured 33,060 recomputes for hovering 8 cards in a 1k-card
     // page: every state event queried the whole document for EVERY stateful
     // rule and batched every match. Reality: a subject-state rule (.card:hover)
     // can only ever change the chain collected above. Rules where the state
-    // sits on an ANCESTOR compound (.card:hover .title) reach further down —
+    // sits on an ANCESTOR compound (.card:hover .title) reach further down -
     // queried from the matching ancestor via :scope, so the cost is bounded
     // by that ancestor's subtree, never the page. computeElement re-checks
     // the full stateful selector, so a superset batch is only wasted work,
@@ -438,7 +597,7 @@ export class DsslEngine {
       const reach = rule._reach !== undefined ? rule._reach : (rule._reach = stateReach(rule.sel, state));
       if (reach === null) continue; // subject-state: the chain covers it
       if (reach.fallback) {
-        // :has()/:not() wrappers defeat the cheap strip — keep the old
+        // :has()/:not() wrappers defeat the cheap strip - keep the old
         // page-wide superset for this rare shape
         const base = rule.sel.replace(STATE_PSEUDO_RE, '').trim() || '*';
         let els; try { els = (this.scope || document).querySelectorAll(base); } catch { continue; }
@@ -481,7 +640,7 @@ export class DsslEngine {
    * ------------------------------------------------------------ */
 
   schedule(els) {
-    if (this.frozen) return;         // v0.7.0 — frozen: state events and seen batches are ambient
+    if (this.frozen) return;         // v0.7.0 - frozen: state events and seen batches are ambient
     els.forEach(el => this.pending.add(el));
     if (this.scheduled) return;
     this.scheduled = true;
@@ -493,17 +652,17 @@ export class DsslEngine {
       for (const el of batch) this.computeElement(el);
       this._applying = false;
       this.applyStagger();
-      this.applyArc();          // v0.6.0 — bend-around arcs after every drain
-      this.scheduleOverlap();   // v0.5.0 — nudges read fresh boxes after the writes settle
+      this.applyArc();          // v0.6.0 - bend-around arcs after every drain
+      this.scheduleOverlap();   // v0.5.0 - nudges read fresh boxes after the writes settle
     });
   }
 
-  /* v0.4.1 — coalesced full recompute for ambient triggers (ResizeObserver,
+  /* v0.4.1 - coalesced full recompute for ambient triggers (ResizeObserver,
    * media flips, signals, reduced-motion). Several triggers can land in the
    * same frame; each one used to run its own computeAll synchronously. One
-   * compute per microtask burst is always enough — the drain is idempotent. */
+   * compute per microtask burst is always enough - the drain is idempotent. */
   scheduleComputeAll() {
-    if (this.frozen) return;         // v0.7.0 — frozen: no ambient recompute
+    if (this.frozen) return;         // v0.7.0 - frozen: no ambient recompute
     if (this._allQueued) return;
     this._allQueued = true;
     queueMicrotask(() => { this._allQueued = false; this.computeAll(); });
@@ -548,13 +707,14 @@ export class DsslEngine {
   }
 
   computeAll() {
+    this._colorCache.clear();   // 0.9.0: tokens or the theme may have changed, so colours are looked up again
     this._applying = true;
     const rootEl = this.scope || document.documentElement;
-    const els = new Set([rootEl, ...this.touched]);   // include previously-styled elements — their rules may have STOPPED matching
+    const els = new Set([rootEl, ...this.touched]);   // include previously-styled elements - their rules may have STOPPED matching
     const root = this.scope || document;
     for (const rule of this.rules) {
       if (rule.sel === ':root') { els.add(rootEl); continue; }
-      // v0.4.0: `:seen` is engine-native and invalid inside querySelectorAll —
+      // v0.4.0: `:seen` is engine-native and invalid inside querySelectorAll -
       // enumerate the stripped selector; computeElement re-checks the real state.
       let sel = rule.sel;
       if (rule.states.has('seen')) sel = sel.replace(/:seen\b/g, '') || '*';
@@ -565,7 +725,7 @@ export class DsslEngine {
     for (const el of els) this.computeElement(el);
     this._applying = false;
     this.applyStagger();
-    this.applyArc();            // v0.6.0 — bend-around arcs after every drain
+    this.applyArc();            // v0.6.0 - bend-around arcs after every drain
     this.scheduleOverlap();     // v0.5.0
   }
 
@@ -580,17 +740,17 @@ export class DsslEngine {
       if (rule.sel === ':root') {
         if (el !== rootEl) continue;
       } else {
-        // v0.7.2 — the gate now runs BEFORE native matches(). The external
+        // v0.7.2 - the gate now runs BEFORE native matches(). The external
         // review caught the wrong order: every element paid a full el.matches()
         // for every rule even when the cheap gate could say no. Same contract
         // as v0.7.0: the gate only ever says NO, and bails to null on anything
-        // it does not fully understand — a missed optimization beats a missed
+        // it does not fully understand - a missed optimization beats a missed
         // match.
         const gate = rule._gate !== undefined ? rule._gate : (rule._gate = gateFor(rule.sel));
         if (gate && !gatePass(el, gate)) continue;
         let sel = rule.sel;
         if (rule.states.has('seen')) {
-          // v0.4.0 — `seen` belongs to the engine, not to CSS selectors: until
+          // v0.4.0 - `seen` belongs to the engine, not to CSS selectors: until
           // the element has intersected, the rule cannot match. Make sure the
           // element IS observed so it re-computes the moment it scrolls in.
           if (!this.isSeen(el)) { this.observeSeen(el); continue; }
@@ -607,7 +767,7 @@ export class DsslEngine {
       (LAYER_RANK[a.layer] ?? 2) - (LAYER_RANK[b.layer] ?? 2) || a.order - b.order
     );
 
-    /* v0.4.1 — diff-based writes. The engine used to WIPE every property it
+    /* v0.4.1 - diff-based writes. The engine used to WIPE every property it
      * owned and rewrite them all on every single recompute, even when nothing
      * had changed. Under pointer boundary storms that meant hundreds of no-op
      * style mutations per second, a resize-observer feedback loop (the write
@@ -615,7 +775,7 @@ export class DsslEngine {
      * visible "twitch" while the browser kept relayouting identical styles.
      *
      * The language's promise is that a recompute is a pure function of (DOM,
-     * rules, state) — so a recompute that resolves to the same declarations
+     * rules, state) - so a recompute that resolves to the same declarations
      * must touch the DOM zero times. Build the new ownership map, diff it
      * against what we own, and write ONLY the difference. */
 
@@ -624,11 +784,12 @@ export class DsslEngine {
     const animSpecs = [];
     let cancelAnims = false;
     let stack = false;
-    let staggerMs;                         // v0.4.0 — @stagger value, if any
-    let overlapVal;                        // v0.5.0 — @overlap policy, if any
-    const deform = {};                     // v0.6.0 — bend/bendY/fold/bendUp/stretch parts
-    let arcVal;                            // v0.6.0 — @bend-around degrees
-    let gflowVal;                          // v0.6.0 — @gradient-flow spec
+    let staggerMs;                         // v0.4.0 - @stagger value, if any
+    let overlapVal;                        // v0.5.0 - @overlap policy, if any
+    const deform = {};                     // v0.6.0 - bend/bendY/fold/bendUp/stretch parts
+    let arcVal;                            // v0.6.0 - @bend-around degrees
+    let gflowVal;                          // v0.6.0 - @gradient-flow spec
+    let textureVal, auraGlowVal, auraPartsVal, sliderVal; // 0.9.0
 
     // flatten matched decls in cascade order (last decl of a prop wins, exactly
     // like sequential setProperty calls did)
@@ -646,7 +807,7 @@ export class DsslEngine {
       }
       if (d.prop === '@stack') { stack = true; continue; }
       if (d.prop === '@stagger') { staggerMs = d.value; continue; }
-      // v0.6.0 — the deform family + gradient tools are engine-native: they
+      // v0.6.0 - the deform family + gradient tools are engine-native: they
       // never land in the inline block as raw @-props; they compose.
       if (d.prop === '@bend') { deform.bend = Number(d.value) || 0; continue; }
       if (d.prop === '@bend-y') { deform.bendY = Number(d.value) || 0; continue; }
@@ -666,9 +827,13 @@ export class DsslEngine {
       }
       if (d.prop === '@bend-around') { arcVal = d.value === null ? null : Number(d.value); continue; }
       if (d.prop === '@gradient-flow') { gflowVal = d.value || null; continue; }
+      if (d.prop === '@texture') { textureVal = d.value || null; continue; }
+      if (d.prop === '@aura-glow') { auraGlowVal = d.value || null; continue; }
+      if (d.prop === '@aura-particles') { auraPartsVal = d.value || null; continue; }
+      if (d.prop === '@slider') { sliderVal = d.value || null; continue; }
       newOwned.set(d.prop, { value: d.value, imp });
     }
-    // anim keys need rule identity — rebuild them from matched order
+    // anim keys need rule identity - rebuild them from matched order
     {
       let i = 0;
       for (const rule of matched) {
@@ -680,7 +845,7 @@ export class DsslEngine {
       }
     }
 
-    // v0.4.1 — resolve shorthand/longhand coexistence BEFORE any write, so the
+    // v0.4.1 - resolve shorthand/longhand coexistence BEFORE any write, so the
     // inline block never holds a family shorthand and one of its longhands.
     for (const fam of ['border']) {
       const sh = newOwned.get(fam);
@@ -689,10 +854,10 @@ export class DsslEngine {
         const lh = newOwned.get(lhName);
         if (!lh) continue;
         if (lhName === 'border-color') newOwned.set(fam, { value: foldIntoBorder(sh.value, lh.value), imp: sh.imp });
-        else newOwned.set(fam, { value: sh.value, imp: sh.imp }); // non-color longhand: shorthand wins width/style only when it has that slot — keep shorthand, drop longhand
+        else newOwned.set(fam, { value: sh.value, imp: sh.imp }); // non-color longhand: shorthand wins width/style only when it has that slot - keep shorthand, drop longhand
         newOwned.delete(lhName);
         if (!this._warned) this._warned = new Set();
-        const wmsg = `[DSSL] folded ${lhName} into ${fam} on <${el.tagName.toLowerCase()}${el.className ? ' .' + String(el.className).split(' ')[0] : ''}> — inline style cannot hold a var() shorthand and its longhand together`;
+        const wmsg = `[DSSL] folded ${lhName} into ${fam} on <${el.tagName.toLowerCase()}${el.className ? ' .' + String(el.className).split(' ')[0] : ''}> - inline style cannot hold a var() shorthand and its longhand together`;
         if (!this._warned.has(wmsg)) { this._warned.add(wmsg); console.info(wmsg); }
       }
     }
@@ -709,7 +874,7 @@ export class DsslEngine {
       }
     }
 
-    // v0.6.0 — the deform family composes into the transform channel, so one
+    // v0.6.0 - the deform family composes into the transform channel, so one
     // inline `transform` carries bend + stretch + whatever the user wrote.
     // Diffing stays honest: a recompute resolving to the same string writes
     // nothing. Edge-pinned members read the live box to bake their pivot.
@@ -721,30 +886,38 @@ export class DsslEngine {
       newOwned.set('transform', { value: c.transform, imp: userT ? userT.imp : '' });
     }
 
-    // v0.6.0 — gradient-flow needs a gradient to flow and room to move. If
+    // v0.6.0 - gradient-flow needs a gradient to flow and room to move. If
     // the element has no background-image at all, say so instead of looping
     // a position nobody can see.
     if (gflowVal) {
       let hasImg = !!newOwned.get('background-image');
       if (!hasImg) { try { hasImg = getComputedStyle(el).backgroundImage !== 'none'; } catch { } }
       if (hasImg) {
-        // a gradient sized 100% has nowhere to slide — give it room unless
+        // a gradient sized 100% has nowhere to slide - give it room unless
         // the cascade explicitly sized it
         if (!newOwned.get('background-size')) newOwned.set('background-size', { value: '200% 100%', imp: '' });
       } else {
         if (!this.gflowWarned.has(el)) {
           this.gflowWarned.add(el);
-          console.info(`[DSSL] gradient-flow on <${el.tagName.toLowerCase()}> has nothing to flow — give it a gradient or background-image first`);
+          console.info(`[DSSL] gradient-flow on <${el.tagName.toLowerCase()}> has nothing to flow - give it a gradient or background-image first`);
         }
         gflowVal = null;
       }
       if (gflowVal && this.reducedMotion && this.reducedMotion.matches) gflowVal = null; // decorative motion
     }
 
-    // REMOVE pass — properties we owned but the new cascade no longer sets.
+    // 0.9.0 - texture sits on top of the author's own background
+    let builtTex = null, texUserLayers = 0;
+    if (textureVal && textureVal.length) {
+      const shv = newOwned.get('background'), imv = newOwned.get('background-image');
+      texUserLayers = shv ? splitList(shv.value).length : imv ? splitList(imv.value).length : 0;
+      builtTex = this.composeTexture(el, newOwned, textureVal);
+    }
+
+    // REMOVE pass - properties we owned but the new cascade no longer sets.
     // This runs BEFORE the promotion read below, so getComputedStyle sees the
     // element's natural display, not a leftover promotion from last time.
-    // v0.4.1: the bookkeeping map must forget them too — the SET pass diffs
+    // v0.4.1: the bookkeeping map must forget them too - the SET pass diffs
     // against `owned`, and a prop deleted from the element but still in the
     // map would look "unchanged" and never be rewritten (that is how the
     // alignment promotion's display used to vanish on the second recompute).
@@ -755,10 +928,10 @@ export class DsslEngine {
       }
     }
 
-    // v0.3.4: alignment implies a formatting context — see ALIGN_PROPS above.
+    // v0.3.4: alignment implies a formatting context - see ALIGN_PROPS above.
     // The element's NATURAL display (without our previous promotion) decides.
     // v0.4.1: when we own a display we are about to drop, getComputedStyle can
-    // race the removal — so the natural value is cached per element the first
+    // race the removal - so the natural value is cached per element the first
     // time we see it without owning a display. none/contents are never
     // promoted (promoting would unhide or boxify them).
     if (flat.some(x => ALIGN_PROPS.has(x.d.prop)) && !newOwned.has('display')) {
@@ -776,17 +949,17 @@ export class DsslEngine {
       }
     }
 
-    // SET pass — only what is new or actually changed.
+    // SET pass - only what is new or actually changed.
     for (const [prop, next] of newOwned) {
       const prev = owned.get(prop);
       if (prev && prev.value === next.value && prev.imp === next.imp) continue;
       try {
         el.style.setProperty(prop, next.value, next.imp);
       } catch (why) {
-        // v0.3.2: the language promises loud errors — if the browser rejects
+        // v0.3.2: the language promises loud errors - if the browser rejects
         // a value we resolved, say so instead of failing silently. This is
         // how the repeat(4px, 1fr) grid collapse would have been caught.
-        const msg = `[DSSL] browser rejected "${prop}: ${next.value}" — ${why && why.message || 'invalid value'}`;
+        const msg = `[DSSL] browser rejected "${prop}: ${next.value}" - ${why && why.message || 'invalid value'}`;
         if (!this._warned) this._warned = new Set();
         if (!this._warned.has(msg)) { this._warned.add(msg); console.warn(msg); }
       }
@@ -795,16 +968,16 @@ export class DsslEngine {
     this.ownMap.set(el, newOwned);
     this.lastApply = Date.now();
 
-    // v0.4.0 — stagger bookkeeping: remember (or forget) this container
+    // v0.4.0 - stagger bookkeeping: remember (or forget) this container
     const hadStagger = this.staggerEls.has(el);
     if (staggerMs !== undefined && staggerMs !== null && Number.isFinite(Number(staggerMs))) {
       this.staggerEls.set(el, Number(staggerMs));
     } else if (hadStagger) {
       this.staggerEls.delete(el);
-      this.resetStagger(el); // rule stopped matching — restore natural delays
+      this.resetStagger(el); // rule stopped matching - restore natural delays
     }
 
-    // v0.6.0 — bend-around bookkeeping: remember (or forget) arc containers
+    // v0.6.0 - bend-around bookkeeping: remember (or forget) arc containers
     const hadArc = this.arcMap.has(el);
     if (arcVal !== undefined && arcVal !== null && Number.isFinite(arcVal) && arcVal !== 0) {
       this.arcMap.set(el, arcVal);
@@ -825,7 +998,7 @@ export class DsslEngine {
     const prevStack = this.stackPrev.get(el) || [];
     if (stack) {
       for (const child of el.children) {
-        // v0.4.1: idempotent — children get recomputed on every drain, but
+        // v0.4.1: idempotent - children get recomputed on every drain, but
         // rewriting grid-area every time churned the style attribute for free.
         if (child.nodeType === 1 && child.style.gridArea !== '1 / 1') {
           try { child.style.gridArea = '1 / 1'; } catch { }
@@ -857,16 +1030,16 @@ export class DsslEngine {
         const anim = el.animate(frames, {
           duration: spec.duration, easing: spec.easing,
           delay: spec.delay || 0, fill: spec.fill,
-          iterations: spec.iterations || 1,        // v0.5.0 — `infinite`
-          direction: spec.direction || 'normal',   // v0.5.0 — `alternate`
+          iterations: spec.iterations || 1,        // v0.5.0 - `infinite`
+          direction: spec.direction || 'normal',   // v0.5.0 - `alternate`
         });
         if (spec.iterations === Infinity) this._hasInfiniteAnims = true;
         anims.set(spec.key, anim);
-      } catch { /* WAAPI unsupported property — skip */ }
+      } catch { /* WAAPI unsupported property - skip */ }
       this._overlapDirty = true;   // moving boxes can create (or clear) overlaps
     }
 
-    // v0.6.0 — gradient-flow: loop background-position through WAAPI. Lives
+    // v0.6.0 - gradient-flow: loop background-position through WAAPI. Lives
     // in the same animMap so replay() and cancels treat it like any motion.
     const hadGflow = anims.has('@gflow');
     if (gflowVal) {
@@ -882,7 +1055,7 @@ export class DsslEngine {
           );
           anims.set('@gflow', a);
           this._hasInfiniteAnims = true;
-        } catch { /* WAAPI missing — skip */ }
+        } catch { /* WAAPI missing - skip */ }
       } else {
         try {
           const t = cur.effect.getTiming();
@@ -897,7 +1070,12 @@ export class DsslEngine {
     }
     if (animSpecs.length || anims.has('@gflow')) this.animMap.set(el, anims);
 
-    // v0.5.0 — overlap bookkeeping: remember (or forget) the element's policy.
+    // 0.9.0 - things that live beside the style attribute: texture shimmer, aura, range sliders
+    this.applyTextureShimmer(el, builtTex, builtTex ? Math.max(...textureVal.map((l) => l.animate || 0)) : 0, texUserLayers);
+    this.applyAura(el, auraGlowVal, auraPartsVal);
+    this.applySlider(el, sliderVal);
+
+    // v0.5.0 - overlap bookkeeping: remember (or forget) the element's policy.
     // The collision pass itself runs rAF-deferred after the drain; a policy
     // that stops matching also drops any nudge it was carrying.
     if (overlapVal) {
@@ -912,11 +1090,11 @@ export class DsslEngine {
   }
 
   /* ------------------------------------------------------------ *
-   * v0.5.0 — overlap: nothing below 100% opacity may overlap
+   * v0.5.0 - overlap: nothing below 100% opacity may overlap
    * ------------------------------------------------------------ */
 
   scheduleOverlap() {
-    if (this.frozen) return;         // v0.7.0 — frozen: nothing moves, ever
+    if (this.frozen) return;         // v0.7.0 - frozen: nothing moves, ever
     if (this._overlapRaf) return;
     this._overlapRaf = requestAnimationFrame(() => {
       this._overlapRaf = 0;
@@ -938,7 +1116,7 @@ export class DsslEngine {
 
   /* One collision pass. Walks the tree once for boxes, resolves candidates
    * biggest-first (big boxes anchor, small decorations yield), and writes
-   * each mover's escape offset through the `translate` channel — a separate
+   * each mover's escape offset through the `translate` channel - a separate
    * transform track, so DSSL transforms and WAAPI animations never notice. */
   resolveOverlaps() {
     if (!this.overlapEls.size) return;
@@ -952,7 +1130,7 @@ export class DsslEngine {
 
     const walk = (el, inherited) => {
       const own = this.overlapPolicy.get(el);
-      const eff = own || inherited;           // nearest explicit policy wins — CSS-style inheritance
+      const eff = own || inherited;           // nearest explicit policy wins - CSS-style inheritance
       if (el !== docEl && el !== document.body) {
         const r = el.getBoundingClientRect();
         if (r.width > 0.5 && r.height > 0.5) {
@@ -980,12 +1158,12 @@ export class DsslEngine {
 
     if (!cands.length) { this.dropStaleNudges(new Set()); return; }
 
-    // bigger boxes anchor — a 300px glow yielding to a 12px badge is backwards
+    // bigger boxes anchor - a 300px glow yielding to a 12px badge is backwards
     cands.sort((a, b) => b.area - a.area || a.order - b.order);
 
     const placed = new Map();   // box → nudge, visible to candidates resolved after it
     for (const c of cands) {
-      // ancestors/descendants always “overlap” their own tree — that is
+      // ancestors/descendants always “overlap” their own tree - that is
       // containment, not collision. Everything else is fair game.
       const others = [];
       for (const o of obst) {
@@ -1017,12 +1195,12 @@ export class DsslEngine {
   }
 
   /* ------------------------------------------------------------ *
-   * v0.6.0 — bend-around: a container's children on an arc
+   * v0.6.0 - bend-around: a container's children on an arc
    * ------------------------------------------------------------ */
 
   /* Runs after every drain (like stagger): reads each arc container's width
    * and lays its element children along the circle. A rotation around a far
-   * pivot also swings the child sideways by R·sin(θ) — left alone, the row
+   * pivot also swings the child sideways by R·sin(θ) - left alone, the row
    * would end up twice as wide and clip. So the arc is laid in three beats:
    * strip the previous arc to read the flex-truth, rotate to measure the
    * swing, then translate the swing away. The row keeps its footprint; only
@@ -1050,7 +1228,7 @@ export class DsslEngine {
         return r.left + r.width / 2;
       };
 
-      // beat 1 — strip the previous arc so the boxes are the layout's truth
+      // beat 1 - strip the previous arc so the boxes are the layout's truth
       kids.forEach((kid, i) => {
         if (!last.has(kid)) return;
         const own = ownOf(kid);
@@ -1059,7 +1237,7 @@ export class DsslEngine {
       });
       const baseX = kids.map(centerX);
 
-      // beat 2 — pure rotation around the far pivot, then measure the swing
+      // beat 2 - pure rotation around the far pivot, then measure the swing
       kids.forEach((kid, i) => {
         const own = ownOf(kid);
         try {
@@ -1069,7 +1247,7 @@ export class DsslEngine {
       });
       const swungX = kids.map(centerX);
 
-      // beat 3 — translate the swing away; the arc keeps the row's width.
+      // beat 3 - translate the swing away; the arc keeps the row's width.
       // Always write: beat 2 just clobbered these properties with the
       // measuring rotation, so a "same as last time" diff would skip the
       // restore and leave the raw rotated state on the element.
@@ -1148,7 +1326,7 @@ export class DsslEngine {
     }
   }
 
-  /* The stagger rule stopped matching — cancel the children's shifted
+  /* The stagger rule stopped matching - cancel the children's shifted
    * animations so they restart with their own declared delays. */
   resetStagger(el) {
     for (const kid of el.children) {
@@ -1173,7 +1351,7 @@ export class DsslEngine {
       if (value === null || value === undefined) document.documentElement.removeAttribute('data-dssl-signal-' + name);
       else document.documentElement.setAttribute('data-dssl-signal-' + name, String(value));
     } catch { }
-    // v0.7.0 — a frozen engine has no ambient drain, but an explicit signal()
+    // v0.7.0 - a frozen engine has no ambient drain, but an explicit signal()
     // is a developer action: drain synchronously so signals keep working
     // while the observers sleep.
     if (this.frozen) { this.freezeNotice(); this.computeAll(); return; }
@@ -1183,14 +1361,14 @@ export class DsslEngine {
   getSignal(name) { return this.signalStore.get(name); }
 
   /* ------------------------------------------------------------ *
-   * v0.7.0 — freeze / unfreeze: the speed escape hatch.
+   * v0.7.0 - freeze / unfreeze: the speed escape hatch.
    *
    * The runtime model (live DOM walk + MutationObserver + inline styles)
-   * is heavier than CSS by design — that is the price of being live. But
+   * is heavier than CSS by design - that is the price of being live. But
    * a page that does not need LIVE restyling should not keep paying for
-   * it. freeze() detaches every observer and listener — MutationObserver,
+   * it. freeze() detaches every observer and listener - MutationObserver,
    * ResizeObserver, IntersectionObserver, matchMedia, state events, the
-   * overlap heartbeat — and leaves the resolved inline styles exactly
+   * overlap heartbeat - and leaves the resolved inline styles exactly
    * where they are. The page keeps its look at zero engine cost, which
    * is what makes big pages viable. Explicit developer calls (apply,
    * signal, refresh, replay) still drain; everything ambient sleeps.
@@ -1218,6 +1396,9 @@ export class DsslEngine {
     }
     if (this._overlapTimer) { clearInterval(this._overlapTimer); this._overlapTimer = null; }
     if (this._overlapRaf) { cancelAnimationFrame(this._overlapRaf); this._overlapRaf = 0; }
+    if (this.aura) this.aura.pause();   // 0.9.0: a frozen page does not animate
+    for (const el of this.texEls) { const a = this.texAnims.get(el); if (a) { try { a.cancel(); } catch { } } this.texAnims.delete(el); }
+    this.texEls.clear();
     this.pending.clear();
     return this.freezeStats();
   }
@@ -1225,7 +1406,7 @@ export class DsslEngine {
   unfreeze() {
     if (!this.frozen) return this.freezeStats();
     this.frozen = false;
-    // disconnect() dropped every per-element observation — rebuild the seen
+    // disconnect() dropped every per-element observation - rebuild the seen
     // observer from scratch (computeAll re-observes its candidates), re-arm
     // the state listeners, re-observe known containers, re-watch the DOM.
     this.io = this.makeSeenObserver();
@@ -1241,12 +1422,13 @@ export class DsslEngine {
       try { this._mo.observe(doc, { childList: true, subtree: true, attributes: true, attributeFilter: undefined }); } catch { }
     }
     this.startOverlapTimer();
+    if (this.aura) this.aura.resume();
     this.computeAll();
     return this.freezeStats();
   }
 
   /* ------------------------------------------------------------ *
-   * v0.7.0 — explain(): the DevTools answer to "which rule wrote
+   * v0.7.0 - explain(): the DevTools answer to "which rule wrote
    * this one declaration?". Inline styles trade the cascade for a
    * style attribute; explain() gives the cascade back as data: every
    * matched rule with its file/line, and the winning declaration per
@@ -1281,7 +1463,7 @@ export class DsslEngine {
     );
 
     // cascade replay: the LAST declaration of a property wins, exactly like
-    // the SET pass — this is the answer to "what actually applied, and what
+    // the SET pass - this is the answer to "what actually applied, and what
     // did it beat?"
     const wins = new Map();
     for (const rule of matched) {
@@ -1346,7 +1528,7 @@ export class DsslEngine {
 
     let css = this.shadowRules.map(cssFor).join('\n\n');
 
-    // v0.8.0 — raw { } blocks: verbatim CSS (@font-face, @keyframes,
+    // v0.8.0 - raw { } blocks: verbatim CSS (@font-face, @keyframes,
     // @supports, @import…), appended after the pseudo-element rules
     if (this.raws && this.raws.length) {
       css += '\n\n' + this.raws.map(r => r.css).join('\n\n');
@@ -1373,7 +1555,7 @@ export class DsslEngine {
       this.shadowStyle.setAttribute('data-dssl-shadow', this.name);
       document.head.appendChild(this.shadowStyle);
     }
-    this.shadowStyle.textContent = `/* generated by DSSL engine "${this.name}" — pseudo-elements + reset only */\n` + css;
+    this.shadowStyle.textContent = `/* generated by DSSL engine "${this.name}" - pseudo-elements + reset only */\n` + css;
   }
 
   /* ------------------------------------------------------------ *
@@ -1394,18 +1576,18 @@ export class DsslEngine {
     }
     this._applying = false;
     this.applyStagger();
-    this.applyArc();            // v0.6.0 — bend-around arcs after every drain
+    this.applyArc();            // v0.6.0 - bend-around arcs after every drain
     this.scheduleOverlap();     // v0.5.0
   }
 }
 
 /* ------------------------------------------------------------------ *
- * v0.5.0 — the escape math, exported pure for tests.
+ * v0.5.0 - the escape math, exported pure for tests.
  *
  * Greedy minimal-translation: against every overlapping obstacle, the
  * four single-axis escapes are measured and the shortest one wins; repeat
  * until the box is clear (or 16 rounds, for sandwiched boxes that cannot
- * fully clear). Touching edges are not overlap — sub-pixel kiss does not
+ * fully clear). Touching edges are not overlap - sub-pixel kiss does not
  * count, or two stacked cards with shared borders would tremble forever.
  * ------------------------------------------------------------------ */
 export function overlapNudge(base, obstacles) {
@@ -1441,13 +1623,13 @@ function shiftBox(b, n) {
 }
 
 /* ------------------------------------------------------------------ *
- * v0.7.0 — the gate prefilter, exported pure for tests.
+ * v0.7.0 - the gate prefilter, exported pure for tests.
  *
  * computeElement used to call el.matches() for every rule on every
  * element: O(elements × rules) native calls, most of which failed on
  * the first class check anyway. A gate extracts the CHEAP NECESSARY
- * conditions from each selector's rightmost compound — classes, id,
- * tag — so the native call is skipped when the element obviously
+ * conditions from each selector's rightmost compound - classes, id,
+ * tag - so the native call is skipped when the element obviously
  * cannot match. Contract: a gate may only ever say NO. Anything this
  * little parser does not fully understand (attribute selectors, quoted
  * strings, escapes, unicode, weird commas) bails to null = no
@@ -1463,7 +1645,7 @@ const GATE_CHARS = /^[A-Za-z0-9_\-#.:>~+\s*(),]+$/;
 export function gateFor(sel) {
   if (!sel || sel === ':root' || sel === '*') return null;
   if (!GATE_CHARS.test(sel)) return null;
-  // paren-aware top-level comma split — :is(.a,.b) span is ONE part
+  // paren-aware top-level comma split - :is(.a,.b) span is ONE part
   const parts = [];
   {
     let depth = 0, cur = '';
@@ -1495,12 +1677,12 @@ export function gateFor(sel) {
     if (!compounds.length) return null;
     let compound = compounds[compounds.length - 1].trim();
     if (!compound) return null;
-    // inner selector lists (:not(.a, .b), :is(…)) are NOT requirements —
+    // inner selector lists (:not(.a, .b), :is(…)) are NOT requirements -
     // their classes/tags do not constrain the element, so strip every
     // paren group before extracting keys.
     let prev;
     do { prev = compound; compound = compound.replace(/\([^()]*\)/g, ''); } while (compound !== prev);
-    if (!compound) { gates.push(null); continue; } // bare :is(...) — no filter
+    if (!compound) { gates.push(null); continue; } // bare :is(...) - no filter
     if (!/^[A-Za-z0-9_\-#.:*\s]+$/.test(compound)) return null;
     const g = { tag: null, id: null, classes: [] };
     const tagM = compound.match(/^[A-Za-z][A-Za-z0-9-]*/);
@@ -1517,7 +1699,7 @@ export function gateFor(sel) {
 }
 
 /* Duck-typed on purpose: tests drive it with fake elements. */
-/* v0.7.2 — stateReach: where can a state change reach in the DOM?
+/* v0.7.2 - stateReach: where can a state change reach in the DOM?
  * Pure and exported for tests. Given a stateful selector and the state that
  * just flipped on some element, it answers:
  *   null              → subject-state (state on the rightmost compound): only

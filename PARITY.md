@@ -15,8 +15,8 @@ The point of this table is to stop two bad arguments: "DSSL is missing everythin
 | `@media` queries | `@media (max-width: 860)`, sugar: `dark`, `light`, `reduced-motion`, bare widths, `<=` ranges | shipped | |
 | `@container` queries | `@container (min-width: 480)` | shipped | nearest ancestor (or self) with container-type |
 | `@layer` cascade layers | `@layer base\|components\|utilities` + `pin {}` | shipped | cascade is (layer, source order); no specificity, no !important |
-| `@supports` | not implemented | planned | low priority: the engine feature-detects itself |
-| `@font-face` | not implemented | planned | `font.*` tokens can name any loaded family today |
+| `@supports` | `raw { }` passes it through verbatim | partial | no sugar; the engine feature-detects itself, and `dssl import` moves it into `raw { }` |
+| `@font-face` | `raw { }` passes it through verbatim (semicolons required inside) | partial | `font.*` tokens can name any loaded family; a missing `;` in `raw` is a warning with a line number |
 | `@keyframes` | `motion name { from {} to {} }` via WAAPI | shipped | `animate: name 600 ease-out infinite alternate` |
 | View transitions | not implemented | planned | |
 | Scroll-driven animations | not implemented | planned | pairs naturally with `seen` + `stagger` |
@@ -25,6 +25,11 @@ The point of this table is to stop two bad arguments: "DSSL is missing everythin
 | Flexbox / Grid | raw properties pass through + `row:` `column:` `grid:` `stack:` sugar | shipped | shorthands write `display`; the compiler warns when that clobbers an explicit `display:` |
 | `place-items` / alignment | `center: both` | shipped | the engine promotes a formatting context when missing, so alignment cannot silently no-op |
 | Transitions | per-property: `transition: 200 snap transform` | shipped | honors `reduced-motion` |
+| Background patterns and noise | `texture:` (30 presets, 10 generators, your own) | shipped | there is no CSS shorthand for "grain on top of my background"; this one keeps the author's background and removes cleanly. Runtime-only |
+| Glow, particles, fire | `aura-glow`, `aura-particle`, `glow-particle`, `aura-glow-particle`, `aura:` | shipped | CSS has `box-shadow` and `filter: drop-shadow`, and nothing for particles. No presets by design. Runtime-only |
+| Styling `<input type="range">` | `slider:` writes the `::-webkit-slider-*` and `::-moz-range-*` rules together | shipped | Chrome tested; the Firefox rules are generated but not run yet. Histogram sliders via `graph` |
+| Accessibility hints in the compiler | contrast, removed focus outline, small targets (warnings) | shipped | CSS says nothing; these never fail a build unless you pass `--strict` |
+| Moving existing CSS over | `dssl import styles.css` | shipped | converts the mechanical differences and reports the rest; the output always compiles |
 | print styles (`@media print`) | not implemented | planned | |
 | `!important` | by design no | by-design-no | `pin { }` is the must-win block; specificity wars are the thing DSSL deletes |
 | Cascade | (layer, source order) | shipped | later wins; identical selectors resolve by order, deterministically |
@@ -56,6 +61,28 @@ so the boundary is explicit, not folklore.
 - the overlap policy: translucent boxes refuse to cover things unless you say so
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
+
+## v0.9.0: texture, aura, sliders, and what testing them found
+
+New language: `texture`, the aura family, `slider`, lint warnings, `dssl import`, and an
+interactive designer in the editor extension. Writing real-browser tests for them found bugs
+that were fixed in the same release:
+
+- `aura-glow: none` also wiped the particles slot. Each `none` now clears only its own slot.
+- With reduced motion the loop kept redrawing a still glow 60 times a second. It now redraws on
+  scroll, resize and a slow poll only (and still follows the page when you scroll).
+- A glow was re-blurred every frame (11 ms for 40 glows). Each glow is now painted once into a
+  cached bitmap and re-lit per frame (0.6 ms).
+- `freeze()` stopped aura but not the texture shimmer. It stops both.
+- A slider clause with a leftover word (`thumb 16 #fff shape bar`) was silently ignored. It is an error.
+- A typo in an aura (`speedd 4`) was swallowed as a colour and never got its did-you-mean.
+- `dssl build` did not count engine-native declarations inside a rule that kept other declarations,
+  so it said nothing about the aura or texture it dropped. It now lists them.
+- The downloadable package and the editor extension each copied a hardcoded list of engine files,
+  so a new module would have crashed them. They copy the whole folder now, and a test guards it.
+- `importCss` threw on a stray `@`. It never throws now.
+
+The contrast lint also found four real contrast failures in this site's own stylesheets.
 
 ## v0.8.2: what rebuilding the site found
 
