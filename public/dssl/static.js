@@ -35,14 +35,61 @@ const declLine = (d, pin) => {
 
 const isEngineProp = (p) => p && p.startsWith('@');
 
-function emitRule(r, { pin = false, pseudo = null } = {}) {
-  let sel = r.sel;
+function emitRule(r, { pin = false, pseudo = null, flat = true } = {}) {
+  // DSSL has no specificity: the later rule wins. Native CSS does have it, so `.code-head + .code` would beat a later
+  // `.code-plain` in a build and not in the engine. Wrapping the selector in :where() gives every rule zero
+  // specificity, so source order decides, exactly as it does in the engine. (A pseudo-element cannot sit inside :where.)
+  let sel = flat ? `:where(${r.sel})` : r.sel;
   if (pseudo) sel = sel + '::' + pseudo;
   let out = `${sel} {\n${r.decls.map(d => declLine(d, pin)).join('\n')}\n}`;
-  for (const q of [...(r.containers || [])].reverse()) out = `@container ${q} {\n${out}\n}`;
-  for (const q of [...(r.media || [])].reverse()) out = `@media ${q} {\n${out}\n}`;
+  // where each generated line came from, relative to the first line of this rule: the selector line maps to the
+  // rule's line in the .dssl file, each declaration line to its own line (0.13.0, for source maps)
+  const maps = [{ dl: 0, file: r.file, line: r.line }];
+  r.decls.forEach((d, i) => maps.push({ dl: 1 + i, file: r.file, line: d.line || r.line }));
+  let wrap = 0;
+  for (const q of [...(r.containers || [])].reverse()) { out = `@container ${q} {\n${out}\n}`; wrap++; }
+  for (const q of [...(r.media || [])].reverse()) { out = `@media ${q} {\n${out}\n}`; wrap++; }
+  return { css: out, maps: maps.map((m) => ({ ...m, dl: m.dl + wrap })) };
+}
+
+/** a source map needs base64 VLQ numbers */
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function vlq(n) {
+  let v = n < 0 ? ((-n) << 1) | 1 : n << 1, out = '';
+  do { let digit = v & 31; v >>>= 5; if (v > 0) digit |= 32; out += B64[digit]; } while (v > 0);
   return out;
 }
+
+/** several compiled files as one document, later files after earlier ones, the way the browser applies them */
+export function mergeDocs(docs) {
+  const out = { rules: [], shadowRules: [], raws: [], fontLinks: [], motionFrames: {}, motions: {}, tokens: {}, registryRule: null, errors: [], warnings: [] };
+  let offset = 0;
+  for (const d of docs) {
+    let max = -1;
+    for (const list of [['rules', d.rules], ['shadowRules', d.shadowRules], ['raws', d.raws]]) {
+      for (const r of list[1] || []) { out[list[0]].push({ ...r, order: (r.order ?? 0) + offset }); max = Math.max(max, r.order ?? 0); }
+    }
+    offset += max + 1;
+    out.fontLinks.push(...(d.fontLinks || []));
+    Object.assign(out.motionFrames, d.motionFrames || {});
+    Object.assign(out.motions, d.motions || {});
+    Object.assign(out.tokens, d.tokens || {});
+    if (d.registryRule) out.registryRule = d.registryRule;   // the last file knows every token
+    out.errors.push(...(d.errors || [])); out.warnings.push(...(d.warnings || []));
+  }
+  return out;
+}
+
+const RESET_CSS = `:where(html) { box-sizing: border-box; -webkit-text-size-adjust: 100%; }
+:where(html *, html *::before, html *::after) { box-sizing: border-box; }
+:where(body) { margin: 0; }
+:where(h1,h2,h3,h4,h5,h6,p,figure,blockquote,dl,dd,pre) { margin: 0; }
+:where(ul,ol) { margin: 0; padding: 0; list-style: none; }
+:where(img,picture,video,canvas,svg) { display: block; max-width: 100%; }
+:where(input,button,textarea,select) { font: inherit; color: inherit; letter-spacing: inherit; }
+:where(a) { color: inherit; text-decoration: none; }
+:where(button) { background: none; border: none; padding: 0; cursor: pointer; }
+:where(table) { border-collapse: collapse; }`;
 
 /** split one rule into { static, engineProps } - static decls survive */
 function splitDecls(decls, kinds) {
@@ -87,7 +134,51 @@ function bakeTexture(rule, toColor, report) {
   return { ...rule, decls };
 }
 
-export function toCSS(doc, opts = {}) {
+/**
+ * --inline-tokens: replace var(--dssl-x) with the token's own value wherever the token is defined once and never changed.
+ * A custom property costs the browser a lookup per use, and thousands of cards use dozens of them. The :root table stays, so
+ * your own CSS and JavaScript can still read the tokens; what you give up is changing a token at run time and having the
+ * compiled rules follow, so tokens that any rule redefines (a dark theme in a media query, a scoped --color.accent) are
+ * never inlined, and neither is anything the page changes with DSSL.apply after load.
+ */
+function inlineTokens(doc, report) {
+  const reg = doc.registryRule;
+  if (!reg) return;
+  const redefined = new Set();
+  for (const list of [doc.rules || [], doc.shadowRules || []]) {
+    for (const r of list) {
+      if (r === reg) continue;
+      // a plain top-level tokens { } block is how the token is DEFINED (the registry already holds its final value);
+      // the same property set under a media query, a signal, a container or a selector other than :root is a change of it
+      const conditional = r.sel !== ':root' || (r.media || []).length || (r.signals || []).length || (r.containers || []).length;
+      if (!conditional) continue;
+      for (const d of r.decls || []) if (/^--dssl-/.test(d.prop)) redefined.add(d.prop);
+    }
+  }
+  const values = new Map();
+  for (const d of reg.decls) if (d.prop.startsWith('--dssl-') && !redefined.has(d.prop)) values.set(d.prop, String(d.value));
+  const VAR = /var\((--dssl-[\w-]+)\)/g;
+  // resolve tokens that point at other tokens, a few levels deep; anything still holding a var() is left alone
+  for (let pass = 0; pass < 4; pass++) for (const [k, v] of values) values.set(k, v.replace(VAR, (m, n) => (values.has(n) && !/var\(/.test(values.get(n)) ? values.get(n) : m)));
+  for (const [k, v] of [...values]) if (/var\(/.test(v)) values.delete(k);
+  let n = 0;
+  for (const list of [doc.rules || [], doc.shadowRules || []]) {
+    for (const r of list) {
+      if (r === reg) continue;
+      for (const d of r.decls || []) {
+        if (typeof d.value !== 'string' || !d.value.includes('var(--dssl-')) continue;
+        const next = d.value.replace(VAR, (m, name) => (values.has(name) ? (n++, values.get(name)) : m));
+        if (next !== d.value) d.value = next;
+      }
+    }
+  }
+  report.inlinedTokens = n; report.inlinableTokens = values.size;
+}
+
+export function toCSS(docIn, opts = {}) {
+  let doc = Array.isArray(docIn) ? mergeDocs(docIn) : docIn;
+  // inlining edits declaration values, so work on a copy and leave the caller's document alone
+  if (opts.inlineTokens) doc = { ...doc, rules: (doc.rules || []).map((r) => ({ ...r, decls: (r.decls || []).map((d) => ({ ...d })) })), shadowRules: (doc.shadowRules || []).map((r) => ({ ...r, decls: (r.decls || []).map((d) => ({ ...d })) })) };
   const file = opts.file || 'styles.dssl';
   const report = {
     file,
@@ -98,6 +189,7 @@ export function toCSS(doc, opts = {}) {
     layers: [],
   };
   const kinds = new Set();
+  if (opts.inlineTokens) inlineTokens(doc, report);
 
   const chunks = [];
   const header = opts.banner !== false
@@ -105,10 +197,17 @@ export function toCSS(doc, opts = {}) {
    Textures are baked in as background images when their colours are known at build time. */\n`
     : '';
   // 0.12.0: fonts { } as @import. An @import has to come before every rule except @layer statements, so it goes right after the banner.
-  let out = header;
+  // everything written goes through put(), which counts lines so the source map knows where each rule landed
+  let out = '', line = 0;
+  const mappings = [];
+  const put = (text, maps) => {
+    for (const m of maps || []) mappings.push({ genLine: line + m.dl, file: m.file, srcLine: m.line });
+    out += text; line += (text.match(/\n/g) || []).length;
+  };
+  put(header);
   const fontUrls = [...new Set((doc.fontLinks || []).map((l) => l.url))];
-  for (const u of fontUrls) out += `@import url("${u}");\n`;
-  if (fontUrls.length) out += '\n';
+  for (const u of fontUrls) put(`@import url("${u}");\n`);
+  if (fontUrls.length) put('\n');
 
   const allRules = [...(doc.registryRule ? [doc.registryRule] : []), ...(doc.rules || [])];
 
@@ -143,7 +242,7 @@ export function toCSS(doc, opts = {}) {
       if (!rule.sel) rule.sel = '*';
     }
     const pin = rule.layer === 'pin';
-    chunks.push({ layer: rule.layer, css: emitRule(rule, { pin }), order: rule.order });
+    chunks.push({ layer: rule.layer, ...emitRule(rule, { pin, flat: !opts.nativeSpecificity }), order: rule.order });
     report.rules++;
   }
 
@@ -153,30 +252,63 @@ export function toCSS(doc, opts = {}) {
     const { keep, engineProps } = splitDecls(r.decls || [], kinds);
     report.engineDecls += engineProps;
     if (!keep.length) { if (engineProps) report.skippedEngine++; continue; }
-    chunks.push({ layer: r.layer, css: emitRule({ ...r, decls: keep }, { pin: r.layer === 'pin', pseudo: r.pseudo }), order: r.order });
+    chunks.push({ layer: r.layer, ...emitRule({ ...r, decls: keep }, { pin: r.layer === 'pin', pseudo: r.pseudo, flat: !opts.nativeSpecificity }), order: r.order });
     report.shadowRules++;
   }
 
   // ---- layers: emit the order statement once, then group ----
   const usedLayers = [...new Set(chunks.map(c => c.layer).filter(Boolean))]
     .sort((a, b) => (LAYER_RANK[a] ?? 2) - (LAYER_RANK[b] ?? 2));
-  if (usedLayers.length) {
+  // 0.13.0: the engine's small reset is unlayered, which in a build would beat every layered rule. As the first layer it
+  // loses to everything, which is what `:where()` was always meant to do.
+  const withReset = !!opts.reset;
+  if (usedLayers.length || withReset) {
     report.layers = usedLayers;
-    out += `@layer ${LAYER_NAMES.join(', ')};\n\n`;
+    put(`@layer ${(withReset ? ['reset', ...LAYER_NAMES] : LAYER_NAMES).join(', ')};\n\n`);
+    if (withReset) put(`@layer reset {\n${RESET_CSS}\n}\n\n`);
     for (const layer of usedLayers) {
       const inLayer = chunks.filter(c => c.layer === layer).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      out += `@layer ${layer} {\n${inLayer.map(c => c.css).join('\n\n')}\n}\n\n`;
+      put(`@layer ${layer} {\n`);
+      inLayer.forEach((c, i) => { put(c.css + (i < inLayer.length - 1 ? '\n\n' : ''), c.maps); });
+      put(`\n}\n\n`);
     }
   }
-  for (const c of chunks.filter(x => x.layer === null)) out += c.css + '\n\n';
+  for (const c of chunks.filter(x => x.layer === null)) put(c.css + '\n\n', c.maps);
 
   // ---- raw { } verbatim ----
   for (const r of doc.raws || []) {
     if (!r.css) continue;
-    out += `/* raw @ ${r.file || file}:${r.line} */\n` + r.css + '\n\n';
+    put(`/* raw @ ${r.file || file}:${r.line} */\n` + r.css + '\n\n', [{ dl: 1, file: r.file, line: r.line }]);
     report.raws++;
   }
 
   report.engineKinds = [...kinds].sort();
-  return { css: out.trimEnd() + '\n', report };
+  let css = out.trimEnd() + '\n';
+  let map = null;
+  if (opts.sourceMap) {
+    // sources: the files rules came from, in first-seen order. opts.sources may say where each one lives and what it holds
+    const info = opts.sources || {};
+    const seenFiles = new Set(mappings.map((m) => m.file).filter(Boolean));
+    // the order the files were given in, then any stragglers
+    const names = [...Object.keys(info).filter((n) => seenFiles.has(n)), ...[...seenFiles].filter((n) => !(n in info))];
+    const lines = [];
+    let prevSrc = 0, prevLine = 0;
+    for (const m of mappings.sort((a, b) => a.genLine - b.genLine)) {
+      if (!m.file) continue;
+      while (lines.length <= m.genLine) lines.push([]);
+      const idx = names.indexOf(m.file);
+      const srcLine = Math.max(0, (m.srcLine || 1) - 1);
+      // [generated column, source index, source line, source column], each relative to the one before it
+      lines[m.genLine].push(vlq(0) + vlq(idx - prevSrc) + vlq(srcLine - prevLine) + vlq(0));
+      prevSrc = idx; prevLine = srcLine;
+    }
+    map = {
+      version: 3, file: opts.mapFile || 'styles.css',
+      sources: names.map((n) => (info[n] && info[n].path) || n),
+      sourcesContent: names.map((n) => (info[n] && info[n].content !== undefined ? info[n].content : null)),
+      names: [], mappings: lines.map((l) => l.join(',')).join(';'),
+    };
+    if (opts.sourceMapUrl) css += `/*# sourceMappingURL=${opts.sourceMapUrl} */\n`;
+  }
+  return { css, report, map };
 }

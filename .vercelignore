@@ -3,6 +3,7 @@
 /tool-results/
 /scripts/*
 !/scripts/gen-site-vocab.mjs
+!/scripts/build-site-css.mjs
 /node_modules/
 /worklog.md
 /*.tar.gz

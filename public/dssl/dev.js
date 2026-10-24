@@ -28,8 +28,8 @@ export function createInspector({ explain }) {
     host.id = HOST_ID;
     host.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483646;pointer-events:none;';
     const root = host.attachShadow({ mode: 'open' });
-    root.innerHTML = `
-      <style>
+    // the panel's CSS goes in a constructed stylesheet, because a strict CSP refuses a <style> element made by script
+    const PANEL_CSS = `
         :host { all: initial }
         .box { position: fixed; border: 2px solid #ff3d8b; background: rgba(255,61,139,.12); pointer-events: none; border-radius: 2px; display: none }
         .panel { position: fixed; right: 12px; bottom: 12px; width: min(440px, calc(100vw - 24px)); max-height: 58vh; overflow: auto; pointer-events: auto;
@@ -47,9 +47,13 @@ export function createInspector({ explain }) {
         .val { color: #ffd98a }
         .muted { color: #9a90ad }
         .none { padding: 12px; color: #9a90ad }
-      </style>
+`;
+    const PANEL_HTML = `
       <div class="box" part="box"></div>
       <div class="panel" role="dialog" aria-label="DSSL inspector"><header><span><b>DSSL</b> inspector</span><span><button data-act="pin" title="Click the page to pin an element">hover</button> <button data-act="close" aria-label="Close inspector">Esc</button></span></header><div class="body"><div class="none">Hover an element. Click it to keep its rules on screen.</div></div></div>`;
+    let adopted = false;
+    try { const sheet = new CSSStyleSheet(); sheet.replaceSync(PANEL_CSS); root.adoptedStyleSheets = [sheet]; adopted = true; } catch { /* an old browser: use a <style> inside the shadow root */ }
+    root.innerHTML = (adopted ? '' : `<style>${PANEL_CSS}</style>`) + PANEL_HTML;
     document.documentElement.appendChild(host);
     const box = root.querySelector('.box'), body = root.querySelector('.body'), pinBtn = root.querySelector('[data-act=pin]');
     let target = null, pinned = false;

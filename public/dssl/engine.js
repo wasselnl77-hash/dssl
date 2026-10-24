@@ -68,6 +68,16 @@ export function assignGlobalOrder(bundlesInLoadOrder) {
 // engine PROMOTES it: inline elements → inline-grid (flow preserved), blockish
 // elements → grid. Explicit `display:` in the same cascade still wins, because
 // the promotion is applied first and "later wins" is the whole cascade.
+/** the page's CSP nonce, if it has one: a script or style tag carries it as .nonce, or a <meta name="dssl-nonce"> can say it */
+function pageNonce() {
+  try {
+    const el = document.querySelector('script[nonce], style[nonce], link[nonce]');
+    if (el && (el.nonce || el.getAttribute('nonce'))) return el.nonce || el.getAttribute('nonce');
+    const m = document.querySelector('meta[name="dssl-nonce"]');
+    return m ? m.getAttribute('content') : '';
+  } catch { return ''; }
+}
+
 const ALIGN_PROPS = new Set([
   'place-items', 'place-content', 'align-items', 'justify-items',
   'align-content', 'justify-content',
@@ -92,18 +102,33 @@ const HAS_CONTEXT_RE = /^(flex|inline-flex|grid|inline-grid)$/;
 const BORDER_STYLES = new Set(['none', 'hidden', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset']);
 const BORDER_WIDTH_RE = /^(0|[\d.]+(?:px|em|rem|%|pt|ch|vw|vh)|thin|medium|thick)$/i;
 
-function foldIntoBorder(shVal, lhVal) {
-  const parts = String(shVal).trim().split(/\s+/);
-  const width = [];
-  const style = [];
-  const color = [];
-  for (const t of parts) {
+/** split on whitespace that is not inside parentheses: `1px solid color-mix(in oklab, red 40%, transparent)` is three words */
+function wordsTop(str) {
+  const out = []; let depth = 0, cur = '';
+  for (const ch of String(str).trim()) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (/\s/.test(ch) && depth === 0) { if (cur) out.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/**
+ * Put one border longhand into a border shorthand, in its own slot (width, style or colour). The cascade is
+ * "later wins", so a `border-style: dashed` written AFTER `border: 1 solid ...` has to win, and the inline style
+ * cannot hold both. `kind` says which slot the longhand owns.
+ */
+function foldIntoBorder(shVal, lhVal, kind = 'color') {
+  const width = [], style = [], color = [];
+  for (const t of wordsTop(shVal)) {
     if (!width.length && BORDER_WIDTH_RE.test(t)) width.push(t);
     else if (!style.length && BORDER_STYLES.has(t.toLowerCase())) style.push(t);
     else color.push(t);
   }
-  if (color.length) color[0] = lhVal;      // replace the color slot (later cascade wins)
-  else color.push(lhVal);                  // shorthand had no color slot - append
+  const slot = kind === 'width' ? width : kind === 'style' ? style : color;
+  slot.length = 0; slot.push(lhVal);        // replace the slot (or fill it, when the shorthand had none)
   return [...width, ...style, ...color].join(' ');
 }
 
@@ -833,6 +858,7 @@ export class DsslEngine {
     let gflowVal;                          // v0.6.0 - @gradient-flow spec
     let textureVal, auraGlowVal, auraPartsVal, sliderVal; // 0.9.0
     let tiltVal = null;                    // 0.10.0
+    let declSeq = 0;                       // cascade position of each declaration, so a longhand can tell whether it came after its shorthand
 
     // flatten matched decls in cascade order (last decl of a prop wins, exactly
     // like sequential setProperty calls did)
@@ -875,7 +901,7 @@ export class DsslEngine {
       if (d.prop === '@aura-particles') { auraPartsVal = d.value || null; continue; }
       if (d.prop === '@slider') { sliderVal = d.value || null; continue; }
       if (d.prop === '@tilt') { tiltVal = d.value || null; continue; }
-      newOwned.set(d.prop, { value: d.value, imp });
+      newOwned.set(d.prop, { value: d.value, imp, seq: ++declSeq });
     }
     // anim keys need rule identity - rebuild them from matched order
     {
@@ -897,8 +923,10 @@ export class DsslEngine {
       for (const lhName of ['border-color', 'border-width', 'border-style']) {
         const lh = newOwned.get(lhName);
         if (!lh) continue;
-        if (lhName === 'border-color') newOwned.set(fam, { value: foldIntoBorder(sh.value, lh.value), imp: sh.imp });
-        else newOwned.set(fam, { value: sh.value, imp: sh.imp }); // non-color longhand: shorthand wins width/style only when it has that slot - keep shorthand, drop longhand
+        // the one that came later in the cascade wins: a longhand after the shorthand is folded into its slot, a
+        // longhand before it is simply overridden. (Before 0.13.0 a later border-style or border-width was thrown away.)
+        const single = wordsTop(lh.value).length === 1;
+        if ((lh.seq || 0) > (sh.seq || 0) && single) newOwned.set(fam, { value: foldIntoBorder(sh.value, lh.value, lhName.slice(7)), imp: sh.imp, seq: lh.seq });
         newOwned.delete(lhName);
         if (!this._warned) this._warned = new Set();
         const wmsg = `[DSSL] folded ${lhName} into ${fam} on <${el.tagName.toLowerCase()}${el.className ? ' .' + String(el.className).split(' ')[0] : ''}> - inline style cannot hold a var() shorthand and its longhand together`;
@@ -914,7 +942,9 @@ export class DsslEngine {
       newOwned.delete(fam);
       for (const [p, v] of expandPositional(sh.value, longhands)) {
         const prevL = newOwned.get(p);
-        if (!prevL) newOwned.set(p, { value: v, imp });
+        // whichever came later in the cascade wins: `margin-top: 14` after `margin: 0` keeps its 14, but `margin: 0` after
+        // `margin-top: 14` resets it (before 0.13.0 the longhand always survived)
+        if (!prevL || (prevL.seq || 0) < (sh.seq || 0)) newOwned.set(p, { value: v, imp, seq: sh.seq });
       }
     }
 
@@ -1606,12 +1636,34 @@ export class DsslEngine {
 :where(table) { border-collapse: collapse; }`;
     }
 
+    this.writeShadowCss(`/* generated by DSSL engine "${this.name}" - pseudo-elements + reset only */\n` + css);
+  }
+
+  /**
+   * 0.13.0: a page with a strict Content-Security-Policy (no 'unsafe-inline' in style-src) refuses a <style> element made by
+   * script, but allows a constructed stylesheet, so that is what the engine uses. Everything else it does to styles goes
+   * through the CSSOM (el.style.setProperty), which the policy has always allowed. The <style> fallback is for browsers
+   * without constructable stylesheets, and for raw CSS that contains @import, which a constructed sheet ignores; it carries
+   * the page's nonce when there is one.
+   */
+  writeShadowCss(css) {
+    const canAdopt = typeof CSSStyleSheet !== 'undefined' && 'adoptedStyleSheets' in document && typeof CSSStyleSheet.prototype.replaceSync === 'function';
+    if (canAdopt && !/@import\b/.test(css)) {
+      try {
+        if (!this._sheet) { this._sheet = new CSSStyleSheet(); document.adoptedStyleSheets = [...document.adoptedStyleSheets, this._sheet]; }
+        this._sheet.replaceSync(css);
+        if (this.shadowStyle) { this.shadowStyle.remove(); this.shadowStyle = null; }
+        return;
+      } catch { /* fall through to a <style> element */ }
+    }
     if (!this.shadowStyle) {
       this.shadowStyle = document.createElement('style');
       this.shadowStyle.setAttribute('data-dssl-shadow', this.name);
+      const nonce = pageNonce();
+      if (nonce) this.shadowStyle.setAttribute('nonce', nonce);
       document.head.appendChild(this.shadowStyle);
     }
-    this.shadowStyle.textContent = `/* generated by DSSL engine "${this.name}" - pseudo-elements + reset only */\n` + css;
+    this.shadowStyle.textContent = css;
   }
 
   /* ------------------------------------------------------------ *

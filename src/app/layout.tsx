@@ -113,12 +113,15 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${display.variable} ${mono.variable}`} data-dssl-reset suppressHydrationWarning>
+    <html lang="en" className={`${display.variable} ${mono.variable}`} suppressHydrationWarning>
       <head>
         <style dangerouslySetInnerHTML={{ __html: prePaint }} />
         {process.env.NODE_ENV !== "production" && (
           <script dangerouslySetInnerHTML={{ __html: hydrationShim }} />
         )}
+        {/* the same sheets, compiled to plain CSS by `dssl build` (scripts/build-site-css.mjs): styled on first paint, with
+            JavaScript off, and in the server-rendered HTML. The engine then adds what a build cannot keep. The reset is in it. */}
+        <link rel="stylesheet" href="/site.css" />
         {dsslInlineStyles().map(({ name, src }) => (
           <style
             key={name}

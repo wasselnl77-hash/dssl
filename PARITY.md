@@ -62,6 +62,21 @@ so the boundary is explicit, not folklore.
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
 
+## v0.13.0: the compiled page is the page
+
+| Promise | Status | Evidence |
+|---|---|---|
+| With JavaScript off, a compiled page renders its static styles correctly on first paint | done | test-static-parity.mjs: 7 pages, 5,000+ elements, identical to the engine (demo elements for engine-only features excluded); the site itself ships this way |
+| Startup within 10% of equivalent CSS | done for the compiled page | bench-compiled.mjs: +0% (default build), -4% (`--inline-tokens`) |
+| Churn at parity | done with `--inline-tokens` (0%); default build +7% churn, +20% on an inherited-value restyle | same benchmark |
+| The same for the runtime engine | **no**: load 17x, churn 4x | the engine applies inline styles; a hybrid mode that skips what the CSS already did is not built |
+| SSR | done | `public/dssl/server.js` (no DOM), real React `renderToStaticMarkup` tested; the site links compiled CSS in its server-rendered head |
+| Strict CSP | done | no `<style>` made by script, zero violations under `style-src 'self'` with the engine, texture, slider, tilt, aura and inspector; textures need `img-src data:` |
+| Devtools show .dssl source lines | done for built CSS | `--sourcemap`; Chrome's own DevTools shows `card.dssl:4` (checked in a real DevTools window). Runtime inline styles cannot carry a source: use `DSSL.inspect()` |
+
+Bugs the comparison found, now fixed: compiled selectors had CSS specificity (now `:where()`), a later `border-style` or
+`border-width` was dropped by the engine, a margin or padding shorthand did not reset an earlier longhand, the reset was unlayered.
+
 ## v0.12.0: the rest of the wood list
 
 Fonts, richer gradients, an inspector, hot reload and mirrored tiling, from the same critic's list (rows marked "done in 0.12.0" below).

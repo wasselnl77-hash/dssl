@@ -28,7 +28,7 @@
  * next (name a tokens.dssl first, exactly like <link> order in the browser).
  * ========================================================================= */
 import { readFileSync, writeFileSync, statSync, existsSync } from 'node:fs';
-import { dirname, resolve as pathResolve, basename, join } from 'node:path';
+import { dirname, resolve as pathResolve, basename, join, relative as pathRelative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // the engine is plain ESM, import it directly, no build step. In a repo checkout
@@ -49,8 +49,14 @@ const USAGE = `dssl v${VERSION} - the DSSL style language
                          --json    machine-readable output
                          --strict  warnings are errors too (exit 1)
                          --quiet   only print diagnostics, no summary
-  dssl build <file>      compile the static subset to a real .css file
-                         -o <out.css>   output path (default: <file>.css)
+  dssl build <files…>    compile the static subset to a real .css file (several files: in load order, tokens first)
+                         -o <out.css>   output path (default: <first file>.css)
+                         --sourcemap    write <out.css>.map so devtools show the .dssl file and line of each rule
+                         --reset        include the small reset, as a layer that loses to everything
+                         --inline-tokens  write each token's value in place of var(--dssl-x) where the token is defined once and
+                                        never changed: the fastest CSS, but a token changed at run time will not reach it
+                         --native-specificity  keep selectors as written. By default every selector is wrapped in :where(),
+                                        so source order wins exactly like in the engine, not CSS specificity
                          --json         machine-readable report
                          --strict       warnings are errors too (exit 1)
                          --no-banner    omit the generated-file header
@@ -192,31 +198,43 @@ if (cmd === 'dev') {
   const json = args.includes('--json');
   const banner = !args.includes('--no-banner');
   const strict = args.includes('--strict');
-  for (const f of ['--json', '--no-banner', '--strict']) { const i = args.indexOf(f); if (i !== -1) args.splice(i, 1); }
+  const sourcemap = args.includes('--sourcemap');
+  const reset = args.includes('--reset');
+  const nativeSpecificity = args.includes('--native-specificity');
+  const inlineTokens = args.includes('--inline-tokens');
+  for (const f of ['--json', '--no-banner', '--strict', '--sourcemap', '--reset', '--native-specificity', '--inline-tokens']) { const i = args.indexOf(f); if (i !== -1) args.splice(i, 1); }
   const outPath = readArg(args, '-o') || readArg(args, '--out');
-  if (!args.length) { console.error('dssl build: give me a .dssl file to build'); process.exit(2); }
-  const input = args[0];
-  const results = compileAll([input]);
-  const r = results[0];
-  const built = toCSS(r.doc, { file: r.name, banner, version: VERSION });
-  const outputPath = outPath || (input.replace(/\.dssl$/i, '') + '.css');
+  if (!args.length) { console.error('dssl build: give me a .dssl file to build (or several, in load order: tokens first)'); process.exit(2); }
+  const inputs = [...args];
+  const results = compileAll(inputs);
+  const errors = results.flatMap((x) => x.errors), warnings = results.flatMap((x) => x.warnings);
+  const outputPath = outPath || (inputs[0].replace(/\.dssl$/i, '') + '.css');
+  const outDir = dirname(pathResolve(outputPath));
+  const sources = {};
+  for (const x of results) sources[x.name] = { path: pathRelative(outDir, pathResolve(x.file)).split('\\').join('/'), content: readFileSync(x.file, 'utf8') };
+  const built = toCSS(results.map((x) => x.doc), {
+    file: inputs.map((f) => basename(f)).join(' + '), banner, version: VERSION, reset, nativeSpecificity, inlineTokens,
+    sourceMap: sourcemap, sources, mapFile: basename(outputPath), sourceMapUrl: sourcemap ? basename(outputPath) + '.map' : undefined,
+  });
   if (json) {
     console.log(JSON.stringify({
       version: VERSION,
-      input: r.file,
+      input: results[0].file, inputs: results.map((x) => x.file),
       output: outputPath,
-      ok: r.errors.length === 0 && (!strict || r.warnings.length === 0),
-      errors: r.errors.map(e => ({ file: e.file || r.name, line: e.line ?? 0, message: e.message, hint: e.hint || null })),
-      warnings: r.warnings.map(w => ({ file: w.file || r.name, line: w.line ?? 0, message: w.message, hint: w.hint || null })),
+      ok: errors.length === 0 && (!strict || warnings.length === 0),
+      errors: errors.map(e => ({ file: e.file, line: e.line ?? 0, message: e.message, hint: e.hint || null })),
+      warnings: warnings.map(w => ({ file: w.file, line: w.line ?? 0, message: w.message, hint: w.hint || null })),
       report: built.report,
-      css: built.css,
+      css: built.css, map: built.map,
     }, null, 2));
   } else {
     writeFileSync(outputPath, built.css);
+    if (built.map) writeFileSync(outputPath + '.map', JSON.stringify(built.map));
     const rep = built.report;
-    console.log(`built ${outputPath} from ${r.file}`);
+    console.log(`built ${outputPath} from ${results.map((x) => x.file).join(', ')}`);
     console.log(`  ${rep.rules} rule(s), ${rep.shadowRules} pseudo-element rule(s), ${rep.keyframes} @keyframes, ${rep.raws} raw block(s)`);
     if (rep.layers.length) console.log(`  layers: ${rep.layers.join(' < ')}`);
+    if (built.map) console.log(`  source map: ${outputPath}.map (browser devtools show the .dssl file and line for each rule)`);
     if (rep.seenStripped) console.log(`  ${rep.seenStripped} seen rule(s) applied unconditionally (the no-JS state)`);
     if (rep.bakedTextures) console.log(`  ${rep.bakedTextures} texture(s) baked into the CSS as background images`);
     for (const n of rep.notBaked || []) console.log(`  texture on "${n.sel}" stays in the runtime: ${n.why}`);
@@ -226,7 +244,7 @@ if (cmd === 'dev') {
     }
     printDiags(results, true);
   }
-  process.exit(r.errors.length || (strict && r.warnings.length) ? 1 : 0);
+  process.exit(errors.length || (strict && warnings.length) ? 1 : 0);
 }
 
 if (cmd === 'import') {

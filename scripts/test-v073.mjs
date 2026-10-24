@@ -161,7 +161,8 @@ raw { @font-face { font-family: X; src: url(x.woff2) } }`;
   const { ast, errors } = parse(src, 'build.dssl');
   const doc = resolve(ast, 'build.dssl');
   const built = toCSS(doc, { file: 'build.dssl', banner: false });
-  const css = built.css;
+  const unwhere = (s) => s.replace(/:where\(((?:[^()]|\([^()]*\))*)\)/g, '$1');   // built selectors are wrapped in :where() since 0.13.0
+  const css = unwhere(built.css);
   ok('8a. @layer statement declares the engine order', css.includes('@layer tokens, base, components, utilities, pin;'));
   ok('8b. tokens become :root custom properties', css.includes('--dssl-color-ink: #16161d'));
   ok('8c. nested hover becomes .card:hover', /\.card:hover\s*\{[^}]*#f5f0e8/.test(css));
@@ -203,7 +204,7 @@ raw { @font-face { font-family: X; src: url(x.woff2) } }`;
   const cssOut = join(dir, 'out.css');
   const b = run(['build', cleanFile, '-o', cssOut]);
   ok('9f. build writes a .css file and reports', b.code === 0 && /\.css/.test(b.out));
-  const built = readFileSync(cssOut, 'utf8');
+  const built = readFileSync(cssOut, 'utf8').replace(/:where\(((?:[^()]|\([^()]*\))*)\)/g, '$1');
   ok('9g. built CSS contains the hover rule', /\.a:hover\s*\{[^}]*blue/.test(built));
   const bj = JSON.parse(run(['build', cleanFile, '--json']).out);
   ok('9h. build --json carries css + report', typeof bj.css === 'string' && bj.report.rules >= 1);

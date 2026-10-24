@@ -729,7 +729,7 @@ Three ways to get it:
 
 1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
    https://open-vsx.org/extension/ehs-studio/dssl-vscode
-2. VS Code: download `dssl-vscode/dssl-vscode-0.12.1.vsix` from the repo files, then
+2. VS Code: download `dssl-vscode/dssl-vscode-0.13.0.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
 3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 
@@ -780,6 +780,91 @@ final state unconditionally (the graceful no-JS look). What needs the
 runtime stays out and gets counted: `@signal` rules and `animate:`.
 The same output is available in the browser as `DSSL.toCSS(source)`.
 
+### Shipping a page that works without the engine
+
+A build is only worth having if the page it makes is the page you wrote. This is what is promised, and what proves it.
+
+**1. JavaScript off, first paint.** `dssl build` writes the static part of your styles as plain CSS, and a page that links it
+is styled before any script exists:
+
+```sh
+node cli/dssl.mjs build tokens.dssl site.dssl home.dssl -o site.css --reset --sourcemap
+```
+
+Several files are built in load order, tokens first, and later files win, exactly like `<link>` order in the browser. Proof:
+`node scripts/test-static-parity.mjs` takes every page of this site as server-rendered HTML and renders it twice, once with the
+engine and once with the built CSS and JavaScript switched off, then compares about 100 computed properties, the box, and
+`::before`/`::after` on every element (over 5,000 of them). They are identical. The only things removed first are the demo
+elements for features a build cannot keep (tilt, bend and stretch, overlap, gradient-flow). That comparison found and fixed
+three real differences, listed under "What a build does differently" below.
+
+What a build cannot do, and says so in its report: `@signal` rules, `animate:`, `aura`, `tilt`, `bend`, `stretch`, `overlap`,
+`gradient-flow`, `stagger`, the slider fill that follows the value, texture shimmer. Those need the engine. A page that uses
+them is still fully styled without it, it just does not move.
+
+**2. Startup and churn.** `node scripts/bench-compiled.mjs` compares the same 2,000-card page written as hand-written CSS
+(literal values), as a normal `dssl build`, as a `dssl build --inline-tokens`, and as the runtime engine. See "Numbers" below.
+
+**3. Server rendering, strict CSP, devtools.**
+
+- *SSR.* `public/dssl/server.js` is the engine's compiler with no DOM in it: `compileSheets([tokens, site], { reset: true })`
+  gives CSS, and `styleTag(css, { nonce })` gives the `<style>` for your HTML. It runs in Node, an edge function or a static
+  site generator, and the test renders real React with `renderToStaticMarkup` and loads the result with no script. This site
+  does it a second way: `scripts/build-site-css.mjs` compiles `public/styles/*.dssl` to `public/site.css` before `next build`,
+  and the layout links it, so every page is styled in the HTML the server sends.
+- *Strict CSP.* The engine writes element styles through the CSSOM (`el.style.setProperty`), which a policy with no
+  `'unsafe-inline'` has always allowed, and its own stylesheet (pseudo-elements, the reset, raw CSS) is a constructed
+  stylesheet, which is exempt too. No `<style>` element is created by script, so nothing needs a nonce; if a browser has no
+  constructable stylesheets the engine falls back to a `<style>` and uses your page's nonce (from a `nonce` attribute on any
+  script, style or link tag, or `<meta name="dssl-nonce" content="...">`). One thing a policy can block: textures are `data:`
+  images, so `img-src` needs `data:`. If it does not have it, the engine says so once in the console. The test runs the engine,
+  a texture, a slider, tilt, aura and the inspector under `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:`
+  and asserts the browser reports zero violations.
+- *Devtools.* `--sourcemap` writes `site.css.map` with a mapping for every rule and every declaration, and embeds the .dssl
+  source so it works even when the file is not served. Chrome's own DevTools then shows `card.dssl:4` next to a rule in the
+  Styles pane and opens the source on click. The selectors come out wrapped in `:where()`, so DevTools shows `:where(.card)`.
+  The engine's inline styles have no source to point at (a style attribute cannot carry one), so for a runtime page use
+  `DSSL.inspect()`.
+
+**Numbers** (`node scripts/bench-compiled.mjs`, 2,000 cards, Chrome 156, medians of 11 interleaved runs; yours will differ,
+run it):
+
+| | hand-written CSS | `dssl build` | `dssl build --inline-tokens` | the engine |
+|---|---|---|---|---|
+| first paint of the finished page | 228 ms | 228 ms (+0%) | 220 ms (-4%) | 300 ms (+32%) |
+| load event | 50 ms | 50.5 ms (+1%) | 48 ms (-4%) | 854 ms (+1600%) |
+| churn: flip a class on every card | 58.7 ms | 62.6 ms (+7%) | 58.5 ms (0%) | 242 ms (+313%) |
+| restyle: change an inherited value | 61.7 ms | 73.8 ms (+20%) | 61.8 ms (0%) | 58 ms (-6%) |
+
+Read it straight. A compiled page is plain CSS, so startup is the same as hand-written CSS and churn is within 7%. The plain
+build is 20% behind on the one test that changes something every element inherits, because every `var(--dssl-x)` has to be
+looked up again. With `--inline-tokens` that cost is gone and all four rows are within 4% of hand-written CSS. So "startup within
+10%, churn at parity" is true of a compiled page built with `--inline-tokens`, and nearly true of the default build (restyle is
+the exception). It is **not** true of the engine. Applying styles in the browser costs 17 times the load time and four times the
+churn of CSS, and the 300 ms in that column is when the engine says it is ready (its first paint is the unstyled page). The way
+to get compiled speed on a page that also needs the engine is to link the built CSS and let the engine handle only what it
+alone can do. That is how this site ships, but the engine still re-applies every rule today, so a page that loads both pays for
+both. Teaching the engine to skip what the CSS already did is not built yet.
+
+**What a build does differently, on purpose, or fixed after the comparison**
+
+- *No specificity.* DSSL says the later rule wins. Plain CSS would let `.code-head + .code` beat a later `.code-plain`. A build
+  wraps every selector in `:where()` so source order decides there too. (`--native-specificity` turns that off, if you are mixing
+  with CSS that expects normal specificity.)
+- *The reset is a layer.* The engine's small reset is unlayered, which in a build would beat every layered rule. `--reset` puts
+  it in the first layer, so everything else wins.
+- *Alignment needs a box.* The engine quietly makes a plain box a grid when a rule aligns its children (`place-items`,
+  `justify-content`...). A build cannot know what each element is. `dssl check` now warns about a rule that aligns without saying
+  `display`, so write `display: grid` (or flex, or use `row`/`column`/`grid`).
+- *Later border and spacing longhands.* The engine used to throw away a `border-style` or `border-width` written after `border`,
+  and kept a `margin-top` even when `margin` came later. Both now follow the cascade, and a build and the engine agree.
+- *Your own inline styles.* The engine overwrites a `style=""` attribute's values for properties its rules set; a build leaves
+  them alone, as CSS does. Put the value in a rule.
+
+`--inline-tokens` writes each token's value in place of `var(--dssl-x)` where the token is defined once and never redefined
+(a dark theme in a media query, a scoped `--color.accent`, anything under `@signal` keeps its variable). It is the fastest CSS, and
+the cost is that a token changed at run time with `DSSL.apply` will not reach the built rules.
+
 ## 6. Tooling and tests
 
 ```sh
@@ -796,6 +881,9 @@ They look for one in the usual places; set `DSSL_CHROME` to point at another.
 ```sh
 node scripts/test-v090.mjs              # 0.9.0 pure logic: colour, texture, aura, slider, lint, import, share links
 node scripts/test-browser-v090.mjs      # 0.9.0 in Chrome: pixels, lifecycle, reduced motion, stress
+node scripts/test-static-parity.mjs     # 0.13.0: every page of this site, built CSS with JavaScript off vs the engine, element by element (needs npm run build)
+node scripts/test-v0130.mjs             # 0.13.0: build fidelity, source maps, strict CSP, server rendering
+node scripts/bench-compiled.mjs         # 0.13.0: compiled DSSL vs hand-written CSS, startup and churn (takes minutes)
 node scripts/test-v0100.mjs             # 0.10.0: glass, tilt, named-colour alpha, playground examples, HTML filter
 node scripts/test-designer.mjs          # the designer's state to DSSL and back, plus a random sweep
 node scripts/test-designer-browser.mjs  # the designer panel, driven like a person would

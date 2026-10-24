@@ -63,6 +63,14 @@ DSSL.replay(sel) / DSSL.refresh() / DSSL.errors() / DSSL.version
 - Alpha on a named colour works: `white/12`, `currentColor/20`. It used to compile to `white/12px`.
 - The playground has a canvas.html tab, `?example=` links, lint warnings and an "as CSS" tab. The canvas keeps a short allow-list of tags and drops scripts, handlers, styles and ids.
 
+## 0.13.0: shipping without the engine
+- `dssl build a.dssl b.dssl -o out.css [--reset] [--sourcemap] [--inline-tokens] [--native-specificity]`: several files in load order. Selectors are wrapped in :where() so source order wins like in the engine (no CSS specificity). --reset adds the small reset as the FIRST layer. --sourcemap writes out.css.map (rule and declaration level, sources embedded) so devtools show the .dssl file and line. --inline-tokens writes token values in place of var() where a token is defined once and never redefined (fastest; tokens changed at run time will not reach built rules).
+- Proof: scripts/test-static-parity.mjs compares every page of the site, built CSS with JavaScript off vs the engine, ~100 properties per element plus box and pseudo-elements, 5,000+ elements: identical. Engine-only features (animate, aura, tilt, bend, stretch, overlap, gradient-flow, stagger, signals, slider fill, texture shimmer) are not in a build.
+- Numbers (scripts/bench-compiled.mjs): compiled page startup = hand-written CSS, churn +7% (0% with --inline-tokens), restyle +20% (0% inlined). The engine is NOT at parity: load event 17x, churn 4x.
+- Strict CSP: the engine uses the CSSOM and constructed stylesheets, never a script-made <style>; nonce honoured on the fallback path. Textures need img-src data:.
+- Server rendering: public/dssl/server.js `compileSheets([...], opts)` and `styleTag(css, {nonce})`, no DOM needed.
+- Fixed in the engine and found by that comparison: a border-style/width written after `border`, and a margin or padding longhand versus its shorthand, now follow the cascade. New check warning: a rule that aligns children without display.
+
 ## 0.12.0: fonts, gradients, symmetrical, dev tools
 - `texture: oak symmetrical [x|y|both]` mirrors every other tile: no seam, the repeat is twice as far apart. Works on image textures (noise, bump, rings, waves, hex); pure-CSS patterns are left alone.
 - `fonts { Fraunces: 500 700 800  "Hanken Grotesk": 400 700 italic  Inter: 100..900 display optional  Brand: from "/f.woff2" 400 }`. Google families become a <link> at run time and an @import in `dssl build`; `from` becomes @font-face.
@@ -90,4 +98,4 @@ Wait for the `dssl-ready` event on `window` before measuring layout: the engine 
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.12.1.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.13.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.

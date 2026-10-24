@@ -229,8 +229,8 @@ section('dssl build: textures are baked in');
 {
   const b = toCSS('.a { background: color.paper; texture: oak }\n.b { background: #222; texture: grain, scanlines }\n.c { background: linear-gradient(red, blue); texture: grain }\n.d { texture: noise animate 100 }\n.e { background: #fff; texture: noise color color.ink }');
   ok('a texture on a plain background is baked: the report counts it and no engine declaration is left for that rule', b.report.bakedTextures === 4 && b.report.engineDecls === 1, JSON.stringify({ baked: b.report.bakedTextures, left: b.report.engineDecls }));
-  ok('the baked rule has a real image on top of its own colour', /\.a \{\s+background: url\("data:image\/svg\+xml[^;]*, var\(--dssl-color-paper\);/.test(b.css));
-  ok('a gradient the author wrote stays underneath the texture', /\.c \{\s+background: url\("data:image[^;]*, linear-gradient\(red, blue\);/.test(b.css));
+  ok('the baked rule has a real image on top of its own colour', /:where\(\.a\) \{\s+background: url\("data:image\/svg\+xml[^;]*, var\(--dssl-color-paper\);/.test(b.css));
+  ok('a gradient the author wrote stays underneath the texture', /:where\(\.c\) \{\s+background: url\("data:image[^;]*, linear-gradient\(red, blue\);/.test(b.css));
   ok('a texture that animates is left in the runtime, and the report says why', (b.report.notBaked || []).some((n) => n.sel === '.d' && /animates/.test(n.why)) && !/\.d \{/.test(b.css.replace(/\.[abce] \{[^}]*\}/g, '')));
   ok('a token colour is resolved at build time', !/@/.test(b.css.split('@layer components')[1].replace(/@layer|@keyframes|data:image[^)]*\)/g, '')) || true);
   ok('blend modes come along', /background-blend-mode: normal, normal;/.test(b.css) || /background-blend-mode:/.test(b.css));

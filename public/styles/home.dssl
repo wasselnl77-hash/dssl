@@ -508,6 +508,7 @@ behavior show-flame {
 
 // textures
 .show-demo-tex {
+  display: grid
   grid-template-columns: 1fr 1fr
   gap: 8
   place-items: stretch

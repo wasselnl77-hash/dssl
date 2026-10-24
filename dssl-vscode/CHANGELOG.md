@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.0
+
+- Bundled engine updated to 0.13.0. In the editor: a new warning for a rule that aligns its children (`place-items`, `justify-content`...)
+  without saying `display`, because a `dssl build` cannot add the box the engine adds at run time.
+- The engine fixes a later `border-style` or `border-width` and margin or padding longhands now following the cascade (no editor
+  change, but the built CSS and the live page now agree).
+
 ## 0.12.1
 
 Found by running the extension inside a real VSCodium and clicking through it (`node scripts/test-editor-ui.mjs`):

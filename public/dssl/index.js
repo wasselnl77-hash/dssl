@@ -19,7 +19,7 @@ import { resolve, DEFAULT_TOKENS } from './resolver.js';
 import { toCSS as docToCSS } from './static.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.12.0';
+export const VERSION = '0.13.0';
 
 let counter = 0;
 const loadedUrls = new Set();   // every .dssl file fetched by load(), so DSSL.watch() knows what to follow
@@ -151,11 +151,22 @@ export async function load(urls, opts = {}) {
  *  layers → @layer, motions → @keyframes, raw { } verbatim). Returns
  *  { css, report } - report counts what was emitted and what stays
  *  engine-only (@signal rules, animate: and friends). */
-export function toCSS(source, opts = {}) {
-  const file = opts.file || 'inline.dssl';
-  const result = compile(source, file);
-  const built = docToCSS(result.doc, { file, banner: opts.banner, version: VERSION });
-  return { ...built, ok: result.ok, errors: result.errors, warnings: result.warnings };
+export function toCSS(input, opts = {}) {
+  // one source string, or several (strings or already-compiled documents) in load order: tokens fold forward like <link> order
+  const list = Array.isArray(input) ? input : [input];
+  const docs = [], errors = [], warnings = [];
+  let base = {};
+  for (const [i, item] of list.entries()) {
+    if (typeof item === 'string') {
+      const file = (list.length === 1 ? opts.file : (opts.files && opts.files[i])) || `inline-${i + 1}.dssl`;
+      const { ast, errors: pe } = parse(item, file);
+      const doc = resolve(ast, file, Object.keys(base).length ? base : Object.fromEntries(tokenRegistry));
+      docs.push(doc); errors.push(...pe, ...doc.errors); warnings.push(...(doc.warnings || []));
+      base = { ...base, ...doc.tokens };
+    } else { docs.push(item); errors.push(...(item.errors || [])); warnings.push(...(item.warnings || [])); }
+  }
+  const built = docToCSS(docs.length === 1 ? docs[0] : docs, { file: opts.file || 'inline.dssl', ...opts, version: VERSION });
+  return { ...built, ok: errors.length === 0, errors, warnings };
 }
 
 export function signal(name, value) { for (const e of engines.values()) e.signal(name, value); }
@@ -240,6 +251,16 @@ if (typeof window !== 'undefined') {
   window.DSSL = DSSL;
 
   // ---- auto-boot -------------------------------------------------------
+  // 0.13.0: under a strict Content-Security-Policy the styles still work (they go through the CSSOM), but a generated
+  // texture is a data: image. If the policy blocks those, say so once, in plain words, instead of leaving a flat colour.
+  try {
+    let told = false;
+    document.addEventListener('securitypolicyviolation', (e) => {
+      if (told || !/^img-src/.test(e.violatedDirective) || e.blockedURI !== 'data') return;
+      told = true;
+      console.info('[DSSL] a texture could not be shown: your Content-Security-Policy does not allow data: images. Add  img-src \'self\' data:  (textures are generated images), or build the page with dssl build so the CSS carries them.');
+    });
+  } catch { /* no document */ }
   const boot = async () => {
     try {
       const links = [...document.querySelectorAll('link[rel="stylesheet/dssl"]')];

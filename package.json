@@ -1,6 +1,6 @@
 {
   "name": "dssl",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "private": true,
   "description": "The DSSL style language and the website that is written in it.",
   "scripts": {
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test-all.mjs",
     "test:fast": "node scripts/test-all.mjs --no-browser",
-    "prebuild": "node scripts/gen-site-vocab.mjs"
+    "prebuild": "node scripts/gen-site-vocab.mjs && node scripts/build-site-css.mjs"
   },
   "dependencies": {
     "next": "^16.1.1",

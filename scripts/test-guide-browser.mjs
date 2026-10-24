@@ -116,7 +116,10 @@ await page.waitForTimeout(120);
 const liftAnims = await page.evaluate(() => document.querySelector('.card').getAnimations().length);
 ok('B5 hover plays the lift motion', liftAnims > 0, 'animations on hover: ' + liftAnims);
 
-ok('no console errors or warnings during the whole run', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
+// B2 above deliberately has a rule that aligns with no display, to prove the engine gives it a box. Since 0.13.0 the linter says
+// so (a build would not), and that one warning is expected here.
+const unexpected = consoleErrors.filter((m) => !/"place-items" on "\.hero" only works on a flex or grid box/.test(m));
+ok('no console errors or warnings during the whole run (but the one alignment warning B2 asks for)', unexpected.length === 0, unexpected.slice(0, 3).join(' | '));
 
 
 

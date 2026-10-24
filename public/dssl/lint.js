@@ -17,6 +17,8 @@
 
 import { parseColor, evalColorExpr, over, contrast, toRgba, toHex } from './color.js';
 
+const ALIGN_PROPS = new Set(['place-items', 'place-content', 'align-items', 'justify-items', 'align-content', 'justify-content']);
+
 /** one design-token lookup closed over the sheet's token map */
 export function makeColorResolver(tokenMap) {
   const lookup = (name) => tokenMap.get(name);
@@ -101,6 +103,21 @@ export function lintRules({ rules, tokenMap, file }) {
             }
           }
         }
+      }
+    }
+
+    // ---- alignment with no box to align in
+    // The engine quietly turns a plain box into a grid when a rule aligns its children (place-items, justify-content...),
+    // so the page looks right in the browser. `dssl build` cannot know what each element is, so a compiled page would not.
+    if (!conditional && states.size === 0) {
+      const aligns = r.decls.find((d) => ALIGN_PROPS.has(d.prop));
+      const hasDisplay = r.decls.some((d) => d.prop === 'display' || d.prop === '@display');
+      if (aligns && !hasDisplay) {
+        warnings.push({
+          file, line: aligns.line,
+          message: `"${aligns.prop}" on "${r.sel}" only works on a flex or grid box, and this rule never says which`,
+          hint: 'add display: grid (or flex), or use row / column / grid, so a build matches the engine: the engine adds it for you at run time, dssl build does not',
+        });
       }
     }
 

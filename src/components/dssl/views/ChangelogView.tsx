@@ -12,6 +12,17 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.13.0",
+    date: "growth phase \u00b7 the compiled page is the page",
+    title: "A built page matches the engine, with JavaScript off. And here are the numbers.",
+    why: "three promises that were easy to say and had to be proved: no-JS first paint, startup and churn close to plain CSS, and server rendering with a strict CSP and devtools that show your .dssl lines.",
+    kind: "add",
+    body:
+      "Every page of this site was rendered twice, once by the engine and once from dssl build output with JavaScript switched off, and about 100 computed properties, the box and the pseudo-elements were compared on over 5,000 elements. That found real differences. Built selectors had CSS specificity, so a more specific earlier rule beat a later one (they are now wrapped in :where(), so the later rule wins like in the engine). The engine dropped a border-style or border-width written after border, and kept a margin-top even when margin came later (both now follow the cascade). The reset was unlayered (now the first layer). dssl build takes several files, writes a source map (Chrome DevTools shows card.dssl:4 next to the rule), and has --inline-tokens for the fastest CSS. The engine now runs under a strict Content-Security-Policy with zero violations, and server.js compiles with no DOM for server rendering. The site itself links its compiled CSS, so it is styled on first paint with scripts off. Numbers, measured: a compiled page starts as fast as hand-written CSS; churn is +7%, or 0% with --inline-tokens. The engine is not at parity (load 17x, churn 4x) and that is stated plainly in the guide.",
+    code: `node cli/dssl.mjs build tokens.dssl site.dssl -o site.css --reset --sourcemap
+node cli/dssl.mjs build tokens.dssl site.dssl -o site.css --inline-tokens   // the fastest CSS`,
+  },
+  {
     version: "v0.12.0",
     date: "growth phase \u00b7 the rest of the list",
     title: "Fonts, gradients, mirrored tiles, an inspector and hot reload.",

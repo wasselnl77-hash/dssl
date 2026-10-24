@@ -269,6 +269,7 @@
 }
 
 .tok-dot {
+  display: inline-grid
   size: 34
   circle: 34
   center: both
@@ -726,7 +727,7 @@ motion pe-pulse {
 }
 
 // a demo box whose content should span the whole box instead of sitting centred
-.demo-box.wide { justify-content: stretch }
+.demo-box.wide { display: grid; justify-content: stretch }
 
 .tx-cell {
   column: gap 6
@@ -913,3 +914,7 @@ behavior snow {
 .gd-oklch { gradient: linear 90 in oklch, #ff0055 -> #00d4ff }
 .gd-band { gradient: linear 90, #ff7a1a 0 30%, #3949ab 30% 100% }
 .gd-mesh { gradient: mesh #14102a, #ff7a1a at 15% 20%, #c2185b at 80% 30% size 45%, #3949ab at 50% 95% }
+
+// spacing helpers for the few paragraphs that sit tight under the one above
+.gap-14 { margin-top: 14 }
+.gap-18 { margin-top: 18 }

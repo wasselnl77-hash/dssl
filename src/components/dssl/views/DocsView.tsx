@@ -29,6 +29,7 @@ const SIDE = [
   { head: null, id: "designer", label: "Designer, import and lint" },
   { head: null, id: "fonts", label: "Fonts" },
   { head: null, id: "devtools", label: "Inspector and hot reload" },
+  { head: null, id: "shipping", label: "Shipping without the engine" },
   { head: null, id: "errors", label: "Errors" },
   { head: null, id: "api", label: "JS API" },
   { head: null, id: "performance", label: "Performance: freeze & explain" },
@@ -182,7 +183,7 @@ background:                     // values can continue
               <code>color.*</code> set. Override any of them from your own{" "}
               <code>tokens</code> block.
             </p>
-            <p className="doc-lead" style={{ marginTop: 14 }}>
+            <p className="doc-lead gap-14">
               <b>v0.7: numeric token keys.</b> The built-in spacing scale stops at 8,
               but big pages need more room, so token keys can be numbers now: define{" "}
               <code>tokens {'{ space { 9: 96 } }'}</code> and reference it as{" "}
@@ -190,7 +191,7 @@ background:                     // values can continue
               block a numeric property name is still an error, but the error now says
               exactly that instead of a shrug.
             </p>
-            <p className="doc-lead" style={{ marginTop: 14 }}>
+            <p className="doc-lead gap-14">
               <b>v0.4: tokens can be re-declared per element.</b> Assign to a dotted
               token inside any rule and the custom property lands on that element;
               since custom properties inherit, every <code>var()</code> in the subtree
@@ -588,7 +589,7 @@ body { overlap: auto }
                 <span className="tok-demo"><PlayIcon /> DSSL.replay(&apos;.motion-box&apos;)</span>
               </button>
             </div>
-            <p className="doc-lead" style={{ marginTop: 18 }}>
+            <p className="doc-lead gap-18">
               <b>v0.4: choreography.</b> Two additions turn motion into a
               reveal-on-scroll system, still with zero JavaScript. <code>seen</code> is
               an engine-native state that fires once when the element enters the
@@ -1042,6 +1043,32 @@ node cli/dssl.mjs dev site --port 4000 --inspect`} />
             </p>
           </section>
 
+          <section className="doc-block" id="shipping">
+            <h2 className="section-title">Shipping without the engine</h2>
+            <p className="doc-lead">
+              <code>dssl build</code> turns the static part of your styles into plain CSS. A page that links it is styled on first
+              paint, with JavaScript off, in a crawler, and in server-rendered HTML.
+            </p>
+            <CodeBlock file="terminal" code={`node cli/dssl.mjs build tokens.dssl site.dssl -o site.css --reset --sourcemap   # several files, load order
+node cli/dssl.mjs build tokens.dssl site.dssl -o site.css --inline-tokens       # the fastest CSS`} />
+            <table className="tbl">
+              <thead><tr><th>promise</th><th>how it is checked</th></tr></thead>
+              <tbody>
+                <tr><td>JavaScript off, first paint is right</td><td>every page of this site, built CSS with scripts off against the engine, about 100 properties on each of 5,000+ elements: identical</td></tr>
+                <tr><td>Startup and churn close to plain CSS</td><td>a 2,000-card page against hand-written CSS: startup +0%, churn +7% (0% with <code>--inline-tokens</code>), restyle +20% (0% inlined)</td></tr>
+                <tr><td>The engine itself</td><td>not at parity: load event 17x, churn 4x. A built page does not pay that</td></tr>
+                <tr><td>Strict CSP</td><td>the engine uses the CSSOM and constructed stylesheets, never a script-made style element: zero violations under <code>style-src &apos;self&apos;</code>. Textures need <code>img-src data:</code></td></tr>
+                <tr><td>Server rendering</td><td><code>public/dssl/server.js</code> compiles with no DOM. This site links its compiled CSS in the HTML it sends</td></tr>
+                <tr><td>Devtools show .dssl lines</td><td><code>--sourcemap</code>: Chrome&apos;s DevTools shows the file and line next to each rule. For a runtime page use <code>DSSL.inspect()</code></td></tr>
+              </tbody>
+            </table>
+            <p className="tbl-note">
+              A build cannot keep what needs the engine: <code>@signal</code>, <code>animate</code>, aura, tilt, bend, stretch, overlap and
+              the slider fill. Selectors are written with <code>:where()</code> so the later rule wins exactly as it does in the engine.
+              The guide has the numbers, the cases where a build differs on purpose, and how to reproduce all of it.
+            </p>
+          </section>
+
           <section className="doc-block" id="designer">
             <h2 className="section-title">Designer, import and lint</h2>
             <p className="doc-lead">
@@ -1094,7 +1121,7 @@ node cli/dssl.mjs dev site --port 4000 --inspect`} />
               friends are your business, the loud checks protect the design vocabulary,
               not the pressure valve.
             </div>
-            <p className="doc-lead" style={{ marginTop: 14 }}>
+            <p className="doc-lead gap-14">
               <b>v0.7: compiler warnings.</b> Some things compile, run, and are still
               probably not what you meant. Those are warnings: <code>ok</code> stays{" "}
               <code>true</code>, but the console says it out loud. The first one: inside

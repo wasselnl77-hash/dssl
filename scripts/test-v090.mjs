@@ -294,14 +294,14 @@ section('dssl build: what stays in the runtime');
   const r = toCSS('behavior fire { aura-glow: #f80 20\n aura-particle: #fd0 5 up }\n.torch { use fire\n background: #222\n texture: grain }\ninput[type=range] { slider: fill #f80 }');
   ok('aura, texture and slider are counted as engine-native even in a rule that keeps other declarations', r.report.engineDecls === 3, JSON.stringify(r.report.engineKinds));
   ok('the report names them (the texture was baked into the CSS, so it is not among them)', r.report.engineKinds.join() === 'aura-glow,aura-particles,slider' && r.report.bakedTextures === 1);
-  { const rule = r.css.slice(r.css.indexOf('.torch {'), r.css.indexOf('}', r.css.indexOf('.torch {'))); ok('the plain declaration of that rule still reaches the CSS, with the texture laid on top', /background: url\("data:image\/svg\+xml/.test(rule) && /, #222;/.test(rule), rule.slice(0, 160)); }
+  { const flat = r.css.replace(/:where\(((?:[^()]|\([^()]*\))*)\)/g, '$1'); const rule = flat.slice(flat.indexOf('.torch {'), flat.indexOf('}', flat.indexOf('.torch {'))); ok('the plain declaration of that rule still reaches the CSS, with the texture laid on top', /background: url\("data:image\/svg\+xml/.test(rule) && /, #222;/.test(rule), rule.slice(0, 160)); }
   ok('the slider\'s vendor pseudo-element rules ARE emitted as real CSS (only the fill follower needs the engine)', /::-webkit-slider-thumb/.test(r.css) && /::-moz-range-thumb/.test(r.css));
   ok('the banner states the real version', r.css.includes(`DSSL v${VERSION}`));
 }
 
 /* ------------------------------------------------------------------ */
 section('release');
-ok('the engine version is 0.9 or later', /^0\.(9|1[0-2])\./.test(VERSION), VERSION);
+ok('the engine version is 0.9 or later', /^0\.(9|1[0-3])\./.test(VERSION), VERSION);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
