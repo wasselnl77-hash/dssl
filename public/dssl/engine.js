@@ -24,6 +24,7 @@ import { composeDeform, arcLayout } from './utils.js';
 import { buildTexture } from './texture.js';
 import { AuraManager, resolveLayer } from './aura.js';
 import { parseColor } from './color.js';
+import { tiltTransform } from './effects.js';
 
 const LAYER_RANK = { tokens: 0, base: 1, components: 2, utilities: 3, pin: 4 };
 
@@ -208,6 +209,7 @@ export class DsslEngine {
     this.sliderEls = new Map();            // range input -> its input listener
     this.texAnims = new WeakMap();         // element -> running texture-shimmer Animation
     this.texEls = new Set();               // elements that have one, so freeze() can stop them all
+    this.tiltEls = new Map();              // 0.10.0: element -> { spec, stop } for tilt:
   }
 
   /* ------------------------------------------------------------ *
@@ -315,6 +317,60 @@ export class DsslEngine {
     const g = (glow || []).map((l) => resolveLayer(l, rc, fallback));
     const p = (particles || []).map((l) => resolveLayer(l, rc, fallback));
     this.auraManager().set(el, g, p);
+  }
+
+  /** 0.10.0: tilt follows the pointer by smoothing toward a target, writing four custom properties on the element */
+  applyTilt(el, spec) {
+    const cur = this.tiltEls.get(el);
+    if (!spec) { if (cur) { cur.stop(); this.tiltEls.delete(el); } return; }
+    const key = JSON.stringify(spec);
+    if (cur && cur.key === key) return;
+    if (cur) cur.stop();
+    let reduce = false;
+    try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { }
+    if (reduce) { this.tiltEls.set(el, { key, stop() { } }); return; }
+    const sign = spec.invert ? -1 : 1;
+    const cu = { x: 0, y: 0, s: 1, gx: 50, gy: 50 };
+    let target = { x: 0, y: 0, s: 1, gx: 50, gy: 50 };
+    let raf = 0;
+    const write = () => {
+      el.style.setProperty('--dssl-tx', cu.x.toFixed(2) + 'deg');
+      el.style.setProperty('--dssl-ty', cu.y.toFixed(2) + 'deg');
+      el.style.setProperty('--dssl-ts', cu.s.toFixed(4));
+      if (spec.glare) { el.style.setProperty('--dssl-gx', cu.gx.toFixed(1) + '%'); el.style.setProperty('--dssl-gy', cu.gy.toFixed(1) + '%'); }
+    };
+    const step = () => {
+      raf = 0;
+      let moving = false;
+      for (const k of ['x', 'y', 's', 'gx', 'gy']) {
+        const d = target[k] - cu[k];
+        const eps = k === 's' ? 0.0005 : 0.02;
+        if (Math.abs(d) > eps) { cu[k] += d * spec.speed; moving = true; } else cu[k] = target[k];
+      }
+      write();
+      if (moving) raf = requestAnimationFrame(step);
+    };
+    const kick = () => { if (!raf) raf = requestAnimationFrame(step); };
+    const move = (e) => {
+      if (e.pointerType === 'touch') return;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const nx = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
+      const ny = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+      target = { x: -ny * spec.max * sign, y: nx * spec.max * sign, s: spec.lift, gx: (nx + 1) * 50, gy: (ny + 1) * 50 };
+      kick();
+    };
+    const leave = () => { target = { x: 0, y: 0, s: 1, gx: 50, gy: 50 }; kick(); };
+    el.addEventListener('pointermove', move, { passive: true });
+    el.addEventListener('pointerleave', leave, { passive: true });
+    this.tiltEls.set(el, {
+      key,
+      stop: () => {
+        el.removeEventListener('pointermove', move); el.removeEventListener('pointerleave', leave);
+        if (raf) cancelAnimationFrame(raf);
+        for (const p of ['--dssl-tx', '--dssl-ty', '--dssl-ts', '--dssl-gx', '--dssl-gy']) el.style.removeProperty(p);
+      },
+    });
   }
 
   /** range inputs: keep --dssl-p (the value as 0..1) current so the track fill and graph can follow it */
@@ -790,6 +846,7 @@ export class DsslEngine {
     let arcVal;                            // v0.6.0 - @bend-around degrees
     let gflowVal;                          // v0.6.0 - @gradient-flow spec
     let textureVal, auraGlowVal, auraPartsVal, sliderVal; // 0.9.0
+    let tiltVal = null;                    // 0.10.0
 
     // flatten matched decls in cascade order (last decl of a prop wins, exactly
     // like sequential setProperty calls did)
@@ -831,6 +888,7 @@ export class DsslEngine {
       if (d.prop === '@aura-glow') { auraGlowVal = d.value || null; continue; }
       if (d.prop === '@aura-particles') { auraPartsVal = d.value || null; continue; }
       if (d.prop === '@slider') { sliderVal = d.value || null; continue; }
+      if (d.prop === '@tilt') { tiltVal = d.value || null; continue; }
       newOwned.set(d.prop, { value: d.value, imp });
     }
     // anim keys need rule identity - rebuild them from matched order
@@ -884,6 +942,15 @@ export class DsslEngine {
       if (deform.fold || deform.bendUp) { try { h = el.offsetHeight; } catch { h = 0; } }
       const c = composeDeform(deform, userT ? userT.value : '', { h });
       newOwned.set('transform', { value: c.transform, imp: userT ? userT.imp : '' });
+    }
+
+    // 0.10.0 - tilt adds its rotation after everything else in the transform.
+    // The angles are variables the pointer handler updates, so moving the
+    // mouse never triggers a restyle.
+    if (tiltVal) {
+      const userT = newOwned.get('transform');
+      const base = userT && userT.value && userT.value !== 'none' ? String(userT.value) + ' ' : '';
+      newOwned.set('transform', { value: base + tiltTransform(tiltVal), imp: userT ? userT.imp : '' });
     }
 
     // v0.6.0 - gradient-flow needs a gradient to flow and room to move. If
@@ -1074,6 +1141,7 @@ export class DsslEngine {
     this.applyTextureShimmer(el, builtTex, builtTex ? Math.max(...textureVal.map((l) => l.animate || 0)) : 0, texUserLayers);
     this.applyAura(el, auraGlowVal, auraPartsVal);
     this.applySlider(el, sliderVal);
+    this.applyTilt(el, tiltVal);
 
     // v0.5.0 - overlap bookkeeping: remember (or forget) the element's policy.
     // The collision pass itself runs rAF-deferred after the drain; a policy
@@ -1399,6 +1467,8 @@ export class DsslEngine {
     if (this.aura) this.aura.pause();   // 0.9.0: a frozen page does not animate
     for (const el of this.texEls) { const a = this.texAnims.get(el); if (a) { try { a.cancel(); } catch { } } this.texAnims.delete(el); }
     this.texEls.clear();
+    for (const t of this.tiltEls.values()) t.stop();
+    this.tiltEls.clear();
     this.pending.clear();
     return this.freezeStats();
   }

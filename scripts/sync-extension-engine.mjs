@@ -9,7 +9,15 @@ import path from 'node:path';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // the resolver imports the others, so the editor needs every one of them
-const files = ['parser.js', 'resolver.js', 'utils.js', 'color.js', 'texture.js', 'aura.js', 'slider.js', 'lint.js', 'import.js'];
+// everything the extension imports directly, plus whatever those files import, so a new module cannot be forgotten
+const roots = ['parser.js', 'resolver.js', 'texture.js', 'aura.js', 'slider.js', 'effects.js', 'import.js', 'lint.js'];
+const files = [];
+const visit = (f) => {
+  if (files.includes(f)) return;
+  files.push(f);
+  for (const m of readFileSync(path.join(root, 'public', 'dssl', f), 'utf8').matchAll(/from\s+'\.\/([a-z0-9-]+\.js)'/g)) visit(m[1]);
+};
+roots.forEach(visit);
 
 for (const f of files) {
   const src = path.join(root, 'public', 'dssl', f);

@@ -23,7 +23,7 @@ interface Window {
     unfreeze: () => unknown;
     explain: (el: Element, opts?: { quiet?: boolean }) => unknown;
     errors: () => DsslError[];
-    toCSS?: (src: string) => { css: string; report: unknown };
+    toCSS?: (src: string, opts?: { banner?: boolean; file?: string }) => { css: string; report: unknown };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     __debug?: any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

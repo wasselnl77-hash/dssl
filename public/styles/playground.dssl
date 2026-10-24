@@ -185,3 +185,82 @@
   background: color.ink/6
   border-bottom: 1 solid color.line
 }
+
+// ---- 0.10.0: tabs, warnings and the CSS view
+.pg-tabs {
+  row: gap 2
+}
+
+.pg-tab {
+  font-family: font.mono
+  font-size: 12
+  color: color.muted
+  background: transparent
+  border: 0
+  border-bottom: 2 solid transparent
+  padding: 4 8
+  cursor: pointer
+  hover { color: color.ink }
+  focus-visible { outline: 2 solid color.accent; outline-offset: 2 }
+}
+
+.pg-tab-on {
+  color: color.ink
+  border-bottom-color: color.accent
+  font-weight: 700
+}
+
+.pg-warns {
+  column: gap 6
+  padding: 10 14
+  background: color.card
+  border-top: 1 solid color.line
+  max-height: 160
+  overflow-y: auto
+}
+
+.pg-warn {
+  font-family: font.mono
+  font-size: 12
+  color: color.ink
+  line-height: 1.55
+  column: gap 2
+  border-left: 4 solid color.tape
+  padding-left: 10
+}
+
+.pg-warn-hint { color: color.muted }
+
+.pg-out-wrap {
+  flex: 1
+  column: gap 0
+  min-height: 420
+  background: color.code-bg
+}
+
+.pg-out-bar {
+  row: gap 8 between
+  align: center
+  padding: 8 14
+  font-family: font.mono
+  font-size: 12
+  color: color.code-ink
+  border-bottom: 1 solid color.code-ink/15
+}
+
+.pg-out {
+  flex: 1
+  margin: 0
+  padding: space.4
+  overflow: auto
+  font-family: font.mono
+  font-size: 12.5
+  line-height: 1.65
+  color: color.code-ink
+  white-space: pre
+  tab-size: 2
+}
+
+.pg-head { flex-wrap: wrap }
+.pg-tab, .pg-head-tools .doc-btn { white-space: nowrap }
+.pg-head-tools { flex-wrap: wrap }

@@ -192,6 +192,54 @@ export default function HomeView() {
         </div>
       </section>
 
+      {/* ------------------------------------------------ live effects, each one the language running on this page */}
+      <section className="block" aria-labelledby="show-title">
+        <div className="wrap">
+          <h2 className="section-title" id="show-title">One line each, running on this page</h2>
+          <p className="section-sub show-sub">
+            None of this is a video or an image. Every effect below is a few words of DSSL
+            applied by the same engine that styles the rest of the site. Move your mouse over the glass.
+          </p>
+          <div className="show-grid">
+            <div className="show-card">
+              <div className="show-demo show-demo-fire"><div className="show-orb show-fire">fire</div></div>
+              <code className="show-code">.torch {"{"} use fire {"}"}</code>
+              <p className="show-text">Fire is a recipe you write once with <code>aura-glow</code> and <code>aura-particle</code>, then reuse by name. Nothing is preset, so every number is yours.</p>
+              <Link className="show-link" href="/playground?example=aura">Edit this fire</Link>
+            </div>
+            <div className="show-card">
+              <div className="show-demo show-demo-glass">
+                <span className="show-blob show-blob-a" />
+                <span className="show-blob show-blob-b" />
+                <div className="show-pane"><b>Frosted</b><span>follows the pointer</span></div>
+              </div>
+              <code className="show-code">glass: 18; tilt: 10 glare</code>
+              <p className="show-text"><code>glass</code> blurs what is behind it and survives a CSS build. <code>tilt</code> turns toward the pointer and stays in the engine.</p>
+              <Link className="show-link" href="/playground?example=glass">Edit this glass</Link>
+            </div>
+            <div className="show-card">
+              <div className="show-demo show-demo-tex">
+                <span className="show-tex show-tex-wood">wood</span>
+                <span className="show-tex show-tex-marble">marble</span>
+                <span className="show-tex show-tex-carbon">carbon</span>
+                <span className="show-tex show-tex-hex">hex</span>
+              </div>
+              <code className="show-code">.sofa {"{"} texture: wood scale 6 {"}"}</code>
+              <p className="show-text">Thirty textures, or build your own from a generator and a few settings. They lay on top of whatever background the element already has.</p>
+              <Link className="show-link" href="/playground?example=textures">Edit these textures</Link>
+            </div>
+            <div className="show-card">
+              <div className="show-demo show-demo-slider">
+                <input className="show-range" type="range" defaultValue={42} aria-label="A histogram slider, styled by one DSSL line" />
+              </div>
+              <code className="show-code">slider: graph 20 45 70 90 ...</code>
+              <p className="show-text">Range inputs are styled through four vendor pseudo-elements. <code>slider:</code> writes them all from one description, and can turn the track into a histogram.</p>
+              <Link className="show-link" href="/playground?example=sliders">Edit this slider</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ------------------------------------------------ four things CSS leaves to you */}
       <section className="block">
         <div className="wrap split">

@@ -19,7 +19,7 @@ import { resolve, DEFAULT_TOKENS } from './resolver.js';
 import { toCSS as docToCSS } from './static.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.9.0';
+export const VERSION = '0.10.0';
 
 let counter = 0;
 const engines = new Map();

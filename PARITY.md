@@ -62,6 +62,14 @@ so the boundary is explicit, not folklore.
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
 
+## v0.10.0: glass, tilt, and a silent colour bug
+
+| Need | DSSL | Status | Notes |
+|---|---|---|---|
+| Frosted glass | `glass: 18 saturate 1.6` | shipped | plain CSS, survives `dssl build`; CSS needs `backdrop-filter` plus a matching background |
+| Pointer-following 3D tilt | `tilt: 10 lift 1.04 glare` | shipped | engine only; flat under reduced motion, ignores touch; not combinable with bend or fold |
+| Alpha on a named colour | `white/12` | fixed | used to compile to `white/12px` and be dropped by the browser with no error |
+
 ## v0.9.0: texture, aura, sliders, and what testing them found
 
 New language: `texture`, the aura family, `slider`, lint warnings, `dssl import`, and an

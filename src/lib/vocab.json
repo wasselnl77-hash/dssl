@@ -392,5 +392,49 @@
       "key": "graph-gap",
       "form": "graph-gap <px>"
     }
+  ],
+  "glassWords": [
+    {
+      "key": "blur",
+      "doc": "a number: how many px to blur what is behind the element (default 16)"
+    },
+    {
+      "key": "saturate",
+      "doc": "saturate <n>: colour boost for what shows through, 1 is unchanged (default 1.5)"
+    },
+    {
+      "key": "bright",
+      "doc": "bright <n>: brightness of what shows through, 1 is unchanged"
+    },
+    {
+      "key": "tint",
+      "doc": "tint <color> | tint none: the milky layer on top (default: a faint wash of the text colour)"
+    }
+  ],
+  "tiltWords": [
+    {
+      "key": "max",
+      "doc": "a number: the largest tilt in degrees (default 8)"
+    },
+    {
+      "key": "lift",
+      "doc": "lift <n>: scale while the pointer is over it, e.g. 1.04"
+    },
+    {
+      "key": "perspective",
+      "doc": "perspective <px>: how strong the 3D depth looks (default 900)"
+    },
+    {
+      "key": "speed",
+      "doc": "speed <0.05 to 1>: how quickly it follows (default 0.18)"
+    },
+    {
+      "key": "invert",
+      "doc": "invert: tilt away from the pointer instead of toward it"
+    },
+    {
+      "key": "glare",
+      "doc": "glare: also keep --dssl-gx and --dssl-gy (0% to 100%) pointing at the pointer, for your own highlight"
+    }
   ]
 }

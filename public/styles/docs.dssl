@@ -863,3 +863,36 @@ behavior snow {
 .doc-list li {
   line-height: 1.65
 }
+
+// ---- 0.10.0: glass and tilt demo
+.fx-scene {
+  position: relative
+  overflow: hidden
+  width: 100%
+  radius: lg
+  padding: 36 28
+  background: linear-gradient(135deg, #ff7a00, #c2185b 55%, #3949ab)
+  display: grid
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr))
+  gap: 20
+}
+
+.fx-blob { position: absolute; radius: full }
+.fx-blob-a { width: 150; height: 150; left: 6%; top: -34; background: #ffe14a }
+.fx-blob-b { width: 120; height: 120; right: 12%; bottom: -26; background: #40e0d0 }
+
+.fx-pane {
+  position: relative
+  column: gap 6
+  min-height: 130
+  padding: 20
+  glass: 18 saturate 1.6
+  tilt: 10 lift 1.04 glare
+  border: 1 solid white/35
+  radius: lg
+  color: white
+  font-size: 13.5
+  background-image: radial-gradient(circle at var(--dssl-gx, 50%) var(--dssl-gy, 50%), white/28, transparent 55%)
+}
+
+.fx-pane b { font-size: 17 }

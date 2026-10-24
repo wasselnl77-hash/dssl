@@ -68,7 +68,7 @@ Both drop a `dssl-engine/` folder next to you: the engine, a starter token set, 
 
 Prefer to click: [dssl-engine.zip](https://dssl-sable.vercel.app/dssl-engine.zip) or [dssl-engine.tar.gz](https://dssl-sable.vercel.app/dssl-engine.tar.gz). Same package, straight from the browser.
 
-Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API). In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.9.1.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. See `dssl-vscode/PUBLISHING.md` for publishing.
+Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API). In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.10.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. See `dssl-vscode/PUBLISHING.md` for publishing.
 
 AI agents and machine reviewers: this repo ships `llms.txt` (dense, structured facts), `AGENTS.md` (how to work on the codebase) and `PARITY.md` (the honest feature matrix against CSS). The site serves the same `llms.txt` at https://dssl-sable.vercel.app/llms.txt
 
@@ -391,6 +391,19 @@ input[type=range] {
 One description writes both the `::-webkit-slider-*` rules (Chrome, Edge, Safari) and the
 `::-moz-range-*` rules (Firefox). `graph 20 45 70 90 60` puts a histogram behind the track, and
 `aura-particle: ... from thumb` makes particles leave the thumb.
+
+## Glass and tilt
+
+```dssl
+.pane {
+  glass: 18 saturate 1.6
+  tilt: 10 lift 1.04 glare
+  border: 1 solid white/35
+}
+```
+
+`glass` blurs what is behind an element and is plain CSS, so `dssl build` keeps it. `tilt` turns
+toward the pointer and stays in the engine. Details are in the guide.
 
 ## Errors that talk back, and warnings
 

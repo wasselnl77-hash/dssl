@@ -12,6 +12,21 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.10.0",
+    date: "growth phase \u00b7 the polish drop",
+    title: "Glass, tilt, a playground that does more, and a quiet bug in colour alpha.",
+    why: "rebuilding the site's own pages kept hitting things the language did not have. Instead of working around them in CSS, they went into DSSL.",
+    kind: "add",
+    body:
+      "glass: blurs what is behind an element and adds a faint wash of the text colour, so it works in light and dark. It is plain CSS, so dssl build keeps it. tilt: turns an element toward the pointer in 3D, with lift, perspective, speed, invert and glare (which keeps --dssl-gx and --dssl-gy pointing at the pointer so you can draw a shine). It only changes custom properties while the mouse moves, ignores touch, stays flat under reduced motion and stops on freeze. The bug: alpha on a named colour, white/12, used to compile to white/12px, which the browser drops without a word. It now becomes a real colour, like tokens and hex always did. The playground grew a canvas.html tab (shared links carry it, and the canvas only accepts a short allow-list of tags, so a link cannot run script), five new examples (aura, textures, sliders, glass and tilt), lint warnings, an as-CSS tab that shows what dssl build would write and what stays in the engine, and Tab and Enter that behave in the editor. The home page now shows the effects running instead of describing them.",
+    code: `.pane {
+  glass: 18 saturate 1.6
+  tilt: 10 lift 1.04 glare
+  border: 1 solid white/35          // used to become white/35px
+  background-image: radial-gradient(circle at var(--dssl-gx, 50%) var(--dssl-gy, 50%), white/28, transparent 55%)
+}`,
+  },
+  {
     version: "v0.9.0",
     date: "growth phase · the surface drop",
     title: "Texture, aura and range sliders, and a designer in the editor.",

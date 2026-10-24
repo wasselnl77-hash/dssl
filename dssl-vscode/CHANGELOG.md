@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0
+
+- Bundled engine updated to 0.10.0: new `glass` and `tilt` properties, with completions and hover
+  docs for both, and alpha on named colours (`white/12`) now compiles to a real colour instead of
+  `white/12px`.
+
 ## 0.9.1
 
 - README: a note at the top explaining the publisher name (`ehs-studio` is the same person as

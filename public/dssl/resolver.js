@@ -24,6 +24,8 @@ import { parseTexture } from './texture.js';
 import { parseAura } from './aura.js';
 import { parseSlider, sliderCss } from './slider.js';
 import { lintRules } from './lint.js';
+import { NAMED as NAMED_COLORS } from './color.js';
+import { glassDecls, parseTilt } from './effects.js';
 // v0.5.0 - the resolver validates the `::name` half of full selectors so a
 // typo like .card::befor is a LOUD error, never a silently dead rule.
 import { PSEUDO_ELEMENTS, VENDOR_PSEUDO, STATE_WORDS } from './parser.js';
@@ -289,6 +291,17 @@ function resolveValue(raw, ctx) {
 
       // known keyword?
       if (CSS_KEYWORDS.has(ident) || CSS_KEYWORDS.has(ident.toLowerCase())) {
+        // 0.10.0 - alpha on a named colour: white/12 used to become white/12px,
+        // which the browser drops without a word. Same treatment as tokens and hex.
+        const low = ident.toLowerCase();
+        if (NAMED_COLORS[low] || low === 'currentcolor') {
+          const am = raw.slice(i).match(/^\s*\/\s*([0-9.]+)\s*%?/);
+          if (am) {
+            out += `color-mix(in oklab, ${ident} ${am[1]}%, transparent)`;
+            i += am[0].length;
+            continue;
+          }
+        }
         out += ident;
         continue;
       }
@@ -1045,6 +1058,16 @@ function auraDecls(prop, v, ctx) {
 for (const name of ['aura', 'aura-glow', 'aura-particle', 'aura-particles', 'glow-particle', 'glow-particles', 'aura-glow-particle', 'aura-glow-particles']) {
   SEMANTIC[name] = (v, ctx) => auraDecls(name, v, ctx);
 }
+
+SEMANTIC.glass = function glass(v, ctx) {
+  return glassDecls(v, { ...styleHooks(ctx), looksLikeColor: (w) => /^(#|rgb|hsl|oklch|oklab|color)|\//.test(w) || /^[a-z]+\.[a-z0-9-]+/.test(w) || /^(white|black|transparent)$/.test(w) }) || [];
+};
+
+SEMANTIC.tilt = function tilt(v, ctx) {
+  const spec = parseTilt(v, styleHooks(ctx));
+  if (spec === undefined) return [];
+  return [{ prop: '@tilt', value: spec }];
+};
 
 SEMANTIC.slider = function slider(v, ctx) {
   const spec = parseSlider(v, styleHooks(ctx));

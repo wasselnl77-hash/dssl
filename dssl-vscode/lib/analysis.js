@@ -7,6 +7,7 @@
 import { parse, PSEUDO_ELEMENTS } from './engine/parser.js';
 import { resolve, DEFAULT_TOKENS, CSS_KEYWORDS } from './engine/resolver.js';
 import { SEMANTIC, CSS, STATES, AT_RULES, BLOCKS, PROPERTY_NAMES } from './props-docs.js';
+import { GLASS_WORDS, TILT_WORDS } from './engine/effects.js';
 import { PRESETS, PRESET_NAMES, GENERATORS, TEXTURE_KEYS, BLEND_MODES } from './engine/texture.js';
 import { GLOW_KEYS, PARTICLE_KEYS, SHAPES, FROM_WORDS, DIR_WORDS } from './engine/aura.js';
 import { SLIDER_CLAUSES, THUMB_SHAPES } from './engine/slider.js';
@@ -21,6 +22,12 @@ function domainItems(prop) {
     for (const g of GENERATORS) add(g, 'texture generator', 'start from scratch with this generator, then add settings');
     for (const [k, d] of Object.entries(TEXTURE_KEYS)) add(k, 'texture setting', d.doc);
     for (const b of BLEND_MODES) add(b, 'blend mode', 'how the texture mixes with what is under it');
+  } else if (prop === 'glass') {
+    for (const [k, d] of Object.entries(GLASS_WORDS)) add(k, 'glass setting', d);
+    add('none', 'clears', 'glass: none removes the effect');
+  } else if (prop === 'tilt') {
+    for (const [k, d] of Object.entries(TILT_WORDS)) add(k, 'tilt setting', d);
+    add('none', 'clears', 'tilt: none removes the effect');
   } else if (prop === 'slider') {
     for (const [k, usage] of Object.entries(SLIDER_CLAUSES)) add(k, 'slider setting', usage);
     for (const t of THUMB_SHAPES) add(t, 'thumb shape', 'shape ' + t);

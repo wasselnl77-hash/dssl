@@ -106,7 +106,7 @@ animate: pop 400 snap both`} />
 
         {/* ---------------------------------------------- texture, aura, slider */}
         <div className="cheat-card">
-          <span className="cheat-k">texture, aura, slider</span>
+          <span className="cheat-k">texture, aura, slider, glass, tilt</span>
           <CodeBlock plain code={`texture: wood                      // 30 presets; stacks with commas
 texture: noise scale 3 color #123 blend multiply   // or your own
 
@@ -121,7 +121,11 @@ behavior fire { aura-glow: ... aura-particle: ... }   // aura has no presets
 .torch { use fire }
 
 slider: track 6 #456 radius full, fill #f80, thumb 22 #fff, ring 3 #f80
-slider: graph 20 45 70 90 60, graph-height 52   // a histogram slider`} />
+slider: graph 20 45 70 90 60, graph-height 52   // a histogram slider
+
+glass: 18 saturate 1.6             // frosted glass, plain CSS
+tilt: 10 lift 1.04 glare           // follows the pointer, engine only
+border: 1 solid white/30           // alpha works on named colours too`} />
           <p className="cheat-p">
             Runtime features: <code>dssl build</code> leaves them out and says so. Aura draws on one
             canvas, stills under reduced motion, and shares a budget of 1800 particles. Open the designer

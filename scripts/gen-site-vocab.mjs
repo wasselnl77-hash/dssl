@@ -10,6 +10,7 @@ import { join, dirname } from 'node:path';
 import { PRESETS, PRESET_NAMES, GENERATORS, TEXTURE_KEYS } from '../public/dssl/texture.js';
 import { GLOW_KEYS, PARTICLE_KEYS } from '../public/dssl/aura.js';
 import { SLIDER_CLAUSES } from '../public/dssl/slider.js';
+import { GLASS_WORDS, TILT_WORDS } from '../public/dssl/effects.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -22,6 +23,8 @@ export function buildVocab() {
     glowKeys: keys(GLOW_KEYS),
     particleKeys: keys(PARTICLE_KEYS),
     sliderClauses: Object.entries(SLIDER_CLAUSES).map(([key, form]) => ({ key, form })),
+    glassWords: Object.entries(GLASS_WORDS).map(([key, doc]) => ({ key, doc })),
+    tiltWords: Object.entries(TILT_WORDS).map(([key, doc]) => ({ key, doc })),
   };
 }
 

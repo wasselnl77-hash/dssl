@@ -57,6 +57,12 @@ DSSL.replay(sel) / DSSL.refresh() / DSSL.errors() / DSSL.version
 - `dssl import styles.css -o styles.dssl` converts CSS to DSSL and reports what could not carry over; the output always compiles.
 - The editor extension has a designer panel (sliders, live previews, graphs, DSSL output, Insert and Load from selection), completions for the new vocabulary, and a CSS converter command.
 
+## 0.10.0: glass, tilt, named-colour alpha
+- `glass: 18 saturate 1.6 tint white/12` writes backdrop-filter plus a faint wash of the text colour. Plain CSS, kept by `dssl build`. Settings: blur number, `saturate <n>`, `bright <n>`, `tint <color>|none`. `glass: none` clears it.
+- `tilt: 10 lift 1.04 perspective 900 speed 0.18 invert glare` turns toward the pointer in 3D. Runtime only. `glare` keeps `--dssl-gx` and `--dssl-gy` pointing at the pointer. Ignores touch, flat under reduced motion, stops on freeze. Do not combine with `bend` or `fold`.
+- Alpha on a named colour works: `white/12`, `currentColor/20`. It used to compile to `white/12px`.
+- The playground has a canvas.html tab, `?example=` links, lint warnings and an "as CSS" tab. The canvas keeps a short allow-list of tags and drops scripts, handlers, styles and ids.
+
 ## CLI (v0.8.0)
 
 ```sh
@@ -70,4 +76,4 @@ Wait for the `dssl-ready` event on `window` before measuring layout: the engine 
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.9.1.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.10.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.

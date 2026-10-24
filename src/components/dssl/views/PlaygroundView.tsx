@@ -1,262 +1,78 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { decodeShare, encodeShare, MAX_SHARE_URL, shareFromHash } from "@/lib/share";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { decodeShare, encodeShare, MAX_SHARE_URL, packPayload, shareFromHash, unpackPayload } from "@/lib/share";
+import { renderSafeHtml } from "@/lib/sanitize";
+import { DEFAULT_HTML, PRESETS } from "@/lib/playground-presets";
 
-const PRESETS: Record<string, { label: string; src: string }> = {
-  cards: {
-    label: "Cards",
-    src: `// style the canvas, bare numbers are px,
-// bare identifiers are tokens
-tokens {
-  color {
-    hotspot: oklch(0.62 0.17 55)
+type Tab = "dssl" | "html" | "css";
+type Built = { css: string; report?: { engineDecls?: number; engineKinds?: string[] }; errors?: unknown[] };
+
+/** Put the tokens layer last in the CSS view. The layer order is already declared on the first line,
+ *  so nothing changes for the browser, and the rules the reader wrote come first. */
+function tokensLast(css: string): string {
+  const start = css.indexOf("@layer tokens {");
+  if (start < 0) return css;
+  const end = css.indexOf("\n}\n", start);
+  if (end < 0) return css;
+  const block = css.slice(start, end + 3);
+  return (css.slice(0, start) + css.slice(end + 3)).replace(/\n{3,}/g, "\n\n").trimEnd() + "\n\n" + block;
+}
+
+/** Tab inserts two spaces and Enter keeps the indent (one deeper after "{"). Escape lets Tab leave the box again. */
+function editorKeys(e: KeyboardEvent<HTMLTextAreaElement>, free: { current: boolean }, after: () => void) {
+  const ta = e.currentTarget;
+  if (e.key === "Escape") { free.current = true; return; }
+  if (e.key === "Tab" && !free.current && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    ta.setRangeText("  ", ta.selectionStart, ta.selectionEnd, "end");
+    after();
+    return;
+  }
+  if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && ta.selectionStart === ta.selectionEnd) {
+    const at = ta.selectionStart;
+    const lineStart = ta.value.lastIndexOf("\n", at - 1) + 1;
+    const line = ta.value.slice(lineStart, at);
+    const indent = /^[ \t]*/.exec(line)![0] + (/[{(]\s*$/.test(line) ? "  " : "");
+    e.preventDefault();
+    ta.setRangeText("\n" + indent, at, at, "end");
+    after();
   }
 }
 
-.pc-board {
-  grid: auto-fill 190
-  gap: space.4
-  width: 100%
-}
-
-.pc-card {
-  background: color.card
-  border: 1 solid color.line
-  radius: md
-  padding: space.4
-  shadow: sm
-  column: gap 8
-  transition: 180
-
-  hover {
-    translate: 0 -4
-    shadow: lg
-    border-color: color.hotspot/45
-
-    .pc-badge {
-      background: color.hotspot
-      color: color.accent-ink
-    }
-  }
-}
-
-.pc-badge {
-  align-self: start
-  font-family: font.mono
-  font-size: 11
-  background: color.accent/12
-  color: color.accent
-  padding: 3 9
-  radius: full
-  transition: 180
-}
-
-.pc-title { font-weight: 700; font-size: 15 }
-.pc-text  { color: color.muted; font-size: 13; line-height: 1.55 }
-
-.pc-btn {
-  padding: 8 14
-  radius: sm
-  background: color.ink
-  color: color.paper
-  font-size: 13
-  font-weight: 600
-
-  hover { translate: 0 -2 }
-  active { translate: 0 0 }
-}`,
-  },
-  tokens: {
-    label: "Tokens",
-    src: `// tokens compile to custom properties on the
-// canvas element, try flipping these
-tokens {
-  color {
-    pop: oklch(0.65 0.19 300)
-    calm: oklch(0.68 0.13 190)
-  }
-  radius { md: 18 }
-}
-
-.pc-board {
-  grid: 3
-  gap: space.4
-}
-
-.pc-card {
-  background: color.card
-  border-top: 4 solid color.pop
-  radius: md
-  padding: space.4
-  column: gap 8
-  shadow: sm
-}
-
-.pc-card:nth-child(2) {
-  border-top-color: color.calm
-}
-
-.pc-card:nth-child(3) {
-  border-top-color: color.pop/55
-}
-
-.pc-badge {
-  background: color.pop/12
-  color: color.pop
-  padding: 3 9
-  radius: full
-  font-family: font.mono
-  font-size: 11
-  align-self: start
-}
-
-.pc-title { font-weight: 700; font-size: 15 }
-.pc-text  { color: color.muted; font-size: 13 }`,
-  },
-  motion: {
-    label: "Motion",
-    src: `// declare once, animate anywhere.
-// reduced-motion users: this all politely
-// does nothing unless marked essential
-motion float {
-  from {
-    opacity: 0
-    translate: 0 18
-    scale: 0.94
-  }
-}
-
-motion shimmer {
-  at 0   { translate: 0 0 }
-  at 50  { translate: 0 -10 }
-  at 100 { translate: 0 0 }
-}
-
-.pc-board {
-  grid: 3
-  gap: space.4
-}
-
-.pc-card {
-  background: color.card
-  border: 1 solid color.line
-  radius: md
-  padding: space.4
-  column: gap 8
-  animate: float 600 snap both
-
-  hover { shadow: lg; translate: 0 -4 }
-}
-
-.pc-card:nth-child(2) { animate: float 600 snap 150 both }
-.pc-card:nth-child(3) { animate: float 600 snap 300 both }
-
-.pc-badge {
-  background: color.accent/12
-  color: color.accent
-  padding: 3 9
-  radius: full
-  font-family: font.mono
-  font-size: 11
-  align-self: start
-}
-
-.pc-title { font-weight: 700; font-size: 15 }
-.pc-text  { color: color.muted; font-size: 13 }
-
-// press "replay" above to re-run the motion`,
-  },
-  signals: {
-    label: "Signals",
-    src: `// press the button in the canvas,
-// DSSL.signal('pgdemo', 'hot') re-styles live
-.pc-board {
-  grid: 3
-  gap: space.4
-}
-
-.pc-card {
-  background: color.card
-  border: 1 solid color.line
-  radius: md
-  padding: space.4
-  column: gap 8
-  transition: 250
-}
-
-@signal pgdemo == hot {
-  .pc-card {
-    background: color.accent
-    border-color: color.accent
-    color: color.accent-ink
-    translate: 0 -3
-    shadow: lg
-
-    .pc-text { color: color.accent-ink/80 }
-    .pc-badge {
-      background: color.accent-ink/20
-      color: color.accent-ink
-    }
-  }
-}
-
-.pc-badge {
-  background: color.accent/12
-  color: color.accent
-  padding: 3 9
-  radius: full
-  font-family: font.mono
-  font-size: 11
-  align-self: start
-}
-
-.pc-title { font-weight: 700; font-size: 15 }
-.pc-text  { color: color.muted; font-size: 13 }`,
-  },
-  errors: {
-    label: "Errors",
-    src: `// this preset fails on purpose,
-// read the panel below the editor
-.pc-card {
-  backgroud: color.card       // typo
-  radius: md
-  padding: space.4
-  colr: color.ink             // typo
-  shadow: color.acnt          // unknown token
-}
-
-.pc-title {
-  font-weight: 700
-  bananify: 12                // unknown property
-}`,
-  },
-};
-
-const SAMPLE_CARDS = [
-  { badge: "one", title: "Styled live", text: "Everything on the left is applied to this canvas by the DSSL engine, scoped, so the rest of the site is untouched." },
-  { badge: "two", title: "Tokens & states", text: "Use color.*, space.*, radius.*, or define your own. Hover states work right here." },
-  { badge: "three", title: "Loud errors", text: "Misspell a token and the panel below explains what it thinks you meant." },
-];
 
 export default function PlaygroundView() {
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const cssRef = useRef<HTMLTextAreaElement>(null);
+  const htmlRef = useRef<HTMLTextAreaElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const freeTab = useRef(false);
   const [errors, setErrors] = useState<DsslError[]>([]);
+  const [warnings, setWarnings] = useState<DsslError[]>([]);
   const [stats, setStats] = useState<DsslApplyResult["stats"] | null>(null);
   const [engineReady, setEngineReady] = useState(false);
   const [preset, setPreset] = useState("cards");
+  const [tab, setTab] = useState<Tab>("dssl");
+  const [built, setBuilt] = useState<Built | null>(null);
   const [hot, setHot] = useState(false);
-  const [shareNote, setShareNote] = useState("");
+  const [note, setNote] = useState("");
 
   const run = useCallback((src: string) => {
     if (!window.DSSL) return;
     const res = window.DSSL.apply(src, { scope: "#pg-canvas", name: "pg", replace: true });
     setErrors(res.errors);
+    setWarnings(res.warnings ?? []);
     setStats(res.stats);
+    try { setBuilt(window.DSSL.toCSS ? (window.DSSL.toCSS(src, { banner: false }) as Built) : null); } catch { setBuilt(null); }
   }, []);
 
-  // wait for the engine, then run the default preset (scoped!)
+  const paintHtml = useCallback((html: string) => {
+    if (!canvasRef.current) return;
+    const r = renderSafeHtml(canvasRef.current, html);
+    if (r.truncated) setNote("The canvas HTML is long, so only the first part is shown.");
+    else if (r.dropped) setNote(`The canvas keeps layout, text and form tags only. ${r.dropped} other tag${r.dropped === 1 ? "" : "s"} or attribute${r.dropped === 1 ? " was" : "s were"} left out.`);
+  }, []);
+
   useEffect(() => {
     if (window.DSSL) {
       const t = setTimeout(() => setEngineReady(true), 0);
@@ -271,49 +87,68 @@ export default function PlaygroundView() {
     if (!engineReady) return;
     let cancelled = false;
     (async () => {
-      // a link like /playground#s=... carries the whole stylesheet
+      // a link like /playground#s=... carries the whole stylesheet, and the canvas HTML when it was edited
       const packed = shareFromHash(window.location.hash);
       const shared = packed ? await decodeShare(packed) : null;
-      if (cancelled) return;
-      if (shared !== null && editorRef.current) {
-        editorRef.current.value = shared;
-        setShareNote("Loaded from a shared link.");
-        run(shared);
-      } else {
-        run(PRESETS.cards.src);
-        if (packed) setShareNote("That link could not be read, so the default is loaded.");
-      }
+      if (cancelled || !cssRef.current || !htmlRef.current) return;
+      // /playground?example=aura opens one of the examples; a shared link wins over it
+      const wanted = new URLSearchParams(window.location.search).get("example");
+      const ex = shared === null && wanted && PRESETS[wanted] ? wanted : null;
+      if (ex) setPreset(ex);
+      const first = shared !== null ? unpackPayload(shared) : ex ? { css: PRESETS[ex].src, html: PRESETS[ex].html } : { css: PRESETS.cards.src, html: undefined };
+      cssRef.current.value = first.css;
+      htmlRef.current.value = first.html ?? DEFAULT_HTML;
+      paintHtml(htmlRef.current.value);
+      run(first.css);
+      if (shared !== null) setNote("Loaded from a shared link.");
+      else if (packed) setNote("That link could not be read, so the default is loaded.");
     })();
     return () => { cancelled = true; };
-  }, [engineReady, run]);
+  }, [engineReady, run, paintHtml]);
 
-  const copyLink = async () => {
-    if (!editorRef.current) return;
-    const packed = await encodeShare(editorRef.current.value);
-    const url = `${window.location.origin}${window.location.pathname}#s=${packed}`;
-    if (url.length > MAX_SHARE_URL) { setShareNote("That stylesheet is too long for a link. Copy the text instead."); return; }
-    window.history.replaceState(null, "", `#s=${packed}`);
-    try {
-      await navigator.clipboard.writeText(url);
-      setShareNote("Link copied.");
-    } catch {
-      setShareNote("The link is in the address bar. Copy it from there.");
-    }
+  const currentPayload = () => {
+    const css = cssRef.current?.value ?? "";
+    const html = htmlRef.current?.value ?? DEFAULT_HTML;
+    return packPayload({ css, html: html === DEFAULT_HTML ? undefined : html });
   };
 
-  const onEdit = () => {
+  const copyLink = async () => {
+    const packed = await encodeShare(currentPayload());
+    const url = `${window.location.origin}${window.location.pathname}#s=${packed}`;
+    if (url.length > MAX_SHARE_URL) { setNote("That is too long for a link. Copy the text instead."); return; }
+    window.history.replaceState(null, "", `#s=${packed}`);
+    try { await navigator.clipboard.writeText(url); setNote("Link copied."); }
+    catch { setNote("The link is in the address bar. Copy it from there."); }
+  };
+
+  const copyCss = async () => {
+    if (!built || errors.length) return;
+    try { await navigator.clipboard.writeText(tokensLast(built.css)); setNote("CSS copied."); }
+    catch { setNote("Select the text and copy it."); }
+  };
+
+  const onEditCss = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => { if (cssRef.current) run(cssRef.current.value); }, 450);
+  };
+  const onEditHtml = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      if (editorRef.current) run(editorRef.current.value);
+      if (!htmlRef.current) return;
+      setNote("");
+      paintHtml(htmlRef.current.value);
     }, 450);
   };
 
   const loadPreset = (key: string) => {
     setPreset(key);
-    if (editorRef.current) {
-      editorRef.current.value = PRESETS[key].src;
-      run(PRESETS[key].src);
-    }
+    setNote("");
+    setHot(false);
+    const p = PRESETS[key];
+    if (cssRef.current) cssRef.current.value = p.src;
+    if (htmlRef.current) htmlRef.current.value = p.html ?? DEFAULT_HTML;
+    paintHtml(p.html ?? DEFAULT_HTML);
+    run(p.src);
   };
 
   const toggleHot = () => {
@@ -323,6 +158,8 @@ export default function PlaygroundView() {
   };
 
   const ok = errors.length === 0;
+  const engineOnly = built?.report?.engineKinds ?? [];
+  const shown = ok && built ? tokensLast(built.css) : null;
 
   return (
     <div className="wrap">
@@ -330,7 +167,7 @@ export default function PlaygroundView() {
         <h1 className="page-title">Playground</h1>
         <p className="page-sub">
           Real engine, real errors, zero setup. Your stylesheet is applied{" "}
-          <b>scoped</b> to the canvas, nothing leaks to the rest of the page.
+          <b>scoped</b> to the canvas, and you can change the canvas HTML too.
         </p>
       </div>
 
@@ -338,33 +175,59 @@ export default function PlaygroundView() {
         {/* ------------------------------------ editor */}
         <div className="pg-pane">
           <div className="pg-head">
-            <span>canvas.dssl</span>
+            <div className="pg-tabs" role="tablist" aria-label="Editor files">
+              {([["dssl", "styles.dssl"], ["html", "canvas.html"], ["css", "as CSS"]] as [Tab, string][]).map(([k, label]) => (
+                <button key={k} type="button" role="tab" aria-selected={tab === k} className={`pg-tab${tab === k ? " pg-tab-on" : ""}`} onClick={() => setTab(k)}>{label}</button>
+              ))}
+            </div>
             <div className="pg-head-tools">
-              <select
-                className="pg-select"
-                value={preset}
-                aria-label="Load preset"
-                onChange={(e) => loadPreset(e.target.value)}
-              >
-                {Object.entries(PRESETS).map(([k, p]) => (
-                  <option key={k} value={k}>{p.label}</option>
-                ))}
+              <select className="pg-select" value={preset} aria-label="Load example" onChange={(e) => loadPreset(e.target.value)}>
+                {Object.entries(PRESETS).map(([k, p]) => (<option key={k} value={k}>{p.label}</option>))}
               </select>
               <button type="button" className="doc-btn btn-sm" onClick={copyLink}>Copy link</button>
             </div>
           </div>
-          {shareNote && <div className="pg-note" role="status">{shareNote}</div>}
+          {note && <div className="pg-note" role="status">{note}</div>}
           <textarea
-            ref={editorRef}
+            ref={cssRef}
             className="pg-editor"
+            hidden={tab !== "dssl"}
             defaultValue={PRESETS.cards.src}
-            onInput={onEdit}
+            onInput={onEditCss}
+            onKeyDown={(e) => editorKeys(e, freeTab, onEditCss)}
+            onBlur={() => { freeTab.current = false; }}
             spellCheck={false}
-            aria-label="DSSL source editor"
+            aria-label="DSSL source editor. Press Escape, then Tab, to leave the box."
           />
+          <textarea
+            ref={htmlRef}
+            className="pg-editor"
+            hidden={tab !== "html"}
+            defaultValue={DEFAULT_HTML}
+            onInput={onEditHtml}
+            onKeyDown={(e) => editorKeys(e, freeTab, onEditHtml)}
+            onBlur={() => { freeTab.current = false; }}
+            spellCheck={false}
+            aria-label="Canvas HTML editor. Press Escape, then Tab, to leave the box."
+          />
+          {tab === "css" && (
+            <div className="pg-out-wrap">
+              <div className="pg-out-bar">
+                <span>
+                  {shown !== null
+                    ? engineOnly.length
+                      ? `stays in the engine: ${engineOnly.join(", ")}`
+                      : "everything here is plain CSS"
+                    : "fix the errors to see the CSS"}
+                </span>
+                <button type="button" className="doc-btn btn-sm" onClick={copyCss} disabled={shown === null}>Copy CSS</button>
+              </div>
+              <pre className="pg-out" tabIndex={0} aria-label="The stylesheet as plain CSS">{shown ?? ""}</pre>
+            </div>
+          )}
           <div className={`pg-status ${ok ? "pg-status-ok" : "pg-status-err"}`} role="status">
             {ok
-              ? `ok, ${stats?.rules ?? 0} rules, ${stats?.tokens ?? 0} tokens, ${stats?.motions ?? 0} motions`
+              ? `ok, ${stats?.rules ?? 0} rules, ${stats?.tokens ?? 0} tokens, ${stats?.motions ?? 0} motions${warnings.length ? `, ${warnings.length} warning${warnings.length === 1 ? "" : "s"}` : ""}`
               : `${errors.length} error${errors.length === 1 ? "" : "s"}: fix and keep going`}
           </div>
           {!ok && (
@@ -372,7 +235,17 @@ export default function PlaygroundView() {
               {errors.map((e, i) => (
                 <div key={i} className="pg-error">
                   <span>line {e.line ?? "?"}: {e.message}</span>
-                  {e.hint && <span className="pg-error-hint">did you mean <em>“{e.hint}”</em>?</span>}
+                  {e.hint && <span className="pg-error-hint">did you mean <em>&ldquo;{e.hint}&rdquo;</em>?</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {warnings.length > 0 && (
+            <div className="pg-warns" aria-live="polite">
+              {warnings.map((w, i) => (
+                <div key={i} className="pg-warn">
+                  <span>{w.line ? `line ${w.line}: ` : ""}{w.message}</span>
+                  {w.hint && <span className="pg-warn-hint">{w.hint}</span>}
                 </div>
               ))}
             </div>
@@ -390,25 +263,12 @@ export default function PlaygroundView() {
                 </button>
               )}
               {(preset === "motion" || preset === "cards") && (
-                <button type="button" className="doc-btn btn-sm" onClick={() => window.DSSL?.replay(".pc-card")}>
-                  replay
-                </button>
+                <button type="button" className="doc-btn btn-sm" onClick={() => window.DSSL?.replay(".pc-card")}>replay</button>
               )}
             </div>
           </div>
           <div className="pg-canvas-wrap">
-            <div className="pg-canvas" id="pg-canvas">
-              <p className="pg-canvas-title">canvas: your dssl styles this</p>
-              <div className="pc-board">
-                {SAMPLE_CARDS.map(c => (
-                  <article className="pc-card" key={c.badge}>
-                    <span className="pc-badge">{c.badge}</span>
-                    <h4 className="pc-title">{c.title}</h4>
-                    <p className="pc-text">{c.text}</p>
-                  </article>
-                ))}
-              </div>
-            </div>
+            <div className="pg-canvas" id="pg-canvas" ref={canvasRef} />
           </div>
         </div>
       </div>

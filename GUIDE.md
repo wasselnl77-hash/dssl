@@ -537,6 +537,36 @@ as 0 to 1) up to date on the input. Typing, dragging and arrow keys all update i
 The WebKit and Blink rules are tested in Chrome. The Firefox rules are written alongside them but
 have not been run in Firefox yet.
 
+### Glass and tilt
+
+`glass:` frosts whatever is behind an element. `tilt:` turns an element toward the pointer in 3D.
+Both work on any element.
+
+```dssl
+.pane {
+  glass: 18 saturate 1.6            // blur what is behind it
+  tilt: 10 lift 1.04 glare          // follow the pointer
+  border: 1 solid white/35
+  background-image: radial-gradient(circle at var(--dssl-gx, 50%) var(--dssl-gy, 50%), white/28, transparent 55%)
+}
+```
+
+`glass` writes a `backdrop-filter` and a faint wash of the text colour (so it works on light and dark
+pages). It is plain CSS, so `dssl build` keeps it. Settings: a blur number, `saturate <n>`,
+`bright <n>`, `tint <color>` or `tint none`, and a bare colour also counts as the tint. Write your own
+`background` after it to replace the wash. `glass: none` clears it.
+
+`tilt` is runtime only. The engine adds `perspective(...) rotateX() rotateY() scale()` after whatever
+`transform` you wrote, driven by custom properties, so moving the mouse never restyles anything.
+Settings: a number of degrees (0 to 45, default 8), `lift <n>` (scale while hovered),
+`perspective <px>` (default 900), `speed <0.02 to 1>` (default 0.18), `invert`, and `glare`, which also
+keeps `--dssl-gx` and `--dssl-gy` (0% to 100%) pointing at the pointer so you can draw a shine.
+It ignores touch, stays flat under reduced motion, stops while the page is frozen, and combines with
+`translate`, `scale` and `rotate`, but not with `bend` or `fold` (they also write the transform).
+
+Also new in 0.10.0: alpha on a named colour works. `white/12` used to compile to `white/12px`, which
+the browser dropped with no error. It now becomes a real colour, like tokens and hex always did.
+
 ### Warnings that help (lint)
 
 Some things compile, run, and are still wrong for the people using the page. DSSL warns about three.
@@ -592,7 +622,7 @@ Three ways to get it:
 
 1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
    https://open-vsx.org/extension/ehs-studio/dssl-vscode
-2. VS Code: download `dssl-vscode/dssl-vscode-0.9.1.vsix` from the repo files, then
+2. VS Code: download `dssl-vscode/dssl-vscode-0.10.0.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
 3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 
@@ -659,6 +689,7 @@ They look for one in the usual places; set `DSSL_CHROME` to point at another.
 ```sh
 node scripts/test-v090.mjs              # 0.9.0 pure logic: colour, texture, aura, slider, lint, import, share links
 node scripts/test-browser-v090.mjs      # 0.9.0 in Chrome: pixels, lifecycle, reduced motion, stress
+node scripts/test-v0100.mjs             # 0.10.0: glass, tilt, named-colour alpha, playground examples, HTML filter
 node scripts/test-designer.mjs          # the designer's state to DSSL and back, plus a random sweep
 node scripts/test-designer-browser.mjs  # the designer panel, driven like a person would
 node scripts/test-designer-host.mjs     # the extension's wiring, against a fake of the editor API

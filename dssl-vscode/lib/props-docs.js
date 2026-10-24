@@ -29,6 +29,8 @@ export const SEMANTIC = {
   'visually-hidden': 'hidden from eyes, visible to screen readers.',
   cover: 'fills the containing block absolutely.',
   use: 'apply a behavior: `use focus-ring`. Behaviors are named rule groups declared with `behavior name { }`.',
+  glass: 'frosted glass: `glass: 18`, `glass: 24 saturate 1.8 tint white/12`. Blurs what is behind the element and adds a faint wash of the text colour. Plain CSS, so `dssl build` keeps it. `glass: none` clears it.',
+  tilt: 'follows the pointer in 3D: `tilt: 10`, `tilt: 12 lift 1.04 perspective 700 speed 0.2 invert glare`. Runtime only. `glare` keeps --dssl-gx and --dssl-gy pointing at the pointer so you can draw a shine. Ignores touch, flat under reduced motion.',
   texture: 'a generated texture layered ON TOP of the element\u2019s own background: `texture: grain`, `texture: wood scale 6 intensity 0.8`, `texture: grain, scanlines`. 30 presets (grain, paper, marble, wood, carbon, halftone, ...) or build your own from a generator (noise, bump, lines, dots, grid, checker, weave, carbon, waves, hex) plus settings (scale, intensity, contrast, octaves, color, color2, blend, stretch, contour, ...). Open the designer to see them all.',
   aura: 'light and particles around an element, with NO presets: you describe it. `aura: glow #ff7a00 30 flicker 0.3, particles #fd0 -> #f60 count 60 shape flame glowing behind`. Replaces both slots. `aura: none` clears them.',
   'aura-glow': 'just the glow slot: `aura-glow: color.accent 24 pulse 1600`. Positional colour and radius, then settings (intensity, pulse, depth, flicker, texture(...), seed, essential). `aura-glow: none` clears only the glow.',

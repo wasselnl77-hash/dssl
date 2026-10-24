@@ -55,3 +55,19 @@ export function shareFromHash(hash: string): string | null {
 
 /** a browser URL length that every chat app and server will accept */
 export const MAX_SHARE_URL = 8000;
+
+/** what a playground link holds: the styles, and the canvas HTML when it is not the default */
+export type SharePayload = { css: string; html?: string };
+
+/** plain text stays plain text (so old links keep working); anything with HTML is a small JSON object */
+export const packPayload = (p: SharePayload): string => (p.html === undefined ? p.css : JSON.stringify({ v: 1, css: p.css, html: p.html }));
+
+export function unpackPayload(text: string): SharePayload {
+  if (text.startsWith('{"v":1,')) {
+    try {
+      const o = JSON.parse(text);
+      if (o && typeof o.css === "string") return { css: o.css, html: typeof o.html === "string" ? o.html : undefined };
+    } catch { /* it was just a stylesheet that starts oddly */ }
+  }
+  return { css: text };
+}

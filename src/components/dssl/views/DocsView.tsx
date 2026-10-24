@@ -25,6 +25,7 @@ const SIDE = [
   { head: null, id: "texture", label: "Texture" },
   { head: null, id: "aura", label: "Aura: light and particles" },
   { head: null, id: "sliders", label: "Range sliders" },
+  { head: null, id: "effects", label: "Glass and tilt" },
   { head: null, id: "designer", label: "Designer, import and lint" },
   { head: null, id: "errors", label: "Errors" },
   { head: null, id: "api", label: "JS API" },
@@ -901,6 +902,54 @@ input.mood {                       // particles leave the thumb, wherever the va
               follow the value through <code>--dssl-p</code>, which the engine keeps current (set{" "}
               <code>input.value</code> from JavaScript, then call <code>DSSL.refresh()</code>). The WebKit and Blink
               rules are tested in Chrome. The Firefox rules are generated but have not been run in Firefox yet.
+            </p>
+          </section>
+
+          <section className="doc-block" id="effects">
+            <h2 className="section-title">Glass and tilt</h2>
+            <p className="doc-lead">
+              <code>glass</code> frosts whatever is behind an element. <code>tilt</code> turns an element toward the
+              pointer in 3D. They were added to build this site, and they work on any element.
+            </p>
+            <CodeBlock file="glass-and-tilt.dssl" code={`.pane {
+  glass: 18 saturate 1.6            // blur what is behind it
+  tilt: 10 lift 1.04 glare          // follow the pointer
+  border: 1 solid white/35
+  background-image: radial-gradient(circle at var(--dssl-gx, 50%) var(--dssl-gy, 50%), white/28, transparent 55%)
+}`} />
+            <div className="demo-box wide">
+              <div className="fx-scene">
+                <span className="fx-blob fx-blob-a" />
+                <span className="fx-blob fx-blob-b" />
+                <div className="fx-pane"><b>Frosted</b><span>glass: 18 saturate 1.6</span></div>
+                <div className="fx-pane"><b>Follows you</b><span>tilt: 10 lift 1.04 glare</span></div>
+              </div>
+            </div>
+            <h3 className="doc-h3">glass</h3>
+            <p className="doc-lead">
+              It writes a <code>backdrop-filter</code> and a faint wash of the text colour, so it works on light and
+              dark pages. It is plain CSS, so <code>dssl build</code> keeps it. Write your own <code>background</code>{" "}
+              after it to replace the wash, or say <code>tint none</code>. <code>glass: none</code> turns it off.
+            </p>
+            <table className="tbl">
+              <thead><tr><th>setting</th><th>what it does</th></tr></thead>
+              <tbody>{vocab.glassWords.map((w) => (<tr key={w.key}><td><code>{w.key}</code></td><td>{w.doc}</td></tr>))}</tbody>
+            </table>
+            <h3 className="doc-h3">tilt</h3>
+            <p className="doc-lead">
+              The engine adds a perspective rotation after whatever <code>transform</code> you wrote, and only changes
+              custom properties while the pointer moves, so nothing restyles. It ignores touch, stays flat under
+              reduced motion, and stops while the page is frozen. It combines with <code>translate</code>,{" "}
+              <code>scale</code> and <code>rotate</code>. Do not combine it with <code>bend</code> or <code>fold</code>,
+              which also write the transform.
+            </p>
+            <table className="tbl">
+              <thead><tr><th>setting</th><th>what it does</th></tr></thead>
+              <tbody>{vocab.tiltWords.map((w) => (<tr key={w.key}><td><code>{w.key}</code></td><td>{w.doc}</td></tr>))}</tbody>
+            </table>
+            <p className="tbl-note">
+              <code>glare</code> is the trick for a shine: the engine keeps <code>--dssl-gx</code> and{" "}
+              <code>--dssl-gy</code> pointing at the pointer, and you use them in any gradient you like.
             </p>
           </section>
 
