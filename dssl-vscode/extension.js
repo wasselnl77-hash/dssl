@@ -1,4 +1,4 @@
-/* extension.js — thin vscode wiring over lib/analysis.js.
+/* extension.js - thin vscode wiring over lib/analysis.js.
  * The analysis layer (and the DSSL compiler it wraps) is ESM; the extension
  * host is happy with a dynamic import from CommonJS. Everything testable
  * lives in lib/, this file only talks to the editor. */
@@ -9,6 +9,9 @@ let mod = null;          // lib/analysis.js module
 let analysis = null;     // current workspace analysis result
 let diags = null;        // DiagnosticCollection (created once)
 let debounceTimer = null;
+let designerHost = null;  // lib/designer-host.js
+let designerPanel = null;
+let lastDsslEditor = null; // the panel steals focus, so remember which .dssl editor to insert into
 
 const KIND = {
   property: vscode.CompletionItemKind.Property,
@@ -90,6 +93,88 @@ function registerHover() {
   });
 }
 
+/* ---- the designer panel ---------------------------------------------- */
+
+/** the .dssl editor to talk to: the last one the user was in, if it is still on screen */
+function findDsslEditor() {
+  const visible = vscode.window.visibleTextEditors.filter((e) => e.document.languageId === 'dssl');
+  if (lastDsslEditor && visible.includes(lastDsslEditor)) return lastDsslEditor;
+  return visible[0] || null;
+}
+
+/** the editor, as designer-host.js wants it. New lines keep the indentation of the line you insert on. */
+function editorBridge() {
+  return {
+    activeDsslEditor() {
+      const ed = findDsslEditor();
+      if (!ed) return null;
+      return {
+        async insert(text) {
+          const sel = ed.selection;
+          const indent = (ed.document.lineAt(sel.start.line).text.match(/^\s*/) || [''])[0];
+          const body = text.replace(/\n/g, '\n' + indent);
+          await ed.edit((b) => (sel.isEmpty ? b.insert(sel.active, body) : b.replace(sel, body)));
+        },
+        selectionText() { return ed.document.getText(ed.selection); },
+      };
+    },
+    copy: (text) => vscode.env.clipboard.writeText(text),
+    info: (m) => vscode.window.setStatusBarMessage('DSSL designer: ' + m, 4000),
+    post: (m) => designerPanel && designerPanel.webview.postMessage(m),
+  };
+}
+
+async function openDesigner(context, tab) {
+  if (!designerHost) designerHost = await import('./lib/designer-host.js');
+  if (designerPanel) {
+    designerPanel.reveal(undefined, true);
+    designerPanel.webview.postMessage({ type: 'tab', tab });
+    return;
+  }
+  const column = vscode.window.activeTextEditor ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active;
+  designerPanel = vscode.window.createWebviewPanel('dsslDesigner', 'DSSL designer', { viewColumn: column, preserveFocus: true }, {
+    enableScripts: true,
+    retainContextWhenHidden: true,
+    localResourceRoots: [context.extensionUri],
+  });
+  const uri = (rel) => designerPanel.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri, ...rel.split('/'))).toString();
+  designerPanel.webview.html = designerHost.designerHtml({ cspSource: designerPanel.webview.cspSource, uri, tab });
+  const bridge = editorBridge();
+  designerPanel.webview.onDidReceiveMessage((msg) => designerHost.handleMessage(msg, bridge).catch((e) => vscode.window.showErrorMessage('DSSL designer: ' + e.message)));
+  designerPanel.onDidDispose(() => { designerPanel = null; });
+}
+
+/* ---- CSS to DSSL -------------------------------------------------------- */
+
+let importChannel = null;
+
+async function convertCss(uri) {
+  const target = uri || (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.uri);
+  if (!target || !/\.css$/i.test(target.fsPath)) { vscode.window.showInformationMessage('DSSL: pick a .css file to convert (right-click it in the Explorer, or open it first).'); return; }
+  const { importCss } = await import('./lib/engine/import.js');
+  const text = Buffer.from(await vscode.workspace.fs.readFile(target)).toString('utf8');
+  const { dssl, report } = importCss(text);
+  const out = vscode.Uri.file(target.fsPath.replace(/\.css$/i, '.dssl'));
+  let exists = true;
+  try { await vscode.workspace.fs.stat(out); } catch { exists = false; }
+  if (exists) {
+    const pick = await vscode.window.showWarningMessage(`${out.fsPath.split(/[\\/]/).pop()} already exists.`, { modal: true }, 'Overwrite');
+    if (pick !== 'Overwrite') return;
+  }
+  await vscode.workspace.fs.writeFile(out, Buffer.from(dssl, 'utf8'));
+  if (!importChannel) importChannel = vscode.window.createOutputChannel('DSSL import');
+  importChannel.clear();
+  importChannel.appendLine(`Converted ${target.fsPath}`);
+  importChannel.appendLine(`  ${report.rules} rule(s), ${report.declarations} declaration(s), ${report.converted} rewritten, ${report.pinned} moved to pin { }, ${report.motions} motion(s), ${report.raw} at-rule(s) kept in raw { }`);
+  for (const d of report.dropped) importChannel.appendLine(`  dropped line ${d.line}: ${d.text}\n    ${d.reason}`);
+  for (const n of report.notes) importChannel.appendLine(`  note line ${n.line}: ${n.message}${n.hint ? '\n    ' + n.hint : ''}`);
+  importChannel.appendLine(report.compile.ok ? '  The result compiles.' : `  The result still has ${report.compile.errors.length} error(s).`);
+  await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(out), { preview: false });
+  const bits = [`${report.converted} values rewritten`];
+  if (report.dropped.length) bits.push(`${report.dropped.length} line(s) dropped`);
+  vscode.window.showInformationMessage(`DSSL: converted to ${out.fsPath.split(/[\\/]/).pop()} (${bits.join(', ')}).`, 'Show the report').then((c) => { if (c) importChannel.show(true); });
+}
+
 async function activate(context) {
   mod = await import('./lib/analysis.js');
   diags = vscode.languages.createDiagnosticCollection('dssl');
@@ -103,7 +188,14 @@ async function activate(context) {
     vscode.workspace.onDidChangeWorkspaceFolders(() => scheduleAnalysis()),
     registerCompletion(),
     registerHover(),
+    vscode.window.onDidChangeActiveTextEditor((ed) => { if (ed && ed.document.languageId === 'dssl') lastDsslEditor = ed; }),
+    vscode.commands.registerCommand('dssl.openDesigner', () => openDesigner(context, 'aura')),
+    vscode.commands.registerCommand('dssl.openAuraDesigner', () => openDesigner(context, 'aura')),
+    vscode.commands.registerCommand('dssl.openTextureDesigner', () => openDesigner(context, 'texture')),
+    vscode.commands.registerCommand('dssl.openSliderDesigner', () => openDesigner(context, 'slider')),
+    vscode.commands.registerCommand('dssl.convertCss', (uri) => convertCss(uri)),
   );
+  if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document.languageId === 'dssl') lastDsslEditor = vscode.window.activeTextEditor;
 
   // run once so diagnostics are present before the first keystroke
   await runAnalysis();

@@ -12,21 +12,20 @@ there, "DSSL" shows up in the tab, searchable, one-click install, updates includ
 One-time, on your side (about 2 minutes):
 
 1. Go to https://open-vsx.org and sign in with your GitHub account.
-2. Top right: your avatar → **Settings** → **Access Tokens** → **Generate token**.
-3. Give it any name, copy the value, and paste it in chat. It gets stored the
-   same way as the HF and Vercel tokens (chmod 600, outside every tracked file,
-   mirrored into `.git/backups/`).
+2. Open your profile, then **Settings**, then **Access Tokens**, and generate a token.
+3. Accept the Eclipse publisher agreement on the same page. Publishing fails without it.
+4. Put the token in a file that is not in the repo, for example `~/Dokumente/tokens/openvsx token`.
 
-Then it is one command on my side:
+Then it is one command:
 
 ```sh
-bash scripts/publish-openvsx.sh
+OPENVSX_TOKEN_FILE="$HOME/Dokumente/tokens/openvsx token" bash scripts/publish-openvsx.sh
 ```
 
-The script reads the token, creates the `ehs-studio` namespace (tolerates "already
-exists"), and publishes the newest `.vsix`. After that:
+(`OPENVSX_TOKEN` or a first argument work too.) The script creates the `ehs-studio` namespace
+(tolerating "already exists") and publishes the newest `.vsix` in this folder. After that:
 
-- VSCodium: Extensions tab → search "DSSL" → Install.
+- VSCodium: Extensions tab, search "DSSL", Install.
 - Future updates: bump `version` in `dssl-vscode/package.json`, repackage with
   `npx @vscode/vsce package --no-dependencies`, rerun the script.
 
@@ -40,7 +39,7 @@ gatekeeper: it requires an Azure DevOps organization and a personal access token
    Suggested ID: `ehs-studio`.
 3. In Azure DevOps: User settings → **Personal access tokens** → New token with
    scope **Marketplace → Manage**.
-4. Hand over the token like the others, then it is:
+4. Keep the token in a file outside the repo, then it is:
 
 ```sh
 cd dssl-vscode && npx @vscode/vsce publish --pat <token>
@@ -58,4 +57,4 @@ This can happen at any time; Open VSX first does not block it.
 
 - `node scripts/sync-extension-engine.mjs` after ANY engine change, so the
   bundled compiler matches the browser compiler.
-- Run the extension lib tests (36 assertions) before packaging.
+- Run `npm run test:fast` and `node scripts/test-designer-host.mjs` before packaging. The second one loads the real `extension.js` against a fake editor API, which is the closest thing to opening it in VS Code. Do also open the packaged `.vsix` in VS Code once.

@@ -1,0 +1,66 @@
+/* The designer follows the editor's theme through VS Code's own CSS variables; the
+   fallbacks only matter when the page is opened outside the editor (tests, screenshots). */
+:root {
+  --bg: var(--vscode-editor-background, #1e1e1e);
+  --fg: var(--vscode-editor-foreground, #d4d4d4);
+  --muted: var(--vscode-descriptionForeground, #9a9a9a);
+  --line: var(--vscode-panel-border, #3c3c3c);
+  --field: var(--vscode-input-background, #2a2a2a);
+  --accent: var(--vscode-button-background, #0e639c);
+  --accent-fg: var(--vscode-button-foreground, #fff);
+  --good: var(--vscode-testing-iconPassed, #73c991);
+  --bad: var(--vscode-errorForeground, #f48771);
+  --font: var(--vscode-font-family, system-ui, sans-serif);
+  --mono: var(--vscode-editor-font-family, ui-monospace, Menlo, Consolas, monospace);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.45 var(--font); }
+header { display: flex; align-items: center; gap: 18px; padding: 10px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 5; }
+h1 { font-size: 15px; margin: 0; font-weight: 600; }
+nav { display: flex; gap: 4px; }
+button { font: inherit; color: var(--fg); background: var(--field); border: 1px solid var(--line); border-radius: 3px; padding: 5px 12px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.tab.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button.mini { padding: 2px 8px; font-size: 12px; }
+button.mini.on { background: var(--accent); color: var(--accent-fg); }
+button.mini.add { border-style: dashed; }
+.panel[hidden] { display: none; }
+.cols { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(340px, 1fr); gap: 18px; padding: 14px 16px 6px; align-items: start; }
+@media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+.right { position: sticky; top: 52px; }
+fieldset { border: 1px solid var(--line); border-radius: 4px; margin: 0 0 12px; padding: 8px 12px 10px; min-width: 0; }
+legend { padding: 0 6px; font-weight: 600; }
+.row { display: grid; grid-template-columns: 112px 1fr; gap: 8px; align-items: center; padding: 2px 0; }
+.lab { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctl { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ctl input[type=range] { flex: 1; min-width: 60px; accent-color: var(--accent); }
+.ctl input[type=range].alpha { max-width: 70px; }
+input.num { width: 64px; background: var(--field); color: var(--fg); border: 1px solid var(--line); border-radius: 3px; padding: 2px 4px; font: inherit; }
+select { background: var(--field); color: var(--fg); border: 1px solid var(--line); border-radius: 3px; padding: 3px 4px; font: inherit; max-width: 100%; }
+input[type=color] { width: 34px; height: 24px; padding: 0; border: 1px solid var(--line); background: none; }
+.pair { display: grid; gap: 0; }
+.stop { display: flex; gap: 6px; align-items: center; } .stop .row { flex: 1; }
+.note, .cap { color: var(--muted); font-size: 12px; margin: 4px 0; }
+.stage { height: 230px; border: 1px solid var(--line); border-radius: 6px; background: #0b0a12; display: grid; place-items: center; overflow: hidden; position: relative; }
+.target { width: 130px; height: 84px; border-radius: 14px; background: #1d1b2c; color: #ccc; display: grid; place-items: center; font-size: 12px; }
+.bgs { display: flex; gap: 6px; align-items: center; margin: 8px 0; color: var(--muted); }
+canvas#life-curve, canvas#live-graph { width: 100%; max-width: 360px; height: auto; border: 1px solid var(--line); border-radius: 3px; background: color-mix(in srgb, var(--field) 60%, transparent); display: block; margin-bottom: 8px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 6px; }
+.tilehead { grid-column: 1 / -1; color: var(--muted); font-size: 12px; margin-top: 6px; }
+.tile { padding: 4px; display: grid; gap: 3px; text-align: left; }
+.tile .sw { display: block; height: 42px; border-radius: 3px; }
+.tile .nm { font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+.layers { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+.swatch { height: 200px; border-radius: 6px; border: 1px solid var(--line); }
+.swrow { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; color: var(--muted); }
+.sliderstage { padding: 38px 24px; border: 1px solid var(--line); border-radius: 6px; background: #101018; }
+.bars { display: flex; gap: 2px; align-items: flex-end; height: 70px; margin-bottom: 6px; }
+.bars input.bar { writing-mode: vertical-lr; direction: rtl; width: 12px; height: 70px; padding: 0; accent-color: var(--accent); }
+footer { border-top: 1px solid var(--line); padding: 10px 16px 16px; position: sticky; bottom: 0; background: var(--bg); z-index: 5; }
+.outhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+#code { width: 100%; font: 12.5px/1.5 var(--mono); background: var(--field); color: var(--fg); border: 1px solid var(--line); border-radius: 3px; padding: 8px; resize: vertical; }
+.status.good { color: var(--good); } .status.bad { color: var(--bad); }
+.btns { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.flash { color: var(--muted); opacity: 0; transition: opacity .2s; } .flash.on { opacity: 1; }

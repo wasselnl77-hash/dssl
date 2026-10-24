@@ -1,8 +1,8 @@
 {
   "name": "dssl-vscode",
   "displayName": "DSSL Language Support",
-  "description": "The DSSL style language in your editor: syntax highlighting, real-compiler diagnostics (the same errors the browser console shows), completions from the live token registry, hover docs. Works in VS Code and VSCodium.",
-  "version": "0.8.2",
+  "description": "The DSSL style language in your editor: syntax highlighting, real-compiler diagnostics (the same errors the browser console shows), completions from the live token registry and for textures, auras and sliders, hover docs, an interactive designer with sliders and live previews for aura, texture and range sliders, and a CSS to DSSL converter. Works in VS Code and VSCodium.",
+  "version": "0.9.0",
   "publisher": "ehs-studio",
   "icon": "icon.png",
   "license": "MIT",
@@ -14,14 +14,24 @@
     "Linters"
   ],
   "keywords": [
-    "dssl",
+    "aura",
     "css",
-    "styling",
+    "css converter",
     "design tokens",
-    "style language"
+    "designer",
+    "dssl",
+    "particles",
+    "style language",
+    "styling",
+    "texture"
   ],
   "activationEvents": [
-    "onLanguage:dssl"
+    "onLanguage:dssl",
+    "onCommand:dssl.openDesigner",
+    "onCommand:dssl.openAuraDesigner",
+    "onCommand:dssl.openTextureDesigner",
+    "onCommand:dssl.openSliderDesigner",
+    "onCommand:dssl.convertCss"
   ],
   "main": "./extension.js",
   "contributes": {
@@ -59,6 +69,57 @@
           "description": "Milliseconds to wait after a keystroke before re-running the compiler."
         }
       }
+    },
+    "commands": [
+      {
+        "command": "dssl.openDesigner",
+        "title": "Open the designer",
+        "category": "DSSL",
+        "icon": "$(paintcan)"
+      },
+      {
+        "command": "dssl.openAuraDesigner",
+        "title": "Design an aura (glow and particles)",
+        "category": "DSSL"
+      },
+      {
+        "command": "dssl.openTextureDesigner",
+        "title": "Design a texture",
+        "category": "DSSL"
+      },
+      {
+        "command": "dssl.openSliderDesigner",
+        "title": "Design a range slider",
+        "category": "DSSL"
+      },
+      {
+        "command": "dssl.convertCss",
+        "title": "Convert a CSS file to DSSL",
+        "category": "DSSL"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "dssl.openDesigner",
+          "when": "resourceLangId == dssl",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "dssl.openDesigner",
+          "when": "resourceLangId == dssl",
+          "group": "navigation@9"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "dssl.convertCss",
+          "when": "resourceExtname == .css",
+          "group": "navigation@9"
+        }
+      ]
     }
   },
   "repository": {

@@ -1,4 +1,4 @@
-/* analysis.js — pure analysis over .dssl text. No vscode imports here; the
+/* analysis.js - pure analysis over .dssl text. No vscode imports here; the
  * extension layer feeds it text and offsets, tests feed it strings.
  * The point of this module: diagnostics come from the REAL parser and
  * resolver (the same code the browser runs), and completions come from the
@@ -7,11 +7,52 @@
 import { parse, PSEUDO_ELEMENTS } from './engine/parser.js';
 import { resolve, DEFAULT_TOKENS, CSS_KEYWORDS } from './engine/resolver.js';
 import { SEMANTIC, CSS, STATES, AT_RULES, BLOCKS, PROPERTY_NAMES } from './props-docs.js';
+import { PRESETS, PRESET_NAMES, GENERATORS, TEXTURE_KEYS, BLEND_MODES } from './engine/texture.js';
+import { GLOW_KEYS, PARTICLE_KEYS, SHAPES, FROM_WORDS, DIR_WORDS } from './engine/aura.js';
+import { SLIDER_CLAUSES, THUMB_SHAPES } from './engine/slider.js';
+
+/* ---- the 0.9.0 vocabulary: what to offer after `texture:`, `aura-glow:`, `slider:` ... ----- */
+const AURA_PROP = /^(aura|aura-glow|aura-particles?|glow-particles?|aura-glow-particles?)$/;
+function domainItems(prop) {
+  const items = [];
+  const add = (label, detail, documentation, kind = 'keyword') => items.push({ label, kind, detail, documentation });
+  if (prop === 'texture') {
+    for (const n of PRESET_NAMES) add(n, 'texture preset', PRESETS[n].doc, 'value');
+    for (const g of GENERATORS) add(g, 'texture generator', 'start from scratch with this generator, then add settings');
+    for (const [k, d] of Object.entries(TEXTURE_KEYS)) add(k, 'texture setting', d.doc);
+    for (const b of BLEND_MODES) add(b, 'blend mode', 'how the texture mixes with what is under it');
+  } else if (prop === 'slider') {
+    for (const [k, usage] of Object.entries(SLIDER_CLAUSES)) add(k, 'slider setting', usage);
+    for (const t of THUMB_SHAPES) add(t, 'thumb shape', 'shape ' + t);
+  } else if (AURA_PROP.test(prop)) {
+    const glowOnly = prop === 'aura-glow';
+    const partsOnly = /particle/.test(prop) && prop !== 'aura-glow-particle' && prop !== 'aura-glow-particles';
+    if (prop === 'aura') { add('glow', 'aura layer', 'a soft light around the element'); add('particles', 'aura layer', 'things that leave the element'); add('none', 'clears', 'remove the whole aura'); }
+    if (!partsOnly) for (const [k, d] of Object.entries(GLOW_KEYS)) add(k, 'glow setting', d.doc);
+    if (!glowOnly) for (const [k, d] of Object.entries(PARTICLE_KEYS)) add(k, 'particle setting', d.doc);
+    if (!glowOnly) {
+      for (const s of SHAPES) add(s, 'particle shape', 'shape ' + s);
+      for (const f of FROM_WORDS) add(f, 'where particles are born', 'from ' + f);
+      for (const d of Object.keys(DIR_WORDS)) add(d, 'direction', 'dir ' + d);
+    }
+    for (const n of PRESET_NAMES) add(`texture(${n})`, 'texture inside an aura', PRESETS[n].doc);
+  }
+  return items;
+}
+function domainHover(word) {
+  if (PRESETS[word]) return `**${word}** _texture preset_ \u2014 ${PRESETS[word].doc}. Use it as \`texture: ${word}\`.`;
+  if (GENERATORS.includes(word)) return `**${word}** _texture generator_ \u2014 start from scratch with it, then add settings.`;
+  if (TEXTURE_KEYS[word]) return `**${word}** _texture setting_ \u2014 ${TEXTURE_KEYS[word].doc}`;
+  if (GLOW_KEYS[word]) return `**${word}** _glow setting_ \u2014 ${GLOW_KEYS[word].doc}`;
+  if (PARTICLE_KEYS[word]) return `**${word}** _particle setting_ \u2014 ${PARTICLE_KEYS[word].doc}`;
+  if (SLIDER_CLAUSES[word]) return `**${word}** _slider setting_ \u2014 \`${SLIDER_CLAUSES[word]}\``;
+  return null;
+}
 
 /* ---- workspace analysis ------------------------------------------------ */
 
 /* docs: Map<absolute path, text>. Fold order: tokens*.dssl first, then
- * alphabetical — the same convention the site uses (tokens first). */
+ * alphabetical - the same convention the site uses (tokens first). */
 export function analyzeWorkspace(docs) {
   const paths = [...docs.keys()].sort((a, b) => {
     const ta = /tokens[^/]*\.dssl$/.test(a) ? 0 : 1;
@@ -174,6 +215,7 @@ export function completionsAt(analysis, path, text, offset) {
         items.push({ label: k, kind: 'keyword', detail: 'animate option', documentation: ANIMATE_EXTRAS[k] || 'animate option' });
       }
     }
+    items.push(...domainItems(prop));
     for (const k of CSS_KEYWORDS) {
       items.push({ label: k, kind: 'keyword', detail: 'keyword' });
     }
@@ -241,6 +283,8 @@ export function hoverAt(analysis, path, text, offset) {
   if (BLOCKS[clean]) return { contents: `**${clean}** \u2014 ${BLOCKS[clean]}` };
   if (AT_RULES[clean]) return { contents: `**${clean}** \u2014 ${AT_RULES[clean]}` };
   if (CSS[clean]) return { contents: `**${clean}** \u2014 ${CSS[clean]}` };
+  const dh = domainHover(clean);
+  if (dh) return { contents: dh };
   if (analysis.motions.has(clean)) {
     return { contents: `**${clean}** _motion_ \u2014 keyframe animation. Run with \`animate: ${clean} 600 ease-out\`.` };
   }

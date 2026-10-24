@@ -1,14 +1,14 @@
-/* props-docs.js — the DSSL vocabulary with one-line docs.
+/* props-docs.js - the DSSL vocabulary with one-line docs.
  * Feeds completions and hovers. Semantic vocabulary entries carry real
  * explanations; passthrough CSS properties get a short reminder that they
  * pass through untouched. */
 
 export const SEMANTIC = {
-  row: 'flex row in one line: `row: gap space.4 between center` sets display:flex, flex-direction, gap, justify-content, align-items. Warning: it writes display — put explicit display: before it, not after.',
+  row: 'flex row in one line: `row: gap space.4 between center` sets display:flex, flex-direction, gap, justify-content, align-items. Warning: it writes display - put explicit display: before it, not after.',
   column: 'flex column in one line: `column: gap 2`. Same display caveat as row: the shorthand wins if it comes later in the rule.',
   grid: 'grid layout in one line: `grid: 3 gap 12` = 3 equal columns with a 12px gap.',
   stack: 'everything stacked and centered: `stack: center`. Flex column + center on both axes.',
-  center: 'alignment that cannot silently no-op — the engine promotes the element to a grid formatting context when needed: `center: both`.',
+  center: 'alignment that cannot silently no-op - the engine promotes the element to a grid formatting context when needed: `center: both`.',
   size: 'width and height in one line: `size: 40 20` = 40 wide, 20 tall. `size: 40` = both.',
   shadow: 'box shadow from the shadow token scale: `shadow: sm | md | lg | xl`. Custom: `shadow: 0 2 4 ink/10, 0 4 12 ink/8`.',
   radius: 'border-radius, bare number or token: `radius: md`, `radius: full`, `radius: 14`.',
@@ -29,6 +29,16 @@ export const SEMANTIC = {
   'visually-hidden': 'hidden from eyes, visible to screen readers.',
   cover: 'fills the containing block absolutely.',
   use: 'apply a behavior: `use focus-ring`. Behaviors are named rule groups declared with `behavior name { }`.',
+  texture: 'a generated texture layered ON TOP of the element\u2019s own background: `texture: grain`, `texture: wood scale 6 intensity 0.8`, `texture: grain, scanlines`. 30 presets (grain, paper, marble, wood, carbon, halftone, ...) or build your own from a generator (noise, bump, lines, dots, grid, checker, weave, carbon, waves, hex) plus settings (scale, intensity, contrast, octaves, color, color2, blend, stretch, contour, ...). Open the designer to see them all.',
+  aura: 'light and particles around an element, with NO presets: you describe it. `aura: glow #ff7a00 30 flicker 0.3, particles #fd0 -> #f60 count 60 shape flame glowing behind`. Replaces both slots. `aura: none` clears them.',
+  'aura-glow': 'just the glow slot: `aura-glow: color.accent 24 pulse 1600`. Positional colour and radius, then settings (intensity, pulse, depth, flicker, texture(...), seed, essential). `aura-glow: none` clears only the glow.',
+  'aura-particle': 'just the particles slot: `aura-particle: #7cf -> transparent 40 up size 6 life 800 speed 30 from bottom`. Settings: count, size, life, speed, dir, spread, gravity, drag, turbulence, from, shape, grow, glowing, behind, blend, texture(...), seed, essential.',
+  'aura-particles': 'the same as `aura-particle`.',
+  'glow-particle': 'the particles slot with every particle glowing (additive light): `glow-particle: #fff 30 out`.',
+  'glow-particles': 'the same as `glow-particle`.',
+  'aura-glow-particle': 'both slots at once, settings shared: `aura-glow-particle: #ff7a00 28 pulse 900 count 50 up`. A glow layer AND a glowing particles layer.',
+  'aura-glow-particles': 'the same as `aura-glow-particle`.',
+  slider: 'styles `<input type="range">` through the WebKit/Blink (`::-webkit-slider-*`) and Firefox (`::-moz-range-*`) pseudo-elements at once: `slider: track 6 color.line radius full, fill color.accent, thumb 22 color.paper, ring 3 color.accent, glow color.accent 14, ticks 10`. Add `graph 20 45 70 90 60` for a histogram slider.',
   seen: 'state that fires ONCE when the element first scrolls into view. Reveal-on-scroll with zero JavaScript. Composes with stagger. Cannot be combined with pseudo-elements.',
 };
 
