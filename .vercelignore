@@ -1,12 +1,8 @@
 /download/
 /upload/
 /tool-results/
-/scripts/
-/tests/
-/examples/
-/mini-services/
-/db/
-/prisma/
+/scripts/*
+!/scripts/gen-site-vocab.mjs
 /node_modules/
 /worklog.md
 /*.tar.gz
