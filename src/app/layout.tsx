@@ -2,11 +2,13 @@ import type { Metadata, Viewport } from "next";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import "./globals.css";
+import { readEngineInfo } from "@/lib/engine-info";
+
+const engine = readEngineInfo();
 
 export const metadata: Metadata = {
-  title: "DSSL — Domain Specific Style Language",
-  description:
-    "DSSL is a styling language for the web: design tokens, its own cascade, loud errors and zero specificity wars. Ships as a ~20 kB engine, no build step.",
+  title: "DSSL: Domain Specific Style Language",
+  description: `DSSL is a styling language for the web: design tokens, its own cascade, loud errors and zero specificity wars. The engine is ${engine.gzKb} kB gzipped, with no build step.`,
   keywords: ["DSSL", "CSS alternative", "style language", "design tokens", "web"],
   icons: { icon: "/favicon.svg" },
 };

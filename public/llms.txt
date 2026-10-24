@@ -1,6 +1,6 @@
 # DSSL
 
-> DSSL is a style language for the web. For JS-guaranteed pages it replaces writing CSS; it does not replace the CSS platform. You write `.dssl` files, the page loads a ~20 kB engine, and the engine walks the DOM in real time applying every matched rule as inline styles. Nothing compiles to CSS at runtime — but v0.8.0 adds the exit lane: `dssl build` compiles the static subset to a real .css file for no-JS, strict-CSP or size-critical pages. Elements added later are styled the moment they appear; signals, states and motion share one grammar.
+> DSSL is a style language for the web. For JS-guaranteed pages it replaces writing CSS; it does not replace the CSS platform. You write `.dssl` files, the page loads the engine (about 58 kB gzipped, about 190 kB as plain source), and the engine walks the DOM in real time applying every matched rule as inline styles. Nothing compiles to CSS at runtime — but v0.8.0 adds the exit lane: `dssl build` compiles the static subset to a real .css file for no-JS, strict-CSP or size-critical pages. Elements added later are styled the moment they appear; signals, states and motion share one grammar.
 
 - Site (docs, playground, changelog, bench): https://dssl-sable.vercel.app
 - Repo + full docs in the README: https://huggingface.co/EHS-Studio/dssl

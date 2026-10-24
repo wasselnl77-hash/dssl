@@ -1,8 +1,10 @@
 "use client";
 
 import CodeBlock from "../CodeBlock";
+import { useEngineInfo } from "../engine-info";
 
 export default function SpecView() {
+  const info = useEngineInfo();
   return (
     <div className="wrap">
       <div className="page-head">
@@ -10,8 +12,8 @@ export default function SpecView() {
         <h1 className="page-title">DSSL v0.2 — “First Light”, ratified</h1>
         <p className="page-sub">
           The v0.1 draft was put to a seven-point vote. This document is the ratified
-          v0.2 result — every decision below is implemented by the engine serving this
-          page. The engine itself has kept growing since: it is now at v0.8.0 (see the
+          v0.2 result, and every decision below is implemented by the engine serving this
+          page. The engine itself has kept growing since: it is now at v{info.version} (see the
           changelog for what the site demanded).
         </p>
       </div>

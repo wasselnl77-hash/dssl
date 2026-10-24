@@ -4,6 +4,7 @@ import { useState } from "react";
 import CodeBlock from "../CodeBlock";
 import { highlightDssl } from "../highlight";
 import { ArrowIcon, PlayIcon } from "../icons";
+import { useEngineInfo } from "../engine-info";
 import type { ViewName } from "../SiteRoot";
 
 const DEMOS = {
@@ -46,7 +47,7 @@ const DEMOS = {
 .demo-card {
   animate: rise-in 500 snap both
 }`,
-  // v0.4.0 — the reveal tab: seen + stagger, both engine-native
+  // v0.4.0, the reveal tab: seen + stagger, both engine-native
   reveal: `motion rise-in {
   from {
     opacity: 0
@@ -68,6 +69,7 @@ const DEMOS = {
 type DemoKey = keyof typeof DEMOS;
 
 export default function HomeView({ go }: { go: (v: ViewName) => void }) {
+  const info = useEngineInfo();
   const [demo, setDemo] = useState<DemoKey>("tokens");
   const [signalOn, setSignalOn] = useState(false);
 
@@ -95,9 +97,9 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
             </h1>
             <p className="hero-sub">
               A styling language for the web that pairs with any HTML and any JavaScript.
-              Its own cascade — no specificity math, no <code>!important</code> — design
-              tokens as the vocabulary, states you can read, motion in four words, and
-              errors that actually speak up. Zero dependencies, no build step.
+              Its own cascade with no specificity math and no <code>!important</code>.
+              Design tokens as the vocabulary, states you can read, motion in four words,
+              and errors that actually speak up. Zero dependencies, no build step.
             </p>
             <div className="hero-ctas">
               <button type="button" className="btn btn-primary" onClick={() => go("docs")}>
@@ -109,13 +111,13 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
               <a href="#get" className="btn btn-ghost">Get the engine</a>
             </div>
             <div className="hero-meta" aria-label="Engine facts">
-              <span>~20 kB engine</span>
+              <span>{info.gzKb} kB gzipped</span>
               <span>zero dependencies</span>
               <span>any HTML, any JS</span>
             </div>
           </div>
 
-          {/* live demo stage — the tabs swap real DSSL, the card below is styled by it */}
+          {/* live demo stage: the tabs swap real DSSL, the card below is styled by it */}
           <div className="demo" aria-label="Live DSSL demo">
             <div className="demo-tabs">
               {(Object.keys(DEMOS) as DemoKey[]).map(k => (
@@ -138,7 +140,7 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
                 <div className="demo-card">
                   <div className="demo-swatch" />
                   <h4>Styled by DSSL</h4>
-                  <p>Hover me — states, tokens and motion are all handled by the engine.</p>
+                  <p>Hover me. States, tokens and motion are all handled by the engine.</p>
                   <span className="demo-chip">live</span>
                 </div>
                 {demo === "motion" && (
@@ -213,7 +215,7 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
           <h2 className="section-title">The vocabulary is the difference</h2>
           <div className="compare sect-gap">
             <div className="compare-col">
-              <span className="compare-tag compare-tag-css">styles.css — 14 lines of machinery</span>
+              <span className="compare-tag compare-tag-css">styles.css: 14 lines of machinery</span>
               <CodeBlock plain code={`.card {
   background-color: var(--card);
   border-radius: 14px;
@@ -230,7 +232,7 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
 .card:hover .chip { background: var(--accent-soft); }`} />
             </div>
             <div className="compare-col">
-              <span className="compare-tag compare-tag-dssl">card.dssl — 8 lines of design</span>
+              <span className="compare-tag compare-tag-dssl">card.dssl: 8 lines of design</span>
               <CodeBlock plain code={`.card {
   background: color.card
   radius: md
@@ -255,7 +257,7 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
           <div className="kicker">the engine</div>
           <h2 className="section-title">No stylesheet is attached to this page</h2>
           <p className="section-sub">
-            Every rule below is implemented by the DSSL engine — it matches selectors
+            Every rule below is implemented by the DSSL engine. It matches selectors
             against the live DOM itself, runs its own cascade, and drives motion through
             the Web Animations API. Only pseudo-elements fall back to generated CSS.
           </p>
@@ -263,12 +265,12 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
             <div className="card card-hover feature">
               <span className="feature-icon">{"{}"}</span>
               <h3>Its own cascade</h3>
-              <p>Later wins. Layers when you care. No specificity score, no !important — ever.</p>
+              <p>Later wins. Layers when you care. No specificity score, no !important. Ever.</p>
             </div>
             <div className="card card-hover feature">
               <span className="feature-icon">◆</span>
               <h3>Tokens as vocabulary</h3>
-              <p>color.ink, space.4, radius.md — references compile to inspectable custom properties.</p>
+              <p>color.ink, space.4, radius.md: references compile to inspectable custom properties.</p>
             </div>
             <div className="card card-hover feature">
               <span className="feature-icon">→</span>
@@ -278,22 +280,22 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
             <div className="card card-hover feature">
               <span className="feature-icon">≋</span>
               <h3>One-word conditions</h3>
-              <p>@media dark. @media 768. @media 480..960. Same shape for @container and @signal — compose by nesting.</p>
+              <p>@media dark. @media 768. @media 480..960. Same shape for @container and @signal. Compose by nesting.</p>
             </div>
             <div className="card card-hover feature">
               <span className="feature-icon">✦</span>
               <h3>Motion in four words</h3>
-              <p>animate: rise-in 400 snap both. seen + stagger reveal grids on scroll — reduced-motion is respected by default.</p>
+              <p>animate: rise-in 400 snap both. seen + stagger reveal grids on scroll. Reduced-motion is respected by default.</p>
             </div>
             <div className="card card-hover feature">
               <span className="feature-icon">§</span>
               <h3>Behaviors</h3>
-              <p>Name a pattern once — focus rings, chips — and use it anywhere with one line.</p>
+              <p>Name a pattern once (focus rings, chips) and use it anywhere with one line.</p>
             </div>
             <div className="card card-hover feature">
               <span className="feature-icon">!</span>
               <h3>Loud errors</h3>
-              <p>Unknown property, unknown token, bad value — each fails with file, line and a suggestion.</p>
+              <p>Unknown property, unknown token, bad value: each fails with file, line and a suggestion.</p>
             </div>
             <div className="card card-hover feature">
               <span className="feature-icon">⇄</span>
@@ -311,18 +313,18 @@ export default function HomeView({ go }: { go: (v: ViewName) => void }) {
           <h2 className="section-title">One call restyles the page</h2>
           <div className="compare sect-gap" style={{ alignItems: "center" }}>
             <div className="compare-col">
-              <CodeBlock file="theme-toggle.js" code={`// flip a signal — DSSL re-evaluates
+              <CodeBlock file="theme-toggle.js" code={`// flip a signal and DSSL re-evaluates
 // every @signal rule in the page
 
 DSSL.signal('demo', 'on')   // on
 DSSL.signal('demo', null)   // off`} />
             </div>            <div className="compare-col demo-canvas" style={{ maxWidth: 480 }}>
               <button type="button" className="btn btn-primary" onClick={toggleSignal}>
-                {signalOn ? "signal: demo == on" : "signal: demo == off"} — click
+                {signalOn ? "signal: demo == on" : "signal: demo == off"}, click
               </button>
               <div className="demo-signal-card">
                 <strong>@signal demo == on</strong>
-                <span>This card is styled by a signal-conditional rule. Flip the signal and the engine recomputes it — inspect the html element to see the mirror attribute.</span>
+                <span>This card is styled by a signal-conditional rule. Flip the signal and the engine recomputes it. Inspect the html element to see the mirror attribute.</span>
               </div>
             </div>
           </div>
@@ -346,8 +348,8 @@ DSSL.signal('demo', null)   // off`} />
               <span className="get-os">macos · linux · bsd</span>
               <CodeBlock plain file="terminal" code="curl -fsSL https://dssl-sable.vercel.app/install.sh | sh" />
               <p className="get-note">
-                Runs on plain sh — dash, ash and busybox included, bash not
-                required. Downloads with curl or wget, whichever you have, and
+                Runs on plain sh (dash, ash and busybox included, bash not
+                required). Downloads with curl or wget, whichever you have, and
                 unpacks with tar, which every distro and macOS ship by default.
                 No tar? It falls back to unzip, then python3.
               </p>
@@ -409,7 +411,7 @@ DSSL.signal('demo', null)   // off`} />
             <h2>Write styles that read like design.</h2>
             <p>
               The full language tour takes about ten minutes. Or paste straight into the
-              playground and break things — the errors will keep you company.
+              playground and break things. The errors will keep you company.
             </p>
             <div className="hero-ctas">
               <button type="button" className="btn btn-primary" onClick={() => go("docs")}>

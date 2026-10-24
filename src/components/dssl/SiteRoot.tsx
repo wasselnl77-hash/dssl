@@ -9,6 +9,8 @@ import PlaygroundView from "./views/PlaygroundView";
 import ChangelogView from "./views/ChangelogView";
 import BenchView from "./views/BenchView";
 import { SunIcon, MoonIcon, MenuIcon } from "./icons";
+import { EngineInfoProvider } from "./engine-info";
+import type { EngineInfo } from "@/lib/engine-info";
 
 export type ViewName = "home" | "docs" | "cheat" | "spec" | "playground" | "changelog" | "bench";
 
@@ -62,7 +64,7 @@ export interface DsslApplyResult {
   stats: { rules: number; shadowRules: number; motions: number; tokens: number; mediaQueries: number };
 }
 
-export default function SiteRoot() {
+export default function SiteRoot({ info }: { info: EngineInfo }) {
   // the view IS the hash — derived, never stored twice
   const view = useSyncExternalStore(
     subscribeHash,
@@ -100,6 +102,7 @@ export default function SiteRoot() {
   }, []);
 
   return (
+    <EngineInfoProvider value={info}>
     <div className="site" data-view={view}>
       <header className="nav">
         <div className="wrap nav-inner">
@@ -122,7 +125,7 @@ export default function SiteRoot() {
           </nav>
 
           <div className="nav-side">
-            <a href="#/changelog" className="ver-badge" onClick={(e) => { e.preventDefault(); go("changelog"); }}>v0.8.0</a>
+            <a href="#/changelog" className="ver-badge" onClick={(e) => { e.preventDefault(); go("changelog"); }}>v{info.version}</a>
             <button type="button" className="theme-btn" onClick={cycleTheme} aria-label="Toggle color theme" title="Theme: auto / light / dark">
               <span className="icon-sun"><SunIcon /></span>
               <span className="icon-moon"><MoonIcon /></span>
@@ -151,13 +154,13 @@ export default function SiteRoot() {
         <div className="wrap footer-inner">
           <div className="footer-col">
             <div className="footer-note">
-              <strong>DSSL</strong> — domain specific style language. Built v0.1 → v0.8.0 while
-              building this site; every feature it needed, it grew, and every bug you sent got
-              fixed for real. This page runs on its own engine, no CSS files attached —
-              the engine styles this DOM directly.
+              <strong>DSSL</strong>, the domain specific style language. Built from v0.1 to v{info.version} while
+              building this site: every feature it needed, it grew, and every bug you sent got
+              fixed for real. This page runs on its own engine with no CSS files attached.
+              The engine styles this DOM directly.
             </div>
             <div className="footer-fine">
-              © 2026 <strong>DSSL. inc</strong> — named after the product, because naming things
+              © 2026 <strong>DSSL. inc</strong>, named after the product, because naming things
               is hard.
             </div>
           </div>
@@ -171,5 +174,6 @@ export default function SiteRoot() {
         </div>
       </footer>
     </div>
+    </EngineInfoProvider>
   );
 }
