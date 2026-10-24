@@ -392,6 +392,16 @@ knots are drawn on top. There are ten presets: `oak`, `walnut`, `cherry`, `maple
 | `planks` | board height in px, with a seam and a different board each |
 | `seed`, `angle` | another board; 0 or 90 degrees |
 
+`symmetrical` removes the repeat problem. It mirrors every other tile, so each edge meets its own reflection (seamless by construction) and the pattern repeats twice as far apart:
+
+```dssl
+.floor { background-color: #8a5f33; texture: oak-planks symmetrical }     // mirrored both ways
+.bar   { texture: walnut symmetrical x }                                 // only left to right
+.post  { texture: noise symmetrical y }                                  // only top to bottom
+```
+
+It works on every texture made of an SVG image (noise, bump, rings, waves, hex). The pure CSS patterns (lines, dots, grid, checker, carbon) are already regular and are left alone. The cost is small: the tile is drawn once and flipped, not copied. The look is a mirror line down the middle, which on wood reads as a book-matched board, a real woodworking trick.
+
 The drawing uses only your seed and plain arithmetic, so the same seed gives the same board on every
 machine, and the tile repeats without a seam. It does repeat: one tile is 576px along the grain, and
 three boards tall with `planks`, so a very large surface shows the pattern twice. Use two textures with
@@ -414,6 +424,43 @@ engine is ready: the engine adds the class `dssl-ready` to `<html>` when it has 
 <style>html:not(.dssl-ready) body { visibility: hidden }</style>
 <script>setTimeout(() => document.documentElement.classList.add('dssl-ready'), 2500)</script> <!-- failsafe -->
 ```
+
+### Fonts
+
+```dssl
+fonts {
+  Fraunces: 500 700 800                 // Google Fonts, these weights
+  "Hanken Grotesk": 400 700 italic      // with italics
+  Inter: 100..900 display optional      // a variable range; how it swaps in
+  Brand: from "/fonts/brand.woff2" 400  // your own file: @font-face
+}
+```
+
+A family line is `Family: weights [italic] [display swap|block|fallback|optional]`, or `Family: from "file" weight` for a file of your own (one weight or one variable range per file, so one line per file). The engine adds the `<link>` and preconnects to `<head>` and removes it again if nothing asks for it; `dssl build` writes `@import` as the first line of the CSS and `@font-face` for your files. Google sees every visitor who loads one of its fonts, which some privacy laws care about: self-host with `from` if that is you.
+
+### Gradients, the new forms
+
+```dssl
+.stripes { gradient: repeating linear 45, #fff 0 10, color.ink 10 20 }
+.blend   { gradient: linear 90 in oklch, #ff0055 -> #00d4ff }
+.mid     { gradient: linear 90, #f00 -> 30% -> #00f }
+.band    { gradient: linear 90, #f00 0 30%, #00f 30% 100% }
+.aurora  { gradient: mesh #14102a, #ff7a1a at 15% 20%, #c2185b at 80% 30% size 45%, #3949ab at 50% 95% }
+.sheen   { gradient: radial at top left, #fff/40 -> transparent + linear 135, #123 -> #456 }
+```
+
+`repeating` turns any kind into its repeating form. `in oklch` (or `oklab`, `hsl`, `lab`, `srgb`, with `longer hue` and friends) picks the colour space the blend happens in. A lone position between two stops is a midpoint. Two positions make a hard band. Bare numbers in a stop position are px (degrees on `conic`). `mesh` takes a base colour and blobs: `color at x y [size n]` (default size 60%). `+` joins layers, first on top. A direction is optional: `linear #f00 -> #00f` works.
+
+### Inspector and hot reload
+
+```js
+DSSL.inspect()   // hover an element: the rules that won each property, with file and line
+DSSL.watch()     // edit a .dssl file, the open page restyles with no reload
+```
+
+Both are loaded only when called (`dev.js`), or switched on with `data-watch` and `data-inspect` on the script tag, or `?dssl-watch` and `?dssl-inspect` in the URL. The inspector outlines the element under the pointer and lists what applied and every matching rule in cascade order; click to pin, Escape to release, Escape again to close. Hot reload polls the .dssl files loaded by `DSSL.load` (and linked .css files) and applies a changed file in place, so scroll position and form input survive; an error shows as a toast with its line. `DSSL.watch(false)` stops it.
+
+`node cli/dssl.mjs dev [dir] [--port 3000] [--inspect]` is a static server that never caches and adds `DSSL.watch()` to every page, with the engine served from the install if the folder has none.
 
 ### Counters
 
@@ -682,7 +729,7 @@ Three ways to get it:
 
 1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
    https://open-vsx.org/extension/ehs-studio/dssl-vscode
-2. VS Code: download `dssl-vscode/dssl-vscode-0.11.0.vsix` from the repo files, then
+2. VS Code: download `dssl-vscode/dssl-vscode-0.12.0.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
 3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 

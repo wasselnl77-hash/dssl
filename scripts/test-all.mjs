@@ -16,7 +16,7 @@ const SUITES = [
   ['color, texture, aura, slider, lint, import, share 0.9.0', 'test-v090.mjs'], ['editor extension', 'test-extension-lib.mjs'],
   ['site stylesheets compile', 'dssl-styles-check.mjs'], ['guide examples compile', 'test-guide-examples.mjs'],
   ['designer: state to DSSL and back', 'test-designer.mjs'], ['designer: editor wiring (fake vscode)', 'test-designer-host.mjs'],
-  ['guide examples in a browser', 'test-guide-browser.mjs', true], ['0.9.0 in a browser', 'test-browser-v090.mjs', true], ['designer panel in a browser', 'test-designer-browser.mjs', true], ['glass, tilt, wood, baked textures, counters 0.10-0.11', 'test-v0100.mjs', true],
+  ['guide examples in a browser', 'test-guide-browser.mjs', true], ['0.9.0 in a browser', 'test-browser-v090.mjs', true], ['designer panel in a browser', 'test-designer-browser.mjs', true], ['glass, tilt, wood, baked textures, counters 0.10-0.11', 'test-v0100.mjs', true], ['symmetrical, fonts, gradients, inspector, hot reload 0.12', 'test-v0120.mjs', true],
 ];
 
 if (!skipBrowser && !findChrome()) {

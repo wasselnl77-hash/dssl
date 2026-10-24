@@ -56,6 +56,7 @@ export const TEXTURE_KEYS = {
   pores:     { words: 1, kind: 'number', min: 0, max: 1, doc: 'rings generator: fine fibre and pore streaks between the rings' },
   knots:     { words: 1, kind: 'number', min: 0, max: 8, int: true, doc: 'rings generator: how many knots in one tile (the pattern repeats, so keep it small)' },
   planks:    { words: 1, kind: 'number', min: 24, max: 1200, doc: 'rings generator: lay it out as planks this many px tall, with a seam and a slightly different board each' },
+  symmetrical: { words: 1, kind: 'word', values: ['both', 'x', 'y'], optional: true, doc: 'mirror every other tile, so each edge meets its own reflection: no seam, and the repeat is twice as far apart. x mirrors left to right, y top to bottom, both (the default) does both. Works on the image-based textures (noise, bump, rings, waves, hex).' },
   invert:    { words: 0, kind: 'flag', doc: 'swap the two colours' },
 };
 
@@ -253,6 +254,8 @@ export function parseTexture(value, hooks) {
         return null;
       }
       if (def.kind === 'flag') { over[key] = true; continue; }
+      // a setting whose value is optional (symmetrical alone means both)
+      if (def.optional && (words[i + 1] === undefined || TEXTURE_KEYS[words[i + 1]] || !def.values.includes(words[i + 1]))) { over[key] = def.values[0]; continue; }
       const vals = words.slice(i + 1, i + 1 + def.words);
       if (vals.length < def.words || vals.some((v) => TEXTURE_KEYS[v])) {
         hooks.error(`texture setting "${key}" needs ${def.words === 1 ? 'a value' : def.words + ' values'}`, def.doc);
@@ -612,12 +615,35 @@ const BUILDERS = { rings: buildRings, noise: buildNoise, bump: buildBump, lines:
  * -position and -blend-mode, top layer first.
  *   rc(cssColorWord) -> {r,g,b,a} | null
  */
+/**
+ * symmetrical: lay the tile out twice over, the second copy flipped, so every edge meets its own mirror image.
+ * That is seamless for any image at all, and the pattern now repeats at double the distance. Only the
+ * SVG-image textures can be flipped this way; the pure CSS ones (lines, dots, grid, checker, carbon) are
+ * already regular and are left alone.
+ */
+function mirrorPiece(piece, mode) {
+  const m = /^url\("(data:image\/svg\+xml,[^"]*)"\)$/.exec(piece.image);
+  const sz = /^([\d.]+)px ([\d.]+)px$/.exec(piece.size || '');
+  if (!m || !sz) return piece;
+  const w = Number(sz[1]), h = Number(sz[2]);
+  const fx = mode === 'x' || mode === 'both', fy = mode === 'y' || mode === 'both';
+  const W = fx ? w * 2 : w, H = fy ? h * 2 : h;
+  const use = (tx, ty, sx, sy) => `<use href='#t' transform='translate(${tx} ${ty}) scale(${sx} ${sy})'/>`;
+  let body = use(0, 0, 1, 1);
+  if (fx) body += use(2 * w, 0, -1, 1);
+  if (fy) body += use(0, 2 * h, 1, -1);
+  if (fx && fy) body += use(2 * w, 2 * h, -1, -1);
+  const inner = m[1].replace(/'/g, '%27');
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='${W}' height='${H}'><defs><image id='t' width='${w}' height='${h}' href='${inner}'/></defs>${body}</svg>`;
+  return { ...piece, image: smallUrl(svg), size: `${W}px ${H}px`, tile: Math.max(piece.tile || 0, W, H) };
+}
+
 export function buildTexture(layers, rc) {
   const parts = [];
   for (const spec of layers) {
     const builder = BUILDERS[spec.gen];
     if (!builder) continue;
-    for (const piece of builder(spec, rc)) parts.push({ ...piece, animate: spec.animate || 0 });
+    for (const piece of builder(spec, rc)) parts.push({ ...(spec.symmetrical ? mirrorPiece(piece, spec.symmetrical) : piece), animate: spec.animate || 0 });
   }
   return {
     image: parts.map((p) => p.image).join(', '),

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0
+
+- Bundled engine updated to 0.12.0: `texture: ... symmetrical`, a `fonts { }` block, richer `gradient:` sentences
+  (repeating, colour spaces, midpoints, hard bands, mesh, layers), `DSSL.inspect()`, `DSSL.watch()` and `dssl dev`.
+- `fonts` appears in block completions with hover docs, and the `gradient` hover lists the new forms.
+
 ## 0.11.0
 
 - Bundled engine updated to 0.11.0: ten wood species and the `rings` texture generator (figure, warp,

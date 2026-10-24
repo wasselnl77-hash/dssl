@@ -24,6 +24,7 @@ import { parseTexture } from './texture.js';
 import { parseAura } from './aura.js';
 import { parseSlider, sliderCss } from './slider.js';
 import { lintRules } from './lint.js';
+import { parseFonts } from './fonts.js';
 import { NAMED as NAMED_COLORS } from './color.js';
 import { glassDecls, parseTilt } from './effects.js';
 // v0.5.0 - the resolver validates the `::name` half of full selectors so a
@@ -425,22 +426,79 @@ const COLOR_WORDS = new Set(('black,silver,gray,white,maroon,red,purple,fuchsia,
   'canvas,canvastext,linktext,visitedtext,activetext,buttonface,buttontext,buttonborder,field,fieldtext,highlight,highlighttext,' +
   'currentcolor,transparent').split(','));
 
+/** split on a top-level " + " (layers), never inside parentheses or quotes */
+function splitLayers(s) {
+  const out = []; let depth = 0, q = null, cur = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) { cur += c; if (c === q) q = null; continue; }
+    if (c === '"' || c === "'") { q = c; cur += c; continue; }
+    if (c === '(' || c === '[') depth++;
+    else if (c === ')' || c === ']') depth = Math.max(0, depth - 1);
+    if (depth === 0 && c === '+' && /\s/.test(s[i - 1] || '') && /\s/.test(s[i + 1] || '')) { out.push(cur.trim()); cur = ''; continue; }
+    cur += c;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+
+const INTERP_RE = /\s*\bin\s+(srgb-linear|srgb|display-p3|lab|oklab|xyz-d50|xyz-d65|xyz|hsl|hwb|lch|oklch)(\s+(?:longer|shorter|increasing|decreasing)\s+hue)?\s*$/i;
+
+/**
+ * gradient: one or several layers.
+ *   linear 135, a -> b                        the original sentence
+ *   repeating linear 45, red 0 10, blue 10 20 stripes: positions take %, px, em, rem (deg on conic)
+ *   linear 90 in oklch, #f00 -> #00f          pick the colour space the blend happens in
+ *   linear 90, a -> 30% -> b                  a lone position between two stops moves the midpoint
+ *   mesh #fff4e6, #ff7a1a at 15% 20%, #c2185b at 80% 30% size 60%    soft blobs of colour on a base
+ *   radial at top left, #fff/40 -> transparent + linear 135, #123 -> #456   layers, first on top
+ */
 function buildGradient(v, ctx) {
+  const layers = splitLayers(String(v).trim());
+  if (layers.length > 1) {
+    const out = [];
+    for (const l of layers) { const g = buildGradientLayer(l, ctx); if (g === null) return null; out.push(g); }
+    return out.join(', ');
+  }
+  return buildGradientLayer(String(v).trim(), ctx);
+}
+
+function buildMesh(rest, ctx) {
+  const items = topSplit(rest, ',').map((x) => x.trim()).filter(Boolean);
+  const bad = (message, hint) => { ctx.errors.push({ file: ctx.file, line: ctx.line, message, hint }); return null; };
+  if (items.length < 2) return bad('mesh needs a base colour and at least one blob', 'try  gradient: mesh #fff4e6, #ff7a1a at 15% 20%, #3949ab at 80% 70%');
+  let base = null; const blobs = [];
+  for (const it of items) {
+    const m = it.match(/^(.*?)\s+at\s+(\S+)\s+(\S+)(?:\s+size\s+(\S+))?$/i);
+    if (!m) { if (base !== null) return bad(`mesh item "${it}" needs a position`, 'write  color at 20% 30%  (and optionally  size 60%)'); base = resolveValue(it, { ...ctx, unitless: false, bareIdents: false }); continue; }
+    const pos = (x) => (/^-?\d+(\.\d+)?$/.test(x) ? x + 'px' : x);
+    const size = m[4] ? pos(m[4]) : '60%';
+    blobs.push(`radial-gradient(circle farthest-side at ${pos(m[2])} ${pos(m[3])}, ${resolveValue(m[1].trim(), { ...ctx, unitless: false, bareIdents: false })}, transparent ${size})`);
+  }
+  if (base === null) return bad('mesh needs a base colour first (an item without "at")', 'gradient: mesh #fff4e6, #ff7a1a at 15% 20%');
+  return [...blobs, `linear-gradient(${base}, ${base})`].join(', ');
+}
+
+function buildGradientLayer(v, ctx) {
   const t = String(v).trim();
-  const m = t.match(/^(linear|radial|conic)\b([\s\S]*)$/i);
+  const mm = t.match(/^mesh\b([\s\S]*)$/i);
+  if (mm) return buildMesh(mm[1], ctx);
+  const m = t.match(/^(repeating\s+)?(linear|radial|conic)\b([\s\S]*)$/i);
   if (!m) {
     ctx.errors.push({
       file: ctx.file, line: ctx.line,
-      message: `gradient needs a kind: "linear", "radial" or "conic"`,
+      message: `gradient needs a kind: "linear", "radial", "conic" or "mesh" (any of them can be "repeating")`,
       hint: 'try  gradient: linear 135, color.accent -> color.ok',
     });
     return null;
   }
-  const kind = m[1].toLowerCase();
-  const rest = m[2].trim();
+  const repeating = !!m[1];
+  const kind = m[2].toLowerCase();
+  const rest = m[3].trim().replace(/^,\s*/, '');
   const DIR_RE = /^to\s+(top|bottom|left|right)(\s+(top|bottom|left|right))?$/i;
-  const isPrefixShaped = (seg) => {
-    const s = seg.toLowerCase();
+  const isPrefixShaped = (seg0) => {
+    const s = seg0.toLowerCase().replace(INTERP_RE, '').trim();
+    if (s === '' && INTERP_RE.test(seg0)) return true;
     if (kind === 'linear') return /^-?\d+(\.\d+)?(deg)?$/.test(s) || DIR_RE.test(s);
     if (kind === 'conic') return /^from\s+-?\d+(\.\d+)?(deg)?(\s+at\s+.+)?$/.test(s) || /^at\s+.+$/.test(s);
     // radial: every atom is shape/size/position vocabulary (possibly around `at`)
@@ -456,6 +514,8 @@ function buildGradient(v, ctx) {
     // mixed styles like `linear 135, a -> b`: the comma belongs to the stop list
     const hc = topSplit(head, ',').map(s => s.trim()).filter(Boolean);
     if (hc.length > 1) { head = hc[0]; stopStrs = [...hc.slice(1), ...stopStrs]; }
+    // no direction at all: `linear #f00 -> #00f`, the first part is a stop
+    if (head && !isPrefixShaped(head) && /^(#|[a-z-]+\(|[a-z]+\.[a-z0-9-]+)/i.test(head) || (head && COLOR_WORDS.has(head.split(/\s+/)[0].toLowerCase()) && !isPrefixShaped(head))) { stopStrs.unshift(head); head = ''; }
   } else {
     const segs = topSplit(rest, ',').map(s => s.trim()).filter(Boolean);
     while (segs.length > 1 && isPrefixShaped(segs[0])) head = head ? head + ' ' + segs.shift() : segs.shift();
@@ -469,6 +529,9 @@ function buildGradient(v, ctx) {
     });
     return null;
   }
+  // the colour space of the blend, if one was written: `in oklch`, `in hsl longer hue`
+  let interp = '';
+  { const im = head.match(INTERP_RE); if (im) { interp = im[0].trim().toLowerCase(); head = head.slice(0, im.index).trim(); } }
   let lead = '';
   const POS_ATOM = /^(center|top|bottom|left|right|closest-side|farthest-side|closest-corner|farthest-corner|-?\d+(?:\.\d+)?(%|px|em|rem)?)$/i;
   if (kind === 'linear') {
@@ -513,10 +576,21 @@ function buildGradient(v, ctx) {
     }
   }
   const stops = [];
-  for (const s of stopStrs) {
+  const posUnit = kind === 'conic' ? 'deg' : 'px';
+  const asPos = (x) => (/^-?\d+(\.\d+)?$/.test(x) ? x + (x === '0' ? '' : posUnit) : x);
+  const POS = String.raw`-?\d+(?:\.\d+)?(?:%|px|em|rem|deg|turn)?`;
+  for (let si = 0; si < stopStrs.length; si++) {
+    const s = stopStrs[si];
+    // a lone position between two colours is a midpoint hint
+    if (new RegExp('^' + POS + '$').test(s)) {
+      if (si === 0 || si === stopStrs.length - 1) { ctx.errors.push({ file: ctx.file, line: ctx.line, message: `"${s}" is a midpoint, so it has to sit between two colours`, hint: 'try  gradient: linear 90, #f00 -> 30% -> #00f' }); return null; }
+      stops.push(asPos(s));
+      continue;
+    }
     let colorPart = s, pos = '';
-    const pm = s.match(/\s+(\d+(?:\.\d+)?)%$/);   // trailing per-stop position
-    if (pm) { pos = pm[1] + '%'; colorPart = s.slice(0, pm.index).trim(); }
+    // trailing position, or two of them (a hard-edged band: red 0 30%)
+    const pm = s.match(new RegExp('\\s+(' + POS + ')(?:\\s+(' + POS + '))?$'));
+    if (pm) { pos = pm[2] ? asPos(pm[1]) + ' ' + asPos(pm[2]) : asPos(pm[1]); colorPart = s.slice(0, pm.index).trim(); }
     if (!colorPart) {
       ctx.errors.push({ file: ctx.file, line: ctx.line, message: `a gradient stop is missing its color (got "${s}")` });
       return null;
@@ -532,8 +606,9 @@ function buildGradient(v, ctx) {
     }
     stops.push(pos ? `${val} ${pos}` : val);
   }
-  const fn = kind === 'linear' ? 'linear-gradient' : kind === 'radial' ? 'radial-gradient' : 'conic-gradient';
-  return `${fn}(${[lead, ...stops].filter(Boolean).join(', ')})`;
+  const fn = (repeating ? 'repeating-' : '') + (kind === 'linear' ? 'linear-gradient' : kind === 'radial' ? 'radial-gradient' : 'conic-gradient');
+  const first = [lead, interp].filter(Boolean).join(' ');
+  return `${fn}(${[first, ...stops].filter(Boolean).join(', ')})`;
 }
 
 function parseFlexWords(value, ctx, dir) {
@@ -1204,6 +1279,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   const errors = [];
   const rules = [];
   const shadowRules = [];
+  const fontLinks = []; // 0.12.0 - stylesheet links from fonts { }
   const raws = []; // v0.8.0 - raw { } / @css { } verbatim passthrough blocks
   const motions = {};
   const behaviors = {};
@@ -1497,6 +1573,18 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           if (tr) rules.push(tr);
           break;
         }
+        case 'fonts': {
+          // 0.12.0 - a font is a stylesheet link or an @font-face, not a rule. Links ride on the document
+          // (the engine adds them to <head>, `dssl build` writes @import); faces are plain CSS and ride with raw.
+          if (ctx.sel) break;
+          const pf = parseFonts(node.css || '', node.line, {
+            error: (line, message, hint) => errors.push({ file, line, message, hint }),
+            suggest: (w, list) => { const h = didYouMean(w, list); return h ? `did you mean "${h}"?` : null; },
+          });
+          for (const l of pf.links) fontLinks.push({ ...l, file });
+          for (const css of pf.faces) raws.push({ css, file, line: node.line, order: order++ });
+          break;
+        }
         case 'raw': {
           // v0.8.0 - verbatim CSS escape hatch (@font-face, @keyframes,
           // @supports, @import, @property…). The parser captured the body
@@ -1702,7 +1790,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
   const mediaQueries = new Set();
   for (const r of [...rules, ...shadowRules]) r.media.forEach(q => mediaQueries.add(q));
 
-  return { rules, shadowRules, raws, motions, motionFrames, errors, warnings, mediaQueries: [...mediaQueries], tokens: Object.fromEntries(tokenMap), registryRule };
+  return { rules, shadowRules, raws, fontLinks, motions, motionFrames, errors, warnings, mediaQueries: [...mediaQueries], tokens: Object.fromEntries(tokenMap), registryRule };
 }
 
 /** naive `&` substitution + descendant join */

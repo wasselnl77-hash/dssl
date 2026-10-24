@@ -296,6 +296,11 @@
       "words": 1
     },
     {
+      "key": "symmetrical",
+      "doc": "mirror every other tile, so each edge meets its own reflection: no seam, and the repeat is twice as far apart. x mirrors left to right, y top to bottom, both (the default) does both. Works on the image-based textures (noise, bump, rings, waves, hex).",
+      "words": 1
+    },
+    {
       "key": "invert",
       "doc": "swap the two colours",
       "words": 0

@@ -12,6 +12,19 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.12.0",
+    date: "growth phase \u00b7 the rest of the list",
+    title: "Fonts, gradients, mirrored tiles, an inspector and hot reload.",
+    why: "the wood critic's list had four things we said we had not done, and one limit. Now it is the whole list, except a real browser DevTools panel, which needs an extension.",
+    kind: "add",
+    body:
+      "texture: symmetrical mirrors every other tile, so the edges always meet and the repeat is twice as far apart (on wood it reads as a book-matched board). It is drawn by flipping one copy, so the file barely grows. A fonts { } block replaces raw CSS: Google families with weights, ranges and italics become a link at run time and an @import in dssl build, and your own files become @font-face. gradient grew repeating forms, colour spaces (in oklch), midpoints, hard bands, mesh (soft blobs over a base) and layers joined with +. DSSL.inspect() shows which rule produced each style, in the page, with file and line. DSSL.watch() and the new dssl dev command restyle the open page when you save a .dssl file, with no reload, and show errors as a toast. The Heartwood page now uses the font block, mirrored planks, a gradient mesh for the hearth glow, and the layered gradient sentence.",
+    code: `fonts { Fraunces: 500 700 800 }
+.floor { texture: oak-planks symmetrical }
+.hearth { gradient: mesh #1a1512, #ff7a1a at 50% 92% size 60%, #b9380f at 20% 100% size 40% }
+// in the console while you work: DSSL.inspect(), DSSL.watch()`,
+  },
+  {
     version: "v0.11.0",
     date: "growth phase \u00b7 the wood drop",
     title: "Real wood, textures that survive the build, and a whole page to prove it.",

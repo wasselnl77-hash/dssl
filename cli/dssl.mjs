@@ -12,6 +12,11 @@
  *       Convert CSS to DSSL (semicolons, px, transition order, font:, @keyframes,
  *       !important, raw blocks) and report what could not be carried over.
  *
+ *   dssl dev [dir] [--port 3000] [--inspect]
+ *       A tiny static server that never caches and adds DSSL.watch() to every page it
+ *       serves, so saving a .dssl file restyles the open page in place. Pages that load
+ *       /dssl/boot.js get it from the engine folder if the served folder has none.
+ *
  *   dssl build styles.dssl [-o out.css] [--json] [--strict] [--no-banner]
  *       The exit lane: compile the static subset to a real .css file.
  *       Tokens become custom properties, states become :hover, layers become
@@ -53,6 +58,9 @@ const USAGE = `dssl v${VERSION} - the DSSL style language
                          -o <out.dssl>  output path (default: <file>.dssl)
                          --stdout       print the DSSL instead of writing a file
                          --json         machine-readable report
+  dssl dev [dir]         serve a folder with hot reload: edit a .dssl file and the page restyles with no reload
+                         --port <n>     port (default 3000)
+                         --inspect      also open the in-page inspector (hover an element to see its rules)
   dssl --version         print the version`;
 
 const readArg = (args, flag) => {
@@ -152,7 +160,35 @@ if (cmd === 'check') {
   process.exit(bad ? 1 : 0);
 }
 
-if (cmd === 'build') {
+if (cmd === 'dev') {
+  const { createServer } = await import('node:http');
+  const { extname } = await import('node:path');
+  const { readFile } = await import('node:fs/promises');
+  const port = Number(readArg(args, '--port') || 3000);
+  const inspectOn = args.includes('--inspect'); if (inspectOn) args.splice(args.indexOf('--inspect'), 1);
+  const dir = pathResolve(args[0] || '.');
+  if (!existsSync(dir)) { console.error(`dssl dev: ${dir} does not exist`); process.exit(2); }
+  const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.dssl': 'text/plain; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain' };
+  const inject = `<script>addEventListener('dssl-ready',function(){if(window.DSSL){DSSL.watch();${inspectOn ? 'DSSL.inspect();' : ''}}});</script>`;
+  createServer(async (req, res) => {
+    let url = decodeURIComponent((req.url || '/').split('?')[0]);
+    if (url.endsWith('/')) url += 'index.html';
+    const inside = (p) => p.startsWith(dir);
+    let file = pathResolve(join(dir, url));
+    if (!inside(file)) { res.writeHead(403); return res.end('no'); }
+    if (!existsSync(file) && url.startsWith('/dssl/')) file = pathResolve(join(engineDir, url.slice(6)));
+    try {
+      if (statSync(file).isDirectory()) file = join(file, 'index.html');
+      let body = await readFile(file);
+      if (extname(file) === '.html') body = Buffer.from(String(body).includes('</body>') ? String(body).replace('</body>', inject + '</body>') : String(body) + inject);
+      res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
+      res.end(body);
+    } catch { res.writeHead(404, { 'content-type': 'text/plain' }); res.end('not found: ' + url); }
+  }).listen(port, () => {
+    console.log(`dssl dev: serving ${dir}`);
+    console.log(`  http://localhost:${port}/   (hot reload on${inspectOn ? ', inspector on' : ''}; Ctrl+C to stop)`);
+  });
+} else if (cmd === 'build') {
   const json = args.includes('--json');
   const banner = !args.includes('--no-banner');
   const strict = args.includes('--strict');
@@ -217,5 +253,7 @@ if (cmd === 'import') {
   process.exit(report.compile.ok ? 0 : 1);
 }
 
-console.error(`dssl: unknown command "${cmd}"\n\n${USAGE}`);
-process.exit(2);
+if (cmd !== 'dev') {   // dev keeps the process alive
+  console.error(`dssl: unknown command "${cmd}"\n\n${USAGE}`);
+  process.exit(2);
+}

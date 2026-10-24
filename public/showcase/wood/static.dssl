@@ -5,6 +5,12 @@
 // The tilt, aura and slider fills live in live.dssl, because they need the engine.
 // =========================================================================
 
+// fonts are their own block: the build writes the @import, the engine adds the <link>
+fonts {
+  Fraunces: 500 700 800
+  "Hanken Grotesk": 400 500 700
+}
+
 * { box-sizing: border-box }
 *::before { box-sizing: border-box }
 *::after { box-sizing: border-box }
@@ -76,7 +82,7 @@ img, svg { max-width: 100% }
   align-items: center
   padding: 120 0 80
   background-color: color.walnut
-  texture: oak-planks scale 14 planks 150
+  texture: oak-planks scale 14 planks 150 symmetrical
   color: color.cream
   overflow: hidden
 }
@@ -85,7 +91,7 @@ img, svg { max-width: 100% }
   content: ""
   position: absolute
   inset: 0
-  background: radial-gradient(ellipse at 30% 40%, transparent 30%, color.char/55 100%)
+  gradient: radial ellipse at 30% 40%, transparent 30%, color.char/55 100%
   pointer-events: none
 }
 
@@ -195,7 +201,7 @@ img, svg { max-width: 100% }
   inset: 0
   radius: lg
   pointer-events: none
-  background: radial-gradient(circle at var(--dssl-gx, 50%) var(--dssl-gy, 50%), color.cream/20, transparent 55%)
+  gradient: radial circle at var(--dssl-gx, 50%) var(--dssl-gy, 50%), color.cream/20, transparent 55%
 }
 
 .note { position: relative; z: 1 }
@@ -379,7 +385,7 @@ img, svg { max-width: 100% }
   padding: 28
   radius: lg
   background-color: color.oak
-  texture: oak-planks scale 12 planks 60 intensity 1
+  texture: oak-planks scale 12 planks 60 symmetrical
   color: color.char
   position: relative
   overflow: hidden
@@ -424,7 +430,8 @@ img, svg { max-width: 100% }
   min-height: 250
   radius: lg
   background-color: #2b2723
-  texture: stone scale 26 intensity 0.55
+  gradient: mesh #1a1512, #ff7a1a at 50% 92% size 60%, #b9380f at 18% 100% size 40%, #b9380f at 82% 100% size 40%
+  texture: stone scale 26 intensity 0.5 blend multiply
   display: grid
   place-items: center
 }

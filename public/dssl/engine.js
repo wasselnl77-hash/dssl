@@ -393,6 +393,7 @@ export class DsslEngine {
     this.rules = rules;
     this.shadowRules = shadowRules;
     this.raws = raws;
+    this.syncFontLinks(bundles);
 
     // unique media queries → MediaQueryList cache
     for (const r of rules) for (const q of r.media) this.mql(q);
@@ -401,6 +402,30 @@ export class DsslEngine {
     this.init();
     this.renderShadow();
     this.computeAll();
+  }
+
+  /** 0.12.0: fonts { } becomes <link> tags in <head>, one per URL, removed again when no sheet asks for it */
+  syncFontLinks(bundles) {
+    if (typeof document === 'undefined' || !document.head) return;
+    const want = new Set();
+    for (const b of bundles) for (const l of b.fontLinks || []) want.add(l.url);
+    const have = new Map();
+    for (const el of document.head.querySelectorAll('link[data-dssl-font]')) have.set(el.getAttribute('href'), el);
+    for (const [url, el] of have) if (!want.has(url)) el.remove();
+    for (const url of want) {
+      if (have.has(url)) continue;
+      if (!document.head.querySelector('link[data-dssl-font-preconnect]') && /^https:\/\/fonts\.googleapis\.com\//.test(url)) {
+        for (const origin of ['https://fonts.googleapis.com', 'https://fonts.gstatic.com']) {
+          const pc = document.createElement('link');
+          pc.rel = 'preconnect'; pc.href = origin; if (origin.includes('gstatic')) pc.crossOrigin = '';
+          pc.setAttribute('data-dssl-font-preconnect', '');
+          document.head.appendChild(pc);
+        }
+      }
+      const el = document.createElement('link');
+      el.rel = 'stylesheet'; el.href = url; el.setAttribute('data-dssl-font', '');
+      document.head.appendChild(el);
+    }
   }
 
   mql(query) {

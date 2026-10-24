@@ -149,6 +149,7 @@ export function parse(source, file = 'inline.dssl') {
     if (h === 'tokens') return { kind: 'tokens' };
     if (h === 'pin') return { kind: 'pin' };
     if (h === 'raw' || h === '@css') return { kind: 'raw' };
+    if (h === 'fonts') return { kind: 'fonts' };
     if (h.startsWith('behavior ')) return { kind: 'behavior', name: h.slice(9).trim() };
     if (h.startsWith('motion ')) return { kind: 'motion', name: h.slice(7).trim() };
     if (h.startsWith('@layer ')) return { kind: 'layer', name: h.slice(7).trim() };
@@ -244,9 +245,9 @@ export function parse(source, file = 'inline.dssl') {
    *    parsing normally. */
   let rawCapture = null; // { node, depth } while a multi-line raw { } is open
   const openBlock = (meta, node, rest, open, line) => {
-    if (meta.kind === 'raw') {
+    if (meta.kind === 'raw' || meta.kind === 'fonts') {
       if (stack.length > 1) {
-        err(line, 'raw { } must be top-level - it drops verbatim CSS into the page stylesheet', 'move it out of the enclosing block');
+        err(line, `${meta.kind} { } must be top-level` + (meta.kind === 'raw' ? ' - it drops verbatim CSS into the page stylesheet' : ' - fonts load for the whole page'), 'move it out of the enclosing block');
         const close = matchBrace(rest, open + 1);
         return close === -1 ? '' : rest.slice(close + 1);
       }

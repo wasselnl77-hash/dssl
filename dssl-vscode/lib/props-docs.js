@@ -12,7 +12,7 @@ export const SEMANTIC = {
   size: 'width and height in one line: `size: 40 20` = 40 wide, 20 tall. `size: 40` = both.',
   shadow: 'box shadow from the shadow token scale: `shadow: sm | md | lg | xl`. Custom: `shadow: 0 2 4 ink/10, 0 4 12 ink/8`.',
   radius: 'border-radius, bare number or token: `radius: md`, `radius: full`, `radius: 14`.',
-  gradient: 'gradient as a sentence: `gradient: linear 135, color.accent -> color.ok`. Stops can be hex, name, token, alpha mix, or percent-positioned. A stop that is not a color is a compile error.',
+  gradient: 'gradient as a sentence: `gradient: linear 135, color.accent -> color.ok`. Also `repeating linear 45, #fff 0 10, #000 10 20` (stripes), `linear 90 in oklch, a -> b` (blend colour space), `a -> 30% -> b` (midpoint), `a 0 30%, b 30% 100%` (hard bands), `mesh #fff4e6, #ff7a1a at 15% 20%, #3949ab at 80% 70%` (soft blobs on a base), and layers joined with ` + ` (first on top). A stop that is not a color is a compile error.',
   'gradient-text': 'clips the gradient grammar into the glyphs: `gradient-text: linear to right, color.accent, color.ink`.',
   'gradient-flow': 'the gradient drifts forever through WAAPI: `gradient-flow: 6s alternate`. Holds still under reduced-motion.',
   bend: 'bows the element in 3D. Positive tips the top away, negative leans toward you. Bare numbers are degrees. Composes into the one transform channel.',
@@ -31,7 +31,7 @@ export const SEMANTIC = {
   use: 'apply a behavior: `use focus-ring`. Behaviors are named rule groups declared with `behavior name { }`.',
   glass: 'frosted glass: `glass: 18`, `glass: 24 saturate 1.8 tint white/12`. Blurs what is behind the element and adds a faint wash of the text colour. Plain CSS, so `dssl build` keeps it. `glass: none` clears it.',
   tilt: 'follows the pointer in 3D: `tilt: 10`, `tilt: 12 lift 1.04 perspective 700 speed 0.2 invert glare`. Runtime only. `glare` keeps --dssl-gx and --dssl-gy pointing at the pointer so you can draw a shine. Ignores touch, flat under reduced motion.',
-  texture: 'a generated texture layered ON TOP of the element\u2019s own background: `texture: grain`, `texture: wood scale 6 intensity 0.8`, `texture: grain, scanlines`. 30 presets (grain, paper, marble, wood, carbon, halftone, ...) or build your own from a generator (noise, bump, lines, dots, grid, checker, weave, carbon, waves, hex) plus settings (scale, intensity, contrast, octaves, color, color2, blend, stretch, contour, ...). Open the designer to see them all.',
+  texture: 'a generated texture layered ON TOP of the element\u2019s own background: `texture: grain`, `texture: wood scale 6 intensity 0.8`, `texture: grain, scanlines`. 30 presets (grain, paper, marble, wood, carbon, halftone, ...) or build your own from a generator (noise, bump, lines, dots, grid, checker, weave, carbon, waves, hex) plus settings (scale, intensity, contrast, octaves, color, color2, blend, stretch, contour, ...). Wood: `texture: oak figure 0.8 knots 2 planks 120` (rings generator, ten species). `symmetrical` mirrors the tile so it never shows a seam. Open the designer to see them all.',
   aura: 'light and particles around an element, with NO presets: you describe it. `aura: glow #ff7a00 30 flicker 0.3, particles #fd0 -> #f60 count 60 shape flame glowing behind`. Replaces both slots. `aura: none` clears them.',
   'aura-glow': 'just the glow slot: `aura-glow: color.accent 24 pulse 1600`. Positional colour and radius, then settings (intensity, pulse, depth, flicker, texture(...), seed, essential). `aura-glow: none` clears only the glow.',
   'aura-particle': 'just the particles slot: `aura-particle: #7cf -> transparent 40 up size 6 life 800 speed 30 from bottom`. Settings: count, size, life, speed, dir, spread, gravity, drag, turbulence, from, shape, grow, glowing, behind, blend, texture(...), seed, essential.',
@@ -123,6 +123,7 @@ export const BLOCKS = {
   tokens: 'define design tokens: `tokens { color { ink: #16161d } radius { md: 14 } space { 9: 96 } }`. Numeric keys are legal. Referenced as color.ink, radius.md, space.9. Trailing /n adds alpha.',
   behavior: 'a named rule group you can `use` anywhere: `behavior focus-ring { focus-visible { ... } }`.',
   motion: 'a named keyframe animation, run with `animate:`: `motion pulse { from { } to { } }`.',
+  fonts: 'load fonts without raw CSS: `fonts { Fraunces: 500 700 800  "Hanken Grotesk": 400 700 italic  Brand: from "/fonts/brand.woff2" 400 }`. Google families become a <link> (and an @import in `dssl build`); `from` writes @font-face. Settings: weights or a range (100..900), italic, display swap|block|fallback|optional.',
   pin: 'must-win declarations. The cascade ranks tokens < base < components < utilities < pin. This is the ONLY way to force a win \u2014 there is no !important.',
 };
 

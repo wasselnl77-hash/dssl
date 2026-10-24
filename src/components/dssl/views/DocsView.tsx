@@ -27,6 +27,8 @@ const SIDE = [
   { head: null, id: "sliders", label: "Range sliders" },
   { head: null, id: "effects", label: "Glass and tilt" },
   { head: null, id: "designer", label: "Designer, import and lint" },
+  { head: null, id: "fonts", label: "Fonts" },
+  { head: null, id: "devtools", label: "Inspector and hot reload" },
   { head: null, id: "errors", label: "Errors" },
   { head: null, id: "api", label: "JS API" },
   { head: null, id: "performance", label: "Performance: freeze & explain" },
@@ -739,6 +741,30 @@ motion wobble {
                 automatically, a gradient at 100% has nowhere to slide.
               </p>
             </div>
+            <h3 className="doc-h3">More forms</h3>
+            <p className="doc-lead">
+              The sentence grew up in 0.12.0. Any kind can be <code>repeating</code>, the blend can happen in another colour
+              space, a lone position between two stops moves the midpoint, two positions make a hard band, <code>mesh</code>{" "}
+              lays soft blobs of colour over a base, and layers are joined with <code>+</code>, first on top.
+            </p>
+            <CodeBlock file="gradient-forms.dssl" code={`.stripes { gradient: repeating linear 45, #fff 0 10, color.ink 10 20 }   // bare numbers are px (deg on conic)
+.blend   { gradient: linear 90 in oklch, #ff0055 -> #00d4ff }           // no muddy middle
+.mid     { gradient: linear 90, #f00 -> 30% -> #00f }                  // the midpoint sits at 30%
+.band    { gradient: linear 90, #f00 0 30%, #00f 30% 100% }            // a hard edge
+.aurora  { gradient: mesh #14102a, #ff7a1a at 15% 20%, #c2185b at 80% 30% size 45%, #3949ab at 50% 95% }
+.sheen   { gradient: radial at top left, #fff/40 -> transparent + linear 135, #123 -> #456 }`} />
+            <div className="demo-box wide">
+              <div className="gd-sw-row">
+                <div className="gd-sw gd-stripes" />
+                <div className="gd-sw gd-srgb" />
+                <div className="gd-sw gd-oklch" />
+                <div className="gd-sw gd-band" />
+                <div className="gd-sw gd-mesh" />
+              </div>
+              <p className="doc-lead fine-print">
+                Left to right: repeating stripes, the same red to cyan blended in sRGB and in oklch, a hard band, and a mesh.
+              </p>
+            </div>
           </section>
 
           <section className="doc-block" id="texture">
@@ -771,7 +797,7 @@ behavior old-leather {
             </div>
             <p className="doc-lead fine-print">
               Every swatch above is a plain box with one rule, like <code>.tx-marble {"{"} texture: marble {"}"}</code>,
-              over the same tan colour. Hover a swatch for what it is meant to look like. The last ten are wood: drawn as
+              over the same tan colour. Hover a swatch for what it is meant to look like. Add <code>symmetrical</code> to any image texture and every other tile is mirrored, so the edges always meet and the repeat is twice as far apart. The last ten are wood: drawn as
               growth rings, not stretched noise, so they take <code>figure</code>, <code>warp</code>, <code>pores</code>,{" "}
               <code>knots</code> and <code>planks</code>. <a href="/showcase/wood/">See a whole page built from them</a>, with
               the textures baked into real CSS by <code>dssl build</code>.
@@ -955,6 +981,64 @@ input.mood {                       // particles leave the thumb, wherever the va
             <p className="tbl-note">
               <code>glare</code> is the trick for a shine: the engine keeps <code>--dssl-gx</code> and{" "}
               <code>--dssl-gy</code> pointing at the pointer, and you use them in any gradient you like.
+            </p>
+          </section>
+
+          <section className="doc-block" id="fonts">
+            <h2 className="section-title">Fonts</h2>
+            <p className="doc-lead">
+              Loading a font used to mean a <code>raw {"{"} {"}"}</code> block of plain CSS. Now it is its own block, one
+              line per family.
+            </p>
+            <CodeBlock file="fonts.dssl" code={`fonts {
+  Fraunces: 500 700 800                 // from Google Fonts, these weights
+  "Hanken Grotesk": 400 700 italic      // and the italics
+  Inter: 100..900 display optional      // a variable range, and how it swaps in
+  Brand: from "/fonts/brand.woff2" 400  // your own file: becomes @font-face
+  Brand: from "/fonts/brand-bold.woff2" 700
+}
+
+tokens { font { display: "Fraunces", Georgia, serif } }`} />
+            <p className="doc-lead">
+              At run time the engine adds the <code>&lt;link&gt;</code> to the page head (with preconnects), and removes it again if
+              no stylesheet asks for it any more. <code>dssl build</code> writes an <code>@import</code> as the first line of the
+              CSS. Your own files become <code>@font-face</code> with the format guessed from the extension. One file holds one
+              weight, or one variable range, so use a line per file.
+            </p>
+            <p className="tbl-note">
+              Google&apos;s servers see everyone who loads one of their fonts, which some privacy laws treat as sharing a
+              visitor&apos;s address. If that matters to you, download the files and use <code>from</code>.
+            </p>
+          </section>
+
+          <section className="doc-block" id="devtools">
+            <h2 className="section-title">Inspector and hot reload</h2>
+            <p className="doc-lead">
+              Two tools for the person writing the styles. Neither is loaded for visitors: they are imported the first
+              time you ask.
+            </p>
+            <CodeBlock file="console" code={`DSSL.inspect()      // hover any element: which rule won each property, and in which file and line
+DSSL.watch()        // edit a .dssl file and the open page restyles, with no reload
+
+// or switch them on from the page, for a dev build only
+<script type="module" src="/dssl/boot.js" data-watch data-inspect></script>
+// or from the address bar: ?dssl-watch  ?dssl-inspect`} />
+            <p className="doc-lead">
+              <b>The inspector</b> outlines the element under the pointer and lists what applied (each declaration with its
+              file, line and selector), then every matching rule in cascade order, with its layer and any state. Click to pin an
+              element so you can read the panel; <code>Esc</code> releases it, and a second <code>Esc</code> closes the panel.
+              It is the same answer as <code>DSSL.explain()</code>, without opening the console.
+            </p>
+            <p className="doc-lead">
+              <b>Hot reload</b> polls the .dssl files you loaded (and any built .css the page links) and applies a file again the
+              moment its text changes. The page does not reload, so scroll position, open menus and form input survive. A mistake
+              shows as a toast with the line and message, and fixing it recovers. <code>DSSL.watch(false)</code> stops it.
+            </p>
+            <CodeBlock file="terminal" code={`node cli/dssl.mjs dev .                 # serve this folder, never cached, with hot reload added to every page
+node cli/dssl.mjs dev site --port 4000 --inspect`} />
+            <p className="tbl-note">
+              Hot reload needs a server that lets the browser re-fetch files. <code>dssl dev</code> is one; most dev servers are too.
+              It does not follow inline <code>&lt;style type=&quot;text/dssl&quot;&gt;</code> blocks, because there is no file to watch.
             </p>
           </section>
 

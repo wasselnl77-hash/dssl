@@ -19,9 +19,10 @@ import { resolve, DEFAULT_TOKENS } from './resolver.js';
 import { toCSS as docToCSS } from './static.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.11.0';
+export const VERSION = '0.12.0';
 
 let counter = 0;
+const loadedUrls = new Set();   // every .dssl file fetched by load(), so DSSL.watch() knows what to follow
 const engines = new Map();
 let lastErrors = [];
 
@@ -139,6 +140,7 @@ export async function load(urls, opts = {}) {
       results.push({ ok: false, errors });
       continue;
     }
+    loadedUrls.add(opts.name || r.url);
     results.push(apply(r.text, { ...opts, name: opts.name || r.url }));
   }
   return results;
@@ -205,9 +207,32 @@ export function explain(el, opts = {}) {
   return rep;
 }
 
+// ---- 0.12.0: dev tools, loaded only when asked for --------------------------
+let devMod = null, inspector = null, watcher = null;
+async function dev() {
+  if (!devMod) devMod = await import('./dev.js');
+  if (!inspector) inspector = devMod.createInspector({ explain });
+  if (!watcher) watcher = devMod.createWatcher({ apply, sources: () => [...loadedUrls] });
+  return { inspector, watcher };
+}
+/** DSSL.inspect() toggles the in-page inspector; DSSL.inspect(false) closes it */
+export async function inspect(on = true) {
+  const d = await dev();
+  if (on === false) { d.inspector.stop(); return false; }
+  d.inspector.start();
+  return true;
+}
+/** DSSL.watch({ interval, css, toast }) re-applies a .dssl file when it changes on disk; DSSL.watch(false) stops */
+export async function watch(o = {}) {
+  const d = await dev();
+  if (o === false) { d.watcher.stop(); return false; }
+  d.watcher.start(typeof o === 'object' ? o : {});
+  return true;
+}
+
 export const DSSL = {
   version: VERSION, compile, apply, load, toCSS, signal, getSignal, refresh, replay, errors,
-  freeze, unfreeze, explain,
+  freeze, unfreeze, explain, inspect, watch,
   __debug: { engines },
 };
 
@@ -239,6 +264,13 @@ if (typeof window !== 'undefined') {
       }
     } finally {
       // always announce readiness - even when there was nothing to auto-load
+      // 0.12.0: <script src="boot.js" data-watch data-inspect> turns the dev tools on, and so does ?dssl-watch in the address
+      try {
+        const tag = document.querySelector('script[src$="boot.js"], script[src$="dssl/index.js"]');
+        const q = new URLSearchParams(location.search);
+        if ((tag && tag.hasAttribute('data-watch')) || q.has('dssl-watch')) watch();
+        if ((tag && tag.hasAttribute('data-inspect')) || q.has('dssl-inspect')) inspect();
+      } catch { /* dev tools are optional */ }
       window.dispatchEvent(new CustomEvent('dssl-ready', { detail: { version: VERSION } }));
       // 0.10.0: a page that hides itself until styled (see the guide, "No flash") shows itself here
       try { document.documentElement.classList.add('dssl-ready'); } catch { /* no document element yet */ }

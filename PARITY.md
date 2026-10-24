@@ -62,6 +62,10 @@ so the boundary is explicit, not folklore.
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
 
+## v0.12.0: the rest of the wood list
+
+Fonts, richer gradients, an inspector, hot reload and mirrored tiling, from the same critic's list (rows marked "done in 0.12.0" below).
+
 ## v0.11.0 (wood): rings, species, planks, baked textures
 
 Written after another AI built a wood site in DSSL and listed what hurt. What came of it:
@@ -76,10 +80,11 @@ Written after another AI built a wood site in DSSL and listed what hurt. What ca
 | Contrast false alarms on translucent backgrounds | judged on the light page, white and black; warns only if it fails on all |
 | Flash of unstyled content | `dssl-ready` class on `<html>`, and `dssl build` for the static part (the wood page does this) |
 | Textures missing from `dssl build` | baked into the CSS when colours are known; the report names the ones that could not be |
-| `@font-face` in `raw {}` | **not done.** A native font loader is still a good idea. |
-| Gradients only cover simple cases | **not done.** Plain CSS gradient strings still pass through, which is what the wood page uses. |
-| Dev-tools inspector for which rule produced a style | **not done.** `DSSL.explain()` is still a console call. |
-| Hot reload | **not done.** |
+| `@font-face` in `raw {}` | done in 0.12.0: a `fonts { }` block (Google families, variable ranges, your own files) |
+| Gradients only cover simple cases | done in 0.12.0: repeating, colour spaces, midpoints, hard bands, `mesh`, layers |
+| Dev-tools inspector for which rule produced a style | done in 0.12.0 as an in-page panel, `DSSL.inspect()`. A real browser DevTools panel would need an extension and is still not done. |
+| Hot reload | done in 0.12.0: `DSSL.watch()` and `dssl dev` |
+| The wood tile repeats every 576px | `texture: ... symmetrical` mirrors the tile, so it never shows a seam |
 
 ## v0.10.0: glass, tilt, and a silent colour bug
 
