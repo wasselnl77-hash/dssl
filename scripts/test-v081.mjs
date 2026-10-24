@@ -12,7 +12,7 @@ import { resolve } from '../public/dssl/resolver.js';
 import { toCSS } from '../public/dssl/static.js';
 import { VERSION } from '../public/dssl/index.js';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync, mkdtempSync, rmSync, mkdirSync, copyFileSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, rmSync, mkdirSync, copyFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -155,7 +155,8 @@ const fluidOf = (src) => val(declsOf(compileDoc(src).doc), 'font-size');
   const dir = mkdtempSync(join(tmpdir(), 'dssl-pkg-'));
   mkdirSync(join(dir, 'cli')); mkdirSync(join(dir, 'dssl'));
   copyFileSync(join(root, 'cli', 'dssl.mjs'), join(dir, 'cli', 'dssl.mjs'));
-  for (const f of ['boot', 'engine', 'index', 'parser', 'resolver', 'static', 'utils']) copyFileSync(join(root, 'public', 'dssl', f + '.js'), join(dir, 'dssl', f + '.js'));
+  // the package ships every engine module; a hardcoded list here is how the 0.8.0 package broke
+  for (const f of readdirSync(join(root, 'public', 'dssl'))) if (f.endsWith('.js')) copyFileSync(join(root, 'public', 'dssl', f), join(dir, 'dssl', f));
   const src = join(dir, 'a.dssl');
   writeFileSync(src, 'h1 { font-size: fluid 16 24 }\n');
   const run = (args) => {
