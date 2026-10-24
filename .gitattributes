@@ -1,3 +1,4 @@
 public/dssl-engine.tar.gz filter=lfs diff=lfs merge=lfs -text
 public/dssl-engine.zip filter=lfs diff=lfs merge=lfs -text
 dssl-vscode/dssl-vscode-0.9.0.vsix filter=lfs diff=lfs merge=lfs -text
+*.vsix filter=lfs diff=lfs merge=lfs -text
