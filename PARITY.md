@@ -1,4 +1,4 @@
-# PARITY.md — DSSL vs CSS, honestly
+# PARITY.md: DSSL vs CSS, honestly
 
 The point of this table is to stop two bad arguments: "DSSL is missing everything" and
 "DSSL replaces all of CSS". Both are false. Here is the ledger. Status: shipped / partial
@@ -40,7 +40,7 @@ keeps working with the engine removed. No other styling replacement can say that
 no other replacement styles with the platform's own primitives.
 
 And since v0.8.0 there is a second exit: `dssl build styles.dssl -o styles.css`
-compiles the static subset to a real stylesheet before you ever ship — no runtime,
+compiles the static subset to a real stylesheet before you ever ship, no runtime,
 no inline styles, CSP-clean, works without JavaScript. Tokens become custom properties,
 states become pseudo-classes, layers become `@layer`, motions become `@keyframes`,
 `pin` becomes `!important`, `raw { }` passes through verbatim, `seen` applies its final
@@ -56,6 +56,17 @@ so the boundary is explicit, not folklore.
 - the overlap policy: translucent boxes refuse to cover things unless you say so
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
+
+## v0.8.2: what rebuilding the site found
+
+- Cross-stylesheet cascade. "Later wins" held inside one sheet and not between
+  sheets: every sheet numbered its rules from zero and the engine compared those
+  numbers across sheets, so a later sheet lost to an earlier one whenever the
+  earlier one had more rules above the rule in question. Every rule now has one
+  position in load order. A consequence: a later `tokens { }` block now overrides
+  a token an earlier sheet set inside `@media` or `@signal`.
+- `fluid` works on the longhands (`padding-top`, `margin-block`, `letter-spacing`,
+  `border-radius` and the rest), not only on the four-sided shorthands.
 
 ## v0.8.1 follow-up corrections
 
@@ -81,7 +92,7 @@ A re-test of 0.8.0 found two bugs, and more showed up while writing the tests:
 The second external review (repro snippets, headless browser) found five bugs and
 asked for the static build first. All fixed or shipped:
 
-- `row: gap 8 between center` — the guide's own example — kept its `between`
+- `row: gap 8 between center`, the guide's own example, kept its `between`
   (every place word used to write both axes; the later word overwrote
   `justify-content` silently). Place words now own an axis: between/around/evenly
   are main-axis, stretch/baseline cross-axis, center/start/end fill free axes;

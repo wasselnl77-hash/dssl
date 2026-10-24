@@ -6,7 +6,7 @@ license: mit
 
 DSSL is a style language for the web. For the pages it fits, it replaces writing CSS entirely. It does not replace the CSS platform: the engine ends in inline styles that the browser parses, and it needs JavaScript. Where it wins is the authoring experience: tokens, words-as-layout, states and motion in one grammar, loud errors, zero build. PARITY.md keeps the honest feature ledger.
 
-Not a preprocessor that spits out stylesheets. Not a utility class graveyard. You write `.dssl` files, the page loads a small engine, and the engine walks your DOM in real time and applies every rule it matches straight onto the elements it finds. Nothing compiles at runtime — and since v0.8.0 there is also an exit lane: `dssl build` compiles the static subset of the same source to a real `.css` file for pages that must work without JavaScript or sit behind a strict CSP. You choose per page: live engine, built CSS, or both.
+Not a preprocessor that spits out stylesheets. Not a utility class graveyard. You write `.dssl` files, the page loads a small engine, and the engine walks your DOM in real time and applies every rule it matches straight onto the elements it finds. Nothing compiles at runtime, and since v0.8.0 there is also an exit lane: `dssl build` compiles the static subset of the same source to a real `.css` file for pages that must work without JavaScript or sit behind a strict CSP. You choose per page: live engine, built CSS, or both.
 
 Elements that show up later get styled the moment they appear. Change a rule and the page updates on the next pass. The language is the runtime.
 
@@ -68,7 +68,7 @@ Both drop a `dssl-engine/` folder next to you: the engine, a starter token set, 
 
 Prefer to click: [dssl-engine.zip](https://dssl-sable.vercel.app/dssl-engine.zip) or [dssl-engine.tar.gz](https://dssl-sable.vercel.app/dssl-engine.tar.gz). Same package, straight from the browser.
 
-Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API): download `dssl-vscode/dssl-vscode-0.8.1.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. An Open VSX listing (so it appears in VSCodium's Extensions tab, searchable) is staged and publishes with one Open VSX token; see `dssl-vscode/PUBLISHING.md`.
+Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API): download `dssl-vscode/dssl-vscode-0.8.2.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. An Open VSX listing (so it appears in VSCodium's Extensions tab, searchable) is staged and publishes with one Open VSX token; see `dssl-vscode/PUBLISHING.md`.
 
 AI agents and machine reviewers: this repo ships `llms.txt` (dense, structured facts), `AGENTS.md` (how to work on the codebase) and `PARITY.md` (the honest feature matrix against CSS). The site serves the same `llms.txt` at https://dssl-sable.vercel.app/llms.txt
 
@@ -346,7 +346,7 @@ v0.7 added warnings: things that compile, run, and are still probably not what y
 .nav-links {
   display: none
   column: gap 2   // warning: "column:" expands to display: flex and
-                  // overrides the earlier "display: none" — menu stays open
+                  // overrides the earlier "display: none", menu stays open
 }
 ```
 
@@ -415,17 +415,17 @@ DSSL.load(['/styles/app.dssl']).then(() => {
 
 ```js
 const rep = DSSL.explain(document.querySelector('.doc-card'))
-// rep.matched — [{ id, sel, layer, file, line, states, media, signals, decls }]
-// rep.wins    — [{ prop, value, by: { sel, file, line } }]
-// rep.pseudo  — the ::before / ::after rules touching this element
+// rep.matched: [{ id, sel, layer, file, line, states, media, signals, decls }]
+// rep.wins   : [{ prop, value, by: { sel, file, line } }]
+// rep.pseudo : the ::before / ::after rules touching this element
 ```
 
 The matcher also pre-filters every rule through a cheap class/tag/id gate extracted from the selector's rightmost compound, so a recompute skips obvious non-matches instead of asking the browser rule by rule. The gate only ever says no; anything it does not fully understand falls back to native matching.
 
-## What works today (v0.8.1)
+## What works today (v0.8.2)
 
 - the full selector surface, including `:nth-child`, `:not`, `:is`, `:where`, `:has`
-- flexbox and grid with `row:` / `column:` / `grid:` / `stack:` / `center:` sugar — place words now own an axis (`between` is main-axis, `stretch` is cross-axis) and conflicts warn instead of silently overwriting
+- flexbox and grid with `row:` / `column:` / `grid:` / `stack:` / `center:` sugar, place words now own an axis (`between` is main-axis, `stretch` is cross-axis) and conflicts warn instead of silently overwriting
 - behaviors and `use`
 - design tokens, numeric keys included, scoped per file and per subtree
 - states, engine-native `seen`, `stagger` choreography
@@ -435,7 +435,8 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 - the overlap policy and `pointer-events` pass-through for veils
 - pseudo-elements in any spelling (shadow CSS), themed scrollbars included
 - `raw { }` / `@css { }` for verbatim CSS (`@font-face`, `@keyframes`, `@supports`); unknown at-rules skip their whole block with one clean error
-- `fluid 16 24` sizing sugar on any length property
+- `fluid 16 24` sizing sugar on any length property, including `padding-top`, `margin-block` and the other longhands
+- one cascade across every stylesheet: a sheet loaded later beats an earlier one (fixed in 0.8.2)
 - the CLI: `dssl check` (CI, --json, --strict) and `dssl build` (real CSS from the static subset, also with --strict)
 - compiler warnings for cascade-order footguns and duplicate axis words
 - `DSSL.freeze()` / `DSSL.unfreeze()` / `DSSL.explain()` / `DSSL.toCSS()`
@@ -457,7 +458,7 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 
 ## Status
 
-v0.8.1, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite, and the docs examples are rendered and asserted in a real browser, so the guide cannot lie. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; when a page must work without JavaScript, build the static subset with `dssl build` or pick another tool for that page. Freeze makes big static pages viable; live interaction is what the engine is for.
+v0.8.2, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite, and the docs examples are rendered and asserted in a real browser, so the guide cannot lie. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; when a page must work without JavaScript, build the static subset with `dssl build` or pick another tool for that page. Freeze makes big static pages viable; live interaction is what the engine is for.
 
 ## License
 

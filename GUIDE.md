@@ -6,7 +6,7 @@ example in this guide is compiled by `scripts/test-guide-examples.mjs` on every
 release, so the examples cannot drift from the compiler. If an example here
 stops compiling, that is a release blocker, not a docs bug.
 
-Status up front: DSSL is a real, tested style engine at v0.8.1, and it is
+Status up front: DSSL is a real, tested style engine at v0.8.2, and it is
 honest alpha. It needs JavaScript, it writes inline styles, and it has a
 first-paint story you should read before shipping anything serious (see
 "Honest limits"). Within those limits, it is genuinely nicer to write than
@@ -109,7 +109,7 @@ Token overrides can be scoped under `@media` or `@signal` for themes.
 .hero    { center: both }
 ```
 
-Each place word owns an axis (v0.8.0 — the example above used to silently
+Each place word owns an axis (v0.8.0, the example above used to silently
 lose the `between` because every word wrote both axes):
 
 - `between`, `around`, `evenly` are main-axis words (`justify-content`)
@@ -123,7 +123,8 @@ overwriting, and a word written twice warns too.
 ### Sizing that moves: fluid
 
 `font-size: fluid 16 24` (and any length-ish property: width, height, gap,
-padding, margin and friends) makes a size that grows smoothly with the window.
+padding, margin, their `-top` / `-bottom` / `-inline` / `-block` longhands,
+letter-spacing and border-radius) makes a size that grows smoothly with the window.
 It is 16px on a 360px wide screen, 24px on a 1200px wide one, and in between it
 slides along a straight line. Past either end it stays put.
 
@@ -142,6 +143,8 @@ What you get at a few window widths for `fluid 16 24`:
 
 A few things worth knowing:
 
+- `padding: fluid 8 16` sets all four sides. To make just one side fluid, use the
+  longhand: `padding-top: fluid 36 80`. (0.8.1 had no way to say that.)
 - Sizes can be px (bare numbers are px), rem or em. Both sizes need the same unit.
 - Percentages are refused with an error, because a percentage cannot follow the
   window width.
@@ -151,7 +154,7 @@ A few things worth knowing:
   right slope but forgot where the line starts, so sizes ran ahead of the
   window and hit their maximum around 840px instead of 1200px.
 
-### raw { } — the escape hatch
+### raw { }: the escape hatch
 
 DSSL has no sugar for `@font-face`, `@keyframes`, `@supports`, `@import` or
 `@property` yet. `raw { }` (alias `@css { }`) drops verbatim CSS into the
@@ -177,11 +180,17 @@ styles.dssl:3 warning: raw { } is verbatim CSS, so this line needs a ";" at the 
 ```
 
 Unknown at-rules outside `raw { }` are skipped whole, with one clean error
-and a pointer here — they never leak their inner rules (that was a real
+and a pointer here, they never leak their inner rules (that was a real
 0.7.2 bug: `@supports (display:grid) { .a { … } }` applied `.a` everywhere
 after erroring).
 
 ### The cascade is (layer, order)
+
+(This holds across stylesheets too: a sheet loaded later beats one loaded before it.
+Versions up to 0.8.1 got that wrong. Each sheet counted its own rules from zero and
+the engine compared those numbers across sheets, so a later sheet could lose just
+because the earlier one was longer. 0.8.2 gives every rule one position in load
+order.)
 
 No specificity, no `!important`. Later wins inside a layer. Layers sort
 `tokens < base < components < utilities < pin`. Nested blocks do what the
@@ -283,7 +292,7 @@ for liveness. `unfreeze()` re-arms everything.
 
 Three ways to get it:
 
-1. Download `dssl-vscode/dssl-vscode-0.8.1.vsix` from the repo files, then
+1. Download `dssl-vscode/dssl-vscode-0.8.2.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. Works in VS Code and VSCodium.
 2. Build it: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 3. Registry listing: staged for Open VSX (the registry VSCodium searches).
@@ -316,6 +325,7 @@ The same output is available in the browser as `DSSL.toCSS(source)`.
 
 ```sh
 node cli/dssl.mjs check public/styles/*.dssl   # compile everything, exit code for CI
+node scripts/test-v082.mjs      # 0.8.2 regression suite (27 assertions)
 node scripts/test-v081.mjs      # 0.8.1 regression suite (37 assertions)
 node scripts/test-v073.mjs      # 0.8.0 regression suite (65 assertions)
 node scripts/test-guide-examples.mjs        # every guide example compiles
@@ -340,7 +350,7 @@ Read this before choosing DSSL for a real site.
 - **JavaScript is required** for the live engine. No JS, no styles at runtime.
   v0.8.0 adds the exit lane: `dssl build styles.dssl -o styles.css` compiles
   the static subset to a real stylesheet you can `<link>` instead of the
-  engine — tokens as custom properties, states as `:hover`, layers as
+  engine, tokens as custom properties, states as `:hover`, layers as
   `@layer`, motions as `@keyframes`, `raw { }` verbatim. What genuinely needs
   JS (`@signal`, `animate:`, deform, overlap) stays out and is counted in the
   report, so you always know what a no-JS page gives up. If a page must work
@@ -353,7 +363,7 @@ Read this before choosing DSSL for a real site.
   and is on the PARITY roadmap as the next big item.
 - **CSP.** Pseudo-elements compile to one real stylesheet the engine injects;
   strict `style-src 'self'` blocks inline style attributes and that sheet.
-  DSSL wants `unsafe-inline` for styles today — or use the `dssl build`
+  DSSL wants `unsafe-inline` for styles today, or use the `dssl build`
   output, which is a normal external stylesheet and CSP-clean.
 - **Interop is invasive.** DSSL normal declarations beat external CSS, and
   `pin` beats external `!important`. Mixing with an existing CSS design

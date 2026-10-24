@@ -946,7 +946,12 @@ const SEMANTIC = {
  * (360px and 1200px by default) — the formula everyone writes by hand and
  * gets wrong. */
 const FLUID_PROPS = new Set(('font-size,width,height,inline-size,block-size,min-width,max-width,min-height,max-height,' +
-  'gap,row-gap,column-gap,padding,margin,inset,top,right,bottom,left').split(','));
+  'gap,row-gap,column-gap,padding,margin,inset,top,right,bottom,left,' +
+  // 0.8.2: the longhands. The site's own hero wanted a fluid padding-top and
+  // there was no way to say it, because `padding: fluid ...` is all four sides.
+  'padding-top,padding-right,padding-bottom,padding-left,padding-inline,padding-block,' +
+  'margin-top,margin-right,margin-bottom,margin-left,margin-inline,margin-block,' +
+  'letter-spacing,border-radius').split(','));
 
 function buildFluidParts(parts, ctx, prop = 'font-size') {
   const bad = (s, why) => {

@@ -23,6 +23,36 @@ import { composeDeform, arcLayout } from './utils.js';
 
 const LAYER_RANK = { tokens: 0, base: 1, components: 2, utilities: 3, pin: 4 };
 
+/* 0.8.2: one cascade position per rule, across every stylesheet on the page.
+ *
+ * A rule's own `order` is just its place inside the sheet it was written in:
+ * every sheet counts from 0. The cascade sorts by (layer, order), so when two
+ * sheets were combined their numbers were compared as if they were one count,
+ * and a later sheet's rule could lose to an earlier sheet's rule purely
+ * because the earlier sheet had more rules above it. "Later wins" held inside
+ * a sheet and not between them. That is also why a tokens block in a later
+ * sheet could not override a conditional token from an earlier one.
+ *
+ * This puts the bundles in load order and shifts each one's numbers past the
+ * end of the one before. The sheet's own numbers are kept in `order0`, so
+ * calling it again after a rebuild gives the same result instead of drifting.
+ */
+export function assignGlobalOrder(bundlesInLoadOrder) {
+  let base = 0;
+  for (const b of bundlesInLoadOrder) {
+    let max = -1;
+    for (const list of [b.rules, b.shadowRules, b.raws]) {
+      if (!list) continue;
+      for (const r of list) {
+        if (r.order0 === undefined) r.order0 = r.order;
+        r.order = base + r.order0;
+        if (r.order0 > max) max = r.order0;
+      }
+    }
+    base += max + 1;
+  }
+}
+
 // v0.3.4 — alignment implies a formatting context.
 // place-items / place-content / align-* / justify-* only arrange children
 // inside flex or grid containers. On a plain <span> or <button> they used to
@@ -175,6 +205,7 @@ export class DsslEngine {
     const shadowRules = [];
     const raws = [];
     const bundles = [...this.bundles.values()].sort((a, b) => a.seq - b.seq);
+    assignGlobalOrder(bundles);
     for (const b of bundles) {
       for (const r of b.rules) {
         rules.push(r); // scoped engines map :root rules onto the scope element

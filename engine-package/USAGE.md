@@ -1,4 +1,4 @@
-# DSSL engine — quickstart
+# DSSL engine: quickstart
 
 DSSL is a style language that runs in the browser. You write `.dssl` files, add two tags to your page, and the engine does the rest. No compiler, no build step, no CSS output. The engine walks your DOM live and writes styles straight onto the elements it matches, including elements that show up later.
 
