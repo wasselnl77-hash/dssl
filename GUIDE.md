@@ -822,7 +822,8 @@ them is still fully styled without it, it just does not move.
   and asserts the browser reports zero violations.
 - *Devtools.* `--sourcemap` writes `site.css.map` with a mapping for every rule and every declaration, and embeds the .dssl
   source so it works even when the file is not served. Chrome's own DevTools then shows `card.dssl:4` next to a rule in the
-  Styles pane and opens the source on click. The selectors come out wrapped in `:where()`, so DevTools shows `:where(.card)`.
+  Styles pane and opens the source on click. The selectors come out wrapped in `:where()`, so DevTools shows `:where(.card)`. Some hosts refuse to serve a file ending in `.map`
+  (Vercel answers 403, which this site found out the hard way); `--map-name site.css.sourcemap` writes the same map under another name.
   The engine's inline styles have no source to point at (a style attribute cannot carry one), so for a runtime page use
   `DSSL.inspect()`.
 

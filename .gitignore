@@ -64,7 +64,7 @@ mini-services/
 
 # compiled from public/styles by scripts/build-site-css.mjs
 /public/site.css
-/public/site.css.map
+/public/site.css.sourcemap
 
 # real-editor test scratch (scripts/test-in-editor.mjs)
 /.vsc-test/

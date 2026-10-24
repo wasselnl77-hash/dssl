@@ -52,6 +52,7 @@ const USAGE = `dssl v${VERSION} - the DSSL style language
   dssl build <files…>    compile the static subset to a real .css file (several files: in load order, tokens first)
                          -o <out.css>   output path (default: <first file>.css)
                          --sourcemap    write <out.css>.map so devtools show the .dssl file and line of each rule
+                         --map-name <f> file name for the map when your host will not serve *.map (default <out.css>.map)
                          --reset        include the small reset, as a layer that loses to everything
                          --inline-tokens  write each token's value in place of var(--dssl-x) where the token is defined once and
                                         never changed: the fastest CSS, but a token changed at run time will not reach it
@@ -204,6 +205,7 @@ if (cmd === 'dev') {
   const inlineTokens = args.includes('--inline-tokens');
   for (const f of ['--json', '--no-banner', '--strict', '--sourcemap', '--reset', '--native-specificity', '--inline-tokens']) { const i = args.indexOf(f); if (i !== -1) args.splice(i, 1); }
   const outPath = readArg(args, '-o') || readArg(args, '--out');
+  const mapName = readArg(args, '--map-name');   // some hosts refuse to serve *.map; a different name is the same map
   if (!args.length) { console.error('dssl build: give me a .dssl file to build (or several, in load order: tokens first)'); process.exit(2); }
   const inputs = [...args];
   const results = compileAll(inputs);
@@ -214,7 +216,7 @@ if (cmd === 'dev') {
   for (const x of results) sources[x.name] = { path: pathRelative(outDir, pathResolve(x.file)).split('\\').join('/'), content: readFileSync(x.file, 'utf8') };
   const built = toCSS(results.map((x) => x.doc), {
     file: inputs.map((f) => basename(f)).join(' + '), banner, version: VERSION, reset, nativeSpecificity, inlineTokens,
-    sourceMap: sourcemap, sources, mapFile: basename(outputPath), sourceMapUrl: sourcemap ? basename(outputPath) + '.map' : undefined,
+    sourceMap: sourcemap, sources, mapFile: basename(outputPath), sourceMapUrl: sourcemap ? (mapName || basename(outputPath) + '.map') : undefined,
   });
   if (json) {
     console.log(JSON.stringify({
@@ -229,12 +231,12 @@ if (cmd === 'dev') {
     }, null, 2));
   } else {
     writeFileSync(outputPath, built.css);
-    if (built.map) writeFileSync(outputPath + '.map', JSON.stringify(built.map));
+    if (built.map) writeFileSync(mapName ? join(dirname(outputPath), mapName) : outputPath + '.map', JSON.stringify(built.map));
     const rep = built.report;
     console.log(`built ${outputPath} from ${results.map((x) => x.file).join(', ')}`);
     console.log(`  ${rep.rules} rule(s), ${rep.shadowRules} pseudo-element rule(s), ${rep.keyframes} @keyframes, ${rep.raws} raw block(s)`);
     if (rep.layers.length) console.log(`  layers: ${rep.layers.join(' < ')}`);
-    if (built.map) console.log(`  source map: ${outputPath}.map (browser devtools show the .dssl file and line for each rule)`);
+    if (built.map) console.log(`  source map: ${mapName ? join(dirname(outputPath), mapName) : outputPath + '.map'} (browser devtools show the .dssl file and line for each rule)`);
     if (rep.seenStripped) console.log(`  ${rep.seenStripped} seen rule(s) applied unconditionally (the no-JS state)`);
     if (rep.bakedTextures) console.log(`  ${rep.bakedTextures} texture(s) baked into the CSS as background images`);
     for (const n of rep.notBaked || []) console.log(`  texture on "${n.sel}" stays in the runtime: ${n.why}`);
