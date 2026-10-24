@@ -519,6 +519,11 @@ input.volume {
 | `graph-height` | `graph-height <px>` |
 | `graph-gap` | `graph-gap <px>` |
 
+One gotcha: the slider parts are real CSS pseudo-elements, so they obey normal CSS specificity, not
+"later wins". A site-wide default like `input[type=range] { slider: ... }` will beat a later
+`.volume { slider: ... }`. Write the default as `:where(input[type=range]) { ... }` and anything more
+specific wins, as you would expect. This site does exactly that.
+
 A histogram slider puts bars behind the track. They colour themselves as the value passes them:
 
 ```dssl

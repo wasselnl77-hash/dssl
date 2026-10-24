@@ -901,7 +901,9 @@ input.mood {                       // particles leave the thumb, wherever the va
               Settings are separated by commas, and a leftover word is an error, not noise. The fill and the bars
               follow the value through <code>--dssl-p</code>, which the engine keeps current (set{" "}
               <code>input.value</code> from JavaScript, then call <code>DSSL.refresh()</code>). The WebKit and Blink
-              rules are tested in Chrome. The Firefox rules are generated but have not been run in Firefox yet.
+              rules are tested in Chrome. The Firefox rules are generated but have not been run in Firefox yet. One gotcha: the slider parts are real CSS
+              pseudo-elements, so they follow normal specificity. To give every slider a default that your own classes
+              can replace, write it as <code>:where(input[type=range])</code>.
             </p>
           </section>
 

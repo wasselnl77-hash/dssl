@@ -553,6 +553,19 @@ html:not([data-theme-mode="dark"]):not([data-theme-mode="light"]) .theme-btn {
   background: transparent
 }
 
+// ------------------------------------------------------- range sliders
+// No slider on this site is the browser's own. This is the default for every
+// input[type=range], written with the language's own slider: property. Later
+// rules (the home, docs and playground demos) replace it. It is wrapped in :where()
+// because the slider parts are real CSS pseudo-elements, which obey specificity,
+// and a default has to lose to anything more specific.
+
+:where(input[type=range]) {
+  width: 100%
+  slider: track 6 color.ink/18 radius full, fill color.accent, thumb 20 color.accent, ring 3 color.card
+  focus-visible { outline: 2 solid color.accent; outline-offset: 6 }
+}
+
 // -------------------------------------------------------------- utilities
 
 @layer utilities {
