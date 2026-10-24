@@ -771,7 +771,10 @@ behavior old-leather {
             </div>
             <p className="doc-lead fine-print">
               Every swatch above is a plain box with one rule, like <code>.tx-marble {"{"} texture: marble {"}"}</code>,
-              over the same tan colour. Hover a swatch for what it is meant to look like.
+              over the same tan colour. Hover a swatch for what it is meant to look like. The last ten are wood: drawn as
+              growth rings, not stretched noise, so they take <code>figure</code>, <code>warp</code>, <code>pores</code>,{" "}
+              <code>knots</code> and <code>planks</code>. <a href="/showcase/wood/">See a whole page built from them</a>, with
+              the textures baked into real CSS by <code>dssl build</code>.
             </p>
             <h3 className="doc-h3">Settings</h3>
             <p className="doc-lead">Settings go after the name, in any order. Only write the ones you want to change.</p>

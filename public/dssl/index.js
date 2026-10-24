@@ -19,7 +19,7 @@ import { resolve, DEFAULT_TOKENS } from './resolver.js';
 import { toCSS as docToCSS } from './static.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.10.0';
+export const VERSION = '0.11.0';
 
 let counter = 0;
 const engines = new Map();
@@ -240,6 +240,8 @@ if (typeof window !== 'undefined') {
     } finally {
       // always announce readiness - even when there was nothing to auto-load
       window.dispatchEvent(new CustomEvent('dssl-ready', { detail: { version: VERSION } }));
+      // 0.10.0: a page that hides itself until styled (see the guide, "No flash") shows itself here
+      try { document.documentElement.classList.add('dssl-ready'); } catch { /* no document element yet */ }
     }
   };
 

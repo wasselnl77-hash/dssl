@@ -1,0 +1,25 @@
+// =========================================================================
+// tokens.dssl: the vocabulary of the wood page
+// Walnut for the dark, oak for the warm, cream for the page, one ember.
+// =========================================================================
+
+tokens {
+  font {
+    display: "Fraunces", "Iowan Old Style", Georgia, serif
+    body: "Hanken Grotesk", "Helvetica Neue", Arial, system-ui, sans-serif
+    mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace
+  }
+  color {
+    char: #140d08
+    walnut: #2a1a10
+    oak: #c9a574
+    paper: #f4ebdc
+    cream: #fbf6ec
+    ink: #24160d
+    muted: #66543f
+    line: #d9cbb2
+    ember: #b9380f
+    flame: #ff7a1a
+    gold: #e8b04a
+  }
+}

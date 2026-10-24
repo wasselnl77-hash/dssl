@@ -281,7 +281,7 @@ replaced, and taking the texture away puts it back exactly as it was.
 .poster { background: #e9e2d0; texture: paper, scanlines intensity 0.1 }   // a comma stacks layers
 ```
 
-There are 30 presets. They are not magic: each one is a stored combination of a few
+There are 40 presets: 30 general ones and ten wood species (see "Wood" below). They are not magic: each one is a stored combination of a few
 generators (`noise`, `bump`, `lines`, `dots`, `grid`, `checker`, `weave`, `carbon`, `waves`, `hex`) and the settings below, so anything a preset does you
 can write yourself.
 
@@ -362,8 +362,63 @@ A few things worth knowing:
 - `animate 90` makes film-grain shimmer by stepping the texture every 90 ms. It stands still
   for visitors who ask for reduced motion, and `DSSL.freeze()` stops it.
 - Textures are SVG filters and gradients, drawn once and cached. A page full of them is cheap.
-- `texture` is an engine feature, so `dssl build` leaves it in the runtime and says so in its report.
+- `texture` is built by the engine at run time. `dssl build` bakes it into the CSS when it can, and says what it could not.
 - Inside an aura, `texture(grain)` makes the light and the particles grainy. See below.
+
+### Wood
+
+`wood` was one generic grain. The `rings` generator draws real structure: each growth ring is a curve,
+the spacing wobbles, the rings arch into cathedral figure, pores run between them, and planks and
+knots are drawn on top. There are ten presets: `oak`, `walnut`, `cherry`, `maple`, `pine`, `mahogany`,
+`ebony`, `birch`, and two laid as boards, `oak-planks` and `walnut-planks`.
+
+```dssl
+.table  { background-color: #c9a574; texture: oak planks 120 }           // laid as boards 120px tall
+.panel  { texture: walnut figure 0.9 warp 0.7 }                          // more arching, more wobble
+.shelf  { texture: pine knots 3 scale 18 }                               // three knots per tile
+.post   { texture: oak angle 90 }                                        // grain running up and down
+.custom { texture: rings scale 8 color #3a2410 color2 #b98a52 seed 21 }  // your own species
+```
+
+| setting | meaning |
+|---|---|
+| `scale` | ring spacing in px |
+| `color`, `color2` | latewood (the dark ring) and earlywood (the pale body) |
+| `contrast` | how dark the rings are, 1.2 is the default |
+| `figure` | 0 to 1: how strongly the rings arch |
+| `warp` | 0 to 1: how much each ring wobbles |
+| `pores` | 0 to 1: fine fibre streaks between rings |
+| `knots` | 0 to 8 knots in one tile |
+| `planks` | board height in px, with a seam and a different board each |
+| `seed`, `angle` | another board; 0 or 90 degrees |
+
+The drawing uses only your seed and plain arithmetic, so the same seed gives the same board on every
+machine, and the tile repeats without a seam. It does repeat: one tile is 576px along the grain, and
+three boards tall with `planks`, so a very large surface shows the pattern twice. Use two textures with
+different seeds on different elements when that matters.
+
+`dssl build` now **bakes textures into the CSS** as background images when every colour is known at
+build time, which is almost always (tokens count). A rule with `background-color: color.walnut;
+texture: oak` comes out as a real `background` with the image on top. Textures that animate, or use a
+colour that is not known at build time, stay in the runtime, and the build report says which and why.
+The wood showcase (`public/showcase/wood/`) does exactly this: `static.dssl` is built to `wood.css`
+with `node scripts/build-wood.mjs`, and only the tilt, the fire and the slider fills are left for the engine.
+
+### No flash before the engine boots
+
+A page that loads its look through the engine can show unstyled for a moment. Two fixes. Build the
+static part with `dssl build` and link the real CSS, as the wood page does. Or hide the page until the
+engine is ready: the engine adds the class `dssl-ready` to `<html>` when it has applied your sheets.
+
+```html
+<style>html:not(.dssl-ready) body { visibility: hidden }</style>
+<script>setTimeout(() => document.documentElement.classList.add('dssl-ready'), 2500)</script> <!-- failsafe -->
+```
+
+### Counters
+
+`counter-reset`, `counter-increment`, `counter-set`, and `content: counter(step)` or
+`counters(item, ".")` work. The names inside `counter()` are yours, not tokens.
 
 ### Aura
 
@@ -627,14 +682,14 @@ Three ways to get it:
 
 1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
    https://open-vsx.org/extension/ehs-studio/dssl-vscode
-2. VS Code: download `dssl-vscode/dssl-vscode-0.10.0.vsix` from the repo files, then
+2. VS Code: download `dssl-vscode/dssl-vscode-0.11.0.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
 3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 
 What it does: real-compiler diagnostics (same errors the browser prints,
 did-you-mean included), completions folded from your workspace token registry,
 hover docs, and a TextMate grammar for `.dssl`. Since 0.9.0 it also completes and
-explains the new vocabulary: after `texture:` it offers the 30 presets and every
+explains the new vocabulary: after `texture:` it offers the presets and every
 setting, after `aura-glow:` only glow settings, after `aura-particle:` only particle
 ones, after `slider:` the clauses.
 
@@ -647,7 +702,7 @@ from the command palette (or the paint-can button on a `.dssl` tab):
   and remove, a live preview drawn by the same renderer the engine uses (on dark, light or slate),
   a graph of one particle's opacity and size over its life, and a live graph of particles alive and
   frame time.
-- **Texture tab.** All 30 presets and 10 generators as thumbnails, up to four stacked layers, every
+- **Texture tab.** All the presets and 11 generators as thumbnails, up to four stacked layers, every
   setting as a slider, colour pickers, a preview over the colour you choose.
 - **Slider tab.** A live range input styled with the generated rules, with a bar editor for histogram sliders.
 

@@ -18,7 +18,7 @@
 import { parseColor, evalColorExpr, over, contrast, toRgba, toHex } from './color.js';
 
 /** one design-token lookup closed over the sheet's token map */
-function makeResolver(tokenMap) {
+export function makeColorResolver(tokenMap) {
   const lookup = (name) => tokenMap.get(name);
   /** CSS value as the resolver emits it ("var(--dssl-color-ink)", "color-mix(...)", "#fff") to a colour */
   return function cssToColor(css, depth = 0) {
@@ -52,7 +52,7 @@ const INTERACTIVE = /^(a|button|input|select|textarea|summary)\b|\[tabindex|\[ro
  */
 export function lintRules({ rules, tokenMap, file }) {
   const warnings = [];
-  const cssToColor = makeResolver(tokenMap);
+  const cssToColor = makeColorResolver(tokenMap);
   const pageBg = (() => { const raw = tokenMap.get('color.paper'); return raw ? evalColorExpr(raw, (n) => tokenMap.get(n)) : null; })();
 
   const killedFocus = [];
@@ -72,10 +72,21 @@ export function lintRules({ rules, tokenMap, file }) {
         let bg = cssToColor(bgD.value);
         let fg = cssToColor(fgD.value);
         if (bg && fg) {
-          if (bg.a < 0.999) bg = pageBg ? over(bg, { ...pageBg, a: 1 }) : null;
-          if (bg) {
-            const fgSolid = fg.a < 0.999 ? over(fg, bg) : fg;
-            const ratio = contrast(fgSolid, bg);
+          // a translucent background takes its look from whatever is behind it, which a single rule cannot know
+          // (a dark theme is usually in a media block, and this check only reads the unconditional rules). So judge
+          // it against the light page colour, white and black, and warn only when it fails on every one of them.
+          const backdrops = bg.a < 0.999 ? [pageBg ? { ...pageBg, a: 1 } : null, { r: 255, g: 255, b: 255, a: 1 }, { r: 0, g: 0, b: 0, a: 1 }].filter(Boolean) : [null];
+          let bestRatio = -1, bestFg = null, bestBg = null;
+          for (const back of backdrops) {
+            const solidBg = back ? over(bg, back) : bg;
+            const solidFg = fg.a < 0.999 ? over(fg, solidBg) : fg;
+            const rr = contrast(solidFg, solidBg);
+            if (rr > bestRatio) { bestRatio = rr; bestFg = solidFg; bestBg = solidBg; }
+          }
+          if (bestBg) {
+            const fgSolid = bestFg;
+            bg = bestBg;
+            const ratio = bestRatio;
             const size = pxOf((lastDecl(r.decls, 'font-size') || {}).value);
             const weightRaw = (lastDecl(r.decls, 'font-weight') || {}).value;
             const weight = weightRaw === 'bold' ? 700 : Number(weightRaw) || 400;

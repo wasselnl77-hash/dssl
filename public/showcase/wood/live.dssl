@@ -1,0 +1,34 @@
+// =========================================================================
+// live.dssl: what needs the engine. Pointer tilt, the fire, and the slider fills.
+// Everything else is already in wood.css, so the page is styled before this loads.
+// =========================================================================
+
+.slab { tilt: 3 perspective 1400 speed 0.1 }
+
+.specimen { tilt: 7 lift 1.02 glare }
+.board { tilt: 9 lift 1.04 perspective 700 glare }
+
+// the fire is a recipe written out in full; nothing about it is a preset
+behavior hearth-fire {
+  aura-glow: #ff7a1a 44 pulse 1100 flicker 0.4
+  aura-particle: #ffe9a0 -> #ff8a1f -> rgba(190,40,0,0) count 90 size 8 20 life 700 1300 speed 40 130 dir up spread 38 from top gravity -45 turbulence 80 shape flame glowing behind
+}
+
+behavior sawdust {
+  aura-particle: #fff1c4 -> rgba(232,176,74,0) count 16 size 2 4 life 700 speed 18 46 dir up spread 70 from thumb glowing
+}
+
+.log { use hearth-fire }
+
+// hardness: a read-only slider, so the "bar" is the real control drawn at a value
+.hard input {
+  width: 100%
+  max-width: 120
+  slider: track 6 color.cream/22 radius full, fill color.flame, thumb 14 color.cream, shape bar
+}
+
+.tool input[type=range] {
+  width: 100%
+  slider: track 8 color.cream/25 radius full, fill color.gold, thumb 24 color.gold, ring 3 color.char, glow color.gold 10
+  use sawdust
+}

@@ -1,0 +1,458 @@
+// =========================================================================
+// static.dssl: everything on the wood page that is plain CSS.
+// `dssl build` turns this into wood.css, textures included: every board you
+// see is a generated vector image baked into the stylesheet, no photographs.
+// The tilt, aura and slider fills live in live.dssl, because they need the engine.
+// =========================================================================
+
+* { box-sizing: border-box }
+*::before { box-sizing: border-box }
+*::after { box-sizing: border-box }
+
+body {
+  margin: 0
+  background: color.cream
+  color: color.ink
+  font-family: font.body
+  font-size: 17
+  line-height: 1.65
+  -webkit-font-smoothing: antialiased
+}
+
+a { color: inherit }
+img, svg { max-width: 100% }
+
+.wrap {
+  width: min(1120px, 100% - 40px)
+  margin: 0 auto
+}
+
+.skip {
+  position: absolute
+  left: 12
+  top: -60
+  background: color.ink
+  color: color.cream
+  padding: 8 14
+  radius: sm
+  z: 50
+  focus { top: 12 }
+}
+
+// ------------------------------------------------------------------ header
+.top {
+  position: absolute
+  inset: 0 0 auto 0
+  z: 10
+  padding: 22 0
+  color: color.cream
+}
+
+.top .wrap { row: gap 24 between; align: center }
+
+.brand {
+  font-family: font.display
+  font-size: 24
+  font-weight: 700
+  letter-spacing: -0.01em
+  text-decoration: none
+}
+
+.nav { row: gap 22; flex-wrap: wrap }
+.nav a {
+  font-size: 15
+  text-decoration: none
+  padding: 6 2
+  border-bottom: 2 solid transparent
+  hover { border-bottom-color: color.gold }
+  focus-visible { outline: 2 solid color.gold; outline-offset: 4 }
+}
+
+// -------------------------------------------------------------------- hero
+.hero {
+  position: relative
+  min-height: 92vh
+  display: grid
+  align-items: center
+  padding: 120 0 80
+  background-color: color.walnut
+  texture: oak-planks scale 14 planks 150
+  color: color.cream
+  overflow: hidden
+}
+
+.hero::after {
+  content: ""
+  position: absolute
+  inset: 0
+  background: radial-gradient(ellipse at 30% 40%, transparent 30%, color.char/55 100%)
+  pointer-events: none
+}
+
+.hero .wrap { position: relative; z: 1 }
+
+.slab {
+  max-width: 640
+  padding: fluid 28 52
+  glass: 22 saturate 1.3 tint color.char/48
+  border: 1 solid color.cream/22
+  radius: lg
+  shadow: xl
+}
+
+.slab h1 {
+  font-family: font.display
+  font-size: fluid 44 86
+  line-height: 1.02
+  letter-spacing: -0.02em
+  font-weight: 800
+  margin: 0 0 20
+}
+
+.slab p {
+  font-size: 19
+  max-width: 52ch
+  margin: 0 0 28
+  color: color.cream/90
+}
+
+.cta {
+  display: inline-block
+  background: color.gold
+  color: color.char
+  font-weight: 700
+  padding: 13 24
+  radius: full
+  text-decoration: none
+  transition: 160 snap
+  hover { translate: 0 -2; shadow: md }
+  focus-visible { outline: 3 solid color.cream; outline-offset: 3 }
+}
+
+// ----------------------------------------------------------------- sections
+.block {
+  padding-top: fluid 64 120
+  padding-bottom: fluid 64 120
+}
+
+.block-dark {
+  background-color: color.char
+  texture: walnut scale 12 intensity 0.22 blend soft-light
+  color: color.cream
+}
+
+.kicker {
+  font-family: font.mono
+  font-size: 13
+  letter-spacing: 0.08em
+  text-transform: uppercase
+  color: color.ember
+  margin: 0 0 10
+}
+
+.block-dark .kicker { color: color.gold }
+
+.title {
+  font-family: font.display
+  font-size: fluid 32 54
+  line-height: 1.08
+  letter-spacing: -0.015em
+  margin: 0 0 18
+  max-width: 18ch
+}
+
+.lede {
+  max-width: 60ch
+  font-size: 19
+  color: color.muted
+  margin: 0 0 48
+}
+
+.block-dark .lede { color: color.cream/78 }
+
+// ---------------------------------------------------------------- anatomy
+.trio {
+  display: grid
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr))
+  gap: 24
+}
+
+.specimen {
+  position: relative
+  min-height: 330
+  radius: lg
+  overflow: hidden
+  display: grid
+  align-content: end
+  padding: 18
+  color: color.cream
+  shadow: lg
+}
+
+.specimen::after {
+  content: ""
+  position: absolute
+  inset: 0
+  radius: lg
+  pointer-events: none
+  background: radial-gradient(circle at var(--dssl-gx, 50%) var(--dssl-gy, 50%), color.cream/20, transparent 55%)
+}
+
+.note { position: relative; z: 1 }
+
+.sp-rings { background-color: color.oak; texture: maple scale 9 figure 0.2 }
+.sp-figure { background-color: color.oak; texture: oak figure 1 warp 0.6 }
+.sp-knot { background-color: color.oak; texture: pine knots 3 scale 18 }
+
+.note {
+  glass: 16 saturate 1.4 tint color.char/55
+  border: 1 solid color.cream/25
+  radius: md
+  padding: 14 16
+  font-size: 15
+  line-height: 1.55
+}
+
+.note b {
+  display: block
+  font-family: font.display
+  font-size: 20
+  margin-bottom: 2
+}
+
+.facts {
+  margin: 56 0 0
+  display: grid
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))
+  gap: 28
+}
+
+.facts dt {
+  font-family: font.display
+  font-size: 22
+  font-weight: 700
+  margin: 0 0 4
+}
+
+.facts dd { margin: 0; color: color.muted }
+
+// ------------------------------------------------------------------ species
+.rack {
+  display: grid
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr))
+  gap: 28 24
+}
+
+.sample {
+  column: gap 10
+  margin: 0
+}
+
+.board {
+  height: 190
+  radius: md
+  background-color: color.oak
+  shadow: lg
+  border: 1 solid color.char/40
+  transition: 200 snap
+}
+
+.b-oak { texture: oak }
+.b-walnut { texture: walnut-planks }
+.b-cherry { texture: cherry }
+.b-maple { texture: maple }
+.b-pine { texture: pine }
+.b-mahogany { texture: mahogany }
+.b-ebony { texture: ebony }
+.b-birch { texture: birch }
+
+.sample h3 {
+  font-family: font.display
+  font-size: 24
+  margin: 6 0 0
+  line-height: 1.1
+}
+
+.latin {
+  font-style: italic
+  color: color.cream/70
+  font-size: 14.5
+  margin: -6 0 0
+}
+
+.hard {
+  row: gap 12 between
+  align: center
+  font-family: font.mono
+  font-size: 12.5
+  color: color.cream/80
+}
+
+// ------------------------------------------------------------------ process
+.steps {
+  list-style: none
+  margin: 0
+  padding: 0
+  counter-reset: step
+  display: grid
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))
+  gap: 26 30
+}
+
+.steps li {
+  counter-increment: step
+  border-top: 2 solid color.ink
+  padding-top: 14
+}
+
+.steps li::before {
+  content: counter(step, decimal-leading-zero)
+  display: block
+  font-family: font.display
+  font-size: 54
+  line-height: 1
+  font-weight: 800
+  color: color.ember
+  margin-bottom: 8
+}
+
+.steps h3 {
+  font-family: font.display
+  font-size: 23
+  margin: 0 0 6
+}
+
+.steps p { margin: 0; color: color.muted; font-size: 16 }
+
+// ----------------------------------------------------------------- movement
+.calc {
+  display: grid
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr)
+  gap: 32
+  align-items: stretch
+}
+
+@media (width <= 820) {
+  .calc { grid-template-columns: 1fr }
+}
+
+.tool {
+  background-color: color.walnut
+  texture: walnut scale 11 intensity 0.35
+  color: color.cream
+  radius: lg
+  padding: 28
+  column: gap 22
+  shadow: lg
+}
+
+.tool label {
+  display: block
+  font-family: font.mono
+  font-size: 13
+  margin-bottom: 8
+  color: color.cream/85
+}
+
+.tool select {
+  width: 100%
+  font: inherit
+  padding: 11 12
+  radius: sm
+  background: color.char
+  color: color.cream
+  border: 1 solid color.cream/30
+  focus-visible { outline: 2 solid color.gold; outline-offset: 2 }
+}
+
+.readout {
+  font-family: font.mono
+  font-size: 13
+  color: color.gold
+  float: right
+}
+
+.result {
+  display: grid
+  align-content: center
+  gap: 8
+  padding: 28
+  radius: lg
+  background-color: color.oak
+  texture: oak-planks scale 12 planks 60 intensity 1
+  color: color.char
+  position: relative
+  overflow: hidden
+}
+
+.result .mm {
+  font-family: font.display
+  font-size: fluid 56 96
+  font-weight: 800
+  line-height: 1
+  letter-spacing: -0.02em
+}
+
+.result .mm-note {
+  max-width: 34ch
+  margin: 0
+}
+
+.result-card {
+  position: relative
+  padding: 24
+  radius: md
+  glass: 18 saturate 1.2 tint color.cream/55
+  border: 1 solid color.cream/60
+}
+
+.small { font-size: 14; color: color.muted; margin: 18 0 0; max-width: 70ch }
+
+// --------------------------------------------------------------------- fire
+.hearth {
+  display: grid
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)
+  gap: 40
+  align-items: center
+}
+
+@media (width <= 820) {
+  .hearth { grid-template-columns: 1fr }
+}
+
+.grate {
+  min-height: 250
+  radius: lg
+  background-color: #2b2723
+  texture: stone scale 26 intensity 0.55
+  display: grid
+  place-items: center
+}
+
+.log {
+  width: 62%
+  height: 74
+  radius: 36
+  background-color: color.walnut
+  texture: bark
+  border: 1 solid color.char
+  shadow: lg
+}
+
+// ------------------------------------------------------------------- footer
+.foot {
+  padding: 40 0 56
+  background-color: color.char
+  color: color.cream/72
+  font-size: 15
+}
+
+.foot a { color: color.gold }
+.foot p { margin: 0 0 8; max-width: 80ch }
+
+// ------------------------------------------------------------- small screens
+@media (width <= 640) {
+  .top .wrap { column: gap 6 }
+  .nav { gap: 6 16 }
+  .hero { padding-top: 150 }
+}

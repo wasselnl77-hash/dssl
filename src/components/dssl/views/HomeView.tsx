@@ -54,7 +54,7 @@ const PARTS = [
   ["Motion in four words", "animate: rise-in 400 snap both. Add seen and stagger to reveal a grid on scroll. Reduced motion is respected by default."],
   ["Behaviors", "Name a pattern once, like a focus ring or a chip, and use it anywhere with one line."],
   ["Loud errors", "Unknown property, unknown token, bad value. Each one names the file and line and suggests a fix."],
-  ["Texture, aura and sliders", "Thirty textures, light and particles with no presets (you build the fire), and one-line range sliders. The VS Code extension has a designer with sliders and live previews."],
+  ["Texture, aura and sliders", "Forty textures, ten of them real wood species, light and particles with no presets (you build the fire), and one-line range sliders. The VS Code extension has a designer with sliders and live previews."],
   ["A JavaScript bridge", "DSSL.signal restyles live, DSSL.replay reruns motion, DSSL.compile powers tools like the VS Code extension."],
 ];
 
@@ -225,7 +225,7 @@ export default function HomeView() {
                 <span className="show-tex show-tex-hex">hex</span>
               </div>
               <code className="show-code">.sofa {"{"} texture: wood scale 6 {"}"}</code>
-              <p className="show-text">Thirty textures, or build your own from a generator and a few settings. They lay on top of whatever background the element already has.</p>
+              <p className="show-text">Forty textures, ten of them wood species, or build your own from a generator and a few settings. They lay on top of whatever background the element already has.</p>
               <Link className="show-link" href="/playground?example=textures">Edit these textures</Link>
             </div>
             <div className="show-card">
@@ -237,6 +237,11 @@ export default function HomeView() {
               <Link className="show-link" href="/playground?example=sliders">Edit this slider</Link>
             </div>
           </div>
+          <p className="show-more">
+            Want to see a whole page? <a href="/showcase/wood/">Heartwood is a field guide to wood</a>, built with these:
+            generated growth rings, glass, tilt, CSS counters, a fire, and styles compiled to real CSS with{" "}
+            <code>dssl build</code>.
+          </p>
         </div>
       </section>
 

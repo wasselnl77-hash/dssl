@@ -182,6 +182,8 @@ if (cmd === 'build') {
     console.log(`  ${rep.rules} rule(s), ${rep.shadowRules} pseudo-element rule(s), ${rep.keyframes} @keyframes, ${rep.raws} raw block(s)`);
     if (rep.layers.length) console.log(`  layers: ${rep.layers.join(' < ')}`);
     if (rep.seenStripped) console.log(`  ${rep.seenStripped} seen rule(s) applied unconditionally (the no-JS state)`);
+    if (rep.bakedTextures) console.log(`  ${rep.bakedTextures} texture(s) baked into the CSS as background images`);
+    for (const n of rep.notBaked || []) console.log(`  texture on "${n.sel}" stays in the runtime: ${n.why}`);
     if (rep.skippedSignals || rep.engineDecls) {
       const kinds = rep.engineKinds.length ? ` (${rep.engineKinds.join(', ')})` : '';
       console.log(`  stays in the runtime: ${rep.skippedSignals} @signal rule(s), ${rep.engineDecls} engine-native declaration(s)${kinds}`);

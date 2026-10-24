@@ -107,7 +107,7 @@ animate: pop 400 snap both`} />
         {/* ---------------------------------------------- texture, aura, slider */}
         <div className="cheat-card">
           <span className="cheat-k">texture, aura, slider, glass, tilt</span>
-          <CodeBlock plain code={`texture: wood                      // 30 presets; stacks with commas
+          <CodeBlock plain code={`texture: wood                      // 40 presets; stacks with commas
 texture: noise scale 3 color #123 blend multiply   // or your own
 
 aura-glow: #ff7a00 30 pulse 900 flicker 0.3

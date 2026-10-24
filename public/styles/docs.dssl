@@ -755,6 +755,16 @@ motion pe-pulse {
 .tx-frost { texture: frost }
 .tx-marble { texture: marble }
 .tx-wood { texture: wood }
+.tx-oak { texture: oak }
+.tx-walnut { texture: walnut }
+.tx-cherry { texture: cherry }
+.tx-maple { texture: maple }
+.tx-pine { texture: pine }
+.tx-mahogany { texture: mahogany }
+.tx-ebony { texture: ebony }
+.tx-birch { texture: birch }
+.tx-oak-planks { texture: oak-planks }
+.tx-walnut-planks { texture: walnut-planks }
 .tx-bark { texture: bark }
 .tx-leather { texture: leather }
 .tx-brushed { texture: brushed }

@@ -21,7 +21,7 @@
 
 import { composeDeform, arcLayout } from './utils.js';
 // 0.9.0: texture layers, aura (light and particles) and the range-slider helper
-import { buildTexture } from './texture.js';
+import { buildTexture, composeTextureInto, splitBgList as splitList } from './texture.js';
 import { AuraManager, resolveLayer } from './aura.js';
 import { parseColor } from './color.js';
 import { tiltTransform } from './effects.js';
@@ -142,24 +142,6 @@ function parseSizeQuery(q) {
 }
 
 /** split a CSS list at top-level commas, so rgba(1,2,3) and var(--x, 4) stay whole */
-function splitList(value) {
-  const out = []; let depth = 0, cur = '';
-  for (const ch of String(value)) {
-    if (ch === '(') depth++;
-    if (ch === ')') depth--;
-    if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = ''; continue; }
-    cur += ch;
-  }
-  if (cur.trim()) out.push(cur.trim());
-  return out;
-}
-/** a list of exactly n entries: the author's, cycled the way CSS cycles them, or the default */
-function expandList(value, n, dflt) {
-  const items = value ? splitList(value) : [];
-  if (!items.length) return Array.from({ length: n }, () => dflt);
-  return Array.from({ length: n }, (_, i) => items[i % items.length]);
-}
-
 export class DsslEngine {
   constructor({ scope = null, name = 'global', reset = false } = {}) {
     this.name = name;
@@ -258,28 +240,7 @@ export class DsslEngine {
       this._texCache.set(key, tex);
     }
     if (!tex.count) return null;
-    const sh = owned.get('background');
-    const img = owned.get('background-image');
-    const blendUser = owned.get('background-blend-mode');
-    const texBlends = tex.blend.split(', ');
-    if (sh) {
-      // the author wrote the shorthand: texture layers go first, their value stays the last layer(s)
-      const userLayers = splitList(sh.value).length;
-      const texShort = tex.parts.map((p) => `${p.image} ${p.position} / ${p.size} ${p.repeat}`).join(', ');
-      owned.set('background', { value: `${texShort}, ${sh.value}`, imp: sh.imp });
-      owned.delete('background-image');
-      owned.set('background-blend-mode', { value: [...texBlends, ...expandList(blendUser && blendUser.value, userLayers, 'normal')].join(', '), imp: sh.imp });
-      return tex;
-    }
-    const userLayers = img ? splitList(img.value).length : 0;
-    const imp = img ? img.imp : '';
-    const get = (name) => (owned.get(name) || {}).value;
-    const join = (texList, name, dflt) => [...texList.split(/,(?![^(]*\))/).map((x) => x.trim()), ...(userLayers ? expandList(get(name), userLayers, dflt) : [])].join(', ');
-    owned.set('background-image', { value: tex.image + (img ? ', ' + img.value : ''), imp });
-    owned.set('background-size', { value: join(tex.size, 'background-size', 'auto'), imp });
-    owned.set('background-position', { value: join(tex.position, 'background-position', '0% 0%'), imp });
-    owned.set('background-repeat', { value: join(tex.repeat, 'background-repeat', 'repeat'), imp });
-    owned.set('background-blend-mode', { value: [...texBlends, ...(userLayers ? expandList(get('background-blend-mode'), userLayers, 'normal') : [])].join(', '), imp });
+    composeTextureInto(owned, tex);
     return tex;
   }
 

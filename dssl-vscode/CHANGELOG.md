@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0
+
+- Bundled engine updated to 0.11.0: ten wood species and the `rings` texture generator (figure, warp,
+  pores, knots, planks), textures baked into the CSS by `dssl build`, CSS counters, and a contrast lint
+  that no longer warns about translucent backgrounds it cannot judge. Completions and hover docs know the
+  new settings.
+
 ## 0.10.0
 
 - Bundled engine updated to 0.10.0: new `glass` and `tilt` properties, with completions and hover

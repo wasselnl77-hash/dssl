@@ -41,7 +41,7 @@ ok('evalColorExpr reads tokens, token/alpha and literals', (() => { const lk = (
 
 /* ------------------------------------------------------------------ */
 section('texture: vocabulary');
-ok(`there are 28 to 32 presets (${PRESET_NAMES.length})`, PRESET_NAMES.length >= 28 && PRESET_NAMES.length <= 32);
+ok(`there are 38 to 44 presets: 30 general ones and the wood species (${PRESET_NAMES.length})`, PRESET_NAMES.length >= 38 && PRESET_NAMES.length <= 44);
 ok('every preset has a one-line description', PRESET_NAMES.every((n) => PRESETS[n].doc && PRESETS[n].doc.length > 8));
 ok('every preset is built only from known generators and settings', PRESET_NAMES.every((n) => PRESETS[n].layers.every((l) => GENERATORS.includes(l.gen) && Object.keys(l).every((k) => ['gen', 'stagger', 'preset'].includes(k) || k in TEXTURE_KEYS))));
 ok('every setting documents itself', Object.values(TEXTURE_KEYS).every((k) => k.doc));
@@ -292,16 +292,16 @@ section('dssl build: what stays in the runtime');
 {
   const { toCSS } = await import('../public/dssl/index.js');
   const r = toCSS('behavior fire { aura-glow: #f80 20\n aura-particle: #fd0 5 up }\n.torch { use fire\n background: #222\n texture: grain }\ninput[type=range] { slider: fill #f80 }');
-  ok('aura, texture and slider are counted as engine-native even in a rule that keeps other declarations', r.report.engineDecls === 4, JSON.stringify(r.report.engineKinds));
-  ok('the report names them', r.report.engineKinds.join() === 'aura-glow,aura-particles,slider,texture');
-  ok('the plain declaration of that rule still reaches the CSS', /\.torch \{\s+background: #222;/.test(r.css));
+  ok('aura, texture and slider are counted as engine-native even in a rule that keeps other declarations', r.report.engineDecls === 3, JSON.stringify(r.report.engineKinds));
+  ok('the report names them (the texture was baked into the CSS, so it is not among them)', r.report.engineKinds.join() === 'aura-glow,aura-particles,slider' && r.report.bakedTextures === 1);
+  { const rule = r.css.slice(r.css.indexOf('.torch {'), r.css.indexOf('}', r.css.indexOf('.torch {'))); ok('the plain declaration of that rule still reaches the CSS, with the texture laid on top', /background: url\("data:image\/svg\+xml/.test(rule) && /, #222;/.test(rule), rule.slice(0, 160)); }
   ok('the slider\'s vendor pseudo-element rules ARE emitted as real CSS (only the fill follower needs the engine)', /::-webkit-slider-thumb/.test(r.css) && /::-moz-range-thumb/.test(r.css));
   ok('the banner states the real version', r.css.includes(`DSSL v${VERSION}`));
 }
 
 /* ------------------------------------------------------------------ */
 section('release');
-ok('the engine version is 0.9 or later', /^0\.(9|10)\./.test(VERSION), VERSION);
+ok('the engine version is 0.9 or later', /^0\.(9|1[01])\./.test(VERSION), VERSION);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

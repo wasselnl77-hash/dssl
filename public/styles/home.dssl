@@ -539,3 +539,12 @@ behavior show-flame {
   width: 100%
   slider: graph 20 45 70 90 60 35 50 80 95 40 60 75, graph-height 56, graph-gap 3, fill #77ccff, track 3 #34445a, thumb 14 #ffffff, shape bar
 }
+
+.show-more {
+  margin: 28 0 0
+  font-size: 16
+  color: color.muted
+  max-width: 70ch
+  a { color: color.accent; font-weight: 700 }
+}
+.show-more code { font-family: font.mono; font-size: 14; color: color.ink }

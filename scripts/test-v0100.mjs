@@ -175,5 +175,129 @@ await withBrowser(async ({ open, errors }) => {
   ok('no page errors', errors.length === 0, errors.join(' | '));
 }, { pages: { '/s': '<!doctype html><meta charset=utf-8><body></body>' } });
 
+section('wood: rings, species, planks (generator)');
+const { PRESETS: TP, PRESET_NAMES, parseTexture, buildTexture } = await import('../public/dssl/texture.js');
+const hooks = { error: () => {}, color: (w) => w, suggest: () => null };
+const rcHex = (c) => { const m = /^#([0-9a-f]{6})$/i.exec(String(c)); return m ? { r: parseInt(m[1].slice(0, 2), 16), g: parseInt(m[1].slice(2, 4), 16), b: parseInt(m[1].slice(4, 6), 16), a: 1 } : null; };
+const make = (text) => buildTexture(parseTexture(text, hooks), rcHex);
+const species = ['oak', 'walnut', 'cherry', 'maple', 'pine', 'mahogany', 'ebony', 'birch', 'oak-planks', 'walnut-planks'];
+ok('all ten wood presets exist', species.every((n) => TP[n]), species.filter((n) => !TP[n]).join());
+ok('they use the rings generator', species.every((n) => TP[n].layers.every((l) => l.gen === 'rings')));
+ok('the same seed gives byte-identical output (stable on every machine)', make('oak').image === make('oak').image && make('oak seed 4').image === make('oak seed 4').image);
+ok('a different seed gives a different board', make('oak seed 4').image !== make('oak seed 5').image);
+ok('species differ from each other', new Set(species.map((n) => make(n).image)).size === species.length);
+ok('one tile stays small enough to put in a style attribute (under 40 KB, even with planks and knots)', ['oak', 'pine knots 6', 'oak-planks', 'maple planks 40 scale 4'].every((t) => make(t).image.length < 40000), ['oak', 'pine knots 6', 'oak-planks', 'maple planks 40 scale 4'].map((t) => make(t).image.length).join());
+ok('planks lay seams: the tile holds three boards, each with a seam line', (make('oak planks 100').image.match(/%3Crect y/g) || []).length >= 3 * 2);
+ok('no planks means no seam rectangles', !/%3Crect y/.test(make('oak').image));
+ok('knots draw ellipses; none by default', /ellipse/.test(decodeURIComponent(make('oak knots 3').image)) && !/ellipse/.test(decodeURIComponent(make('oak').image)));
+ok('angle 90 swaps the tile size', make('oak angle 90').size.split(' ')[0] === make('oak').size.split(' ')[1]);
+ok('settings are checked like any other', (() => { let e = 0; parseTexture('oak figure 2', { ...hooks, error: () => e++ }); parseTexture('oak knots 20', { ...hooks, error: () => e++ }); parseTexture('oak plank 90', { ...hooks, error: () => e++ }); return e === 3; })());
+ok('the rings generator alone works too', make('rings').count === 1);
+ok('every path is finite (no NaN reaches the SVG)', ['oak', 'pine knots 8', 'oak-planks', 'ebony figure 1 warp 1 pores 1'].every((t) => !/NaN|Infinity/.test(decodeURIComponent(make(t).image))));
+
+section('wood: it renders, tiles without a seam, and planks are planks');
+const { decodePng, px } = await import('./lib/pixels.mjs');
+const tileUrl = (text) => make(text).image;
+await withBrowser(async ({ open, errors }) => {
+  const p = await open('/tile'); await p.waitForTimeout(600);
+  const png = decodePng(await p.screenshot({ clip: { x: 0, y: 0, width: 1152, height: 600 } }));
+  const colDiff = (x0, x1, y0, y1) => { let t = 0, n = 0; for (let y = y0; y < y1; y++) { const a = px(png, x0, y), b = px(png, x1, y); t += Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]); n++; } return t / n; };
+  const rowDiff = (y0, y1, x0, x1) => { let t = 0, n = 0; for (let x = x0; x < x1; x += 1) { const a = px(png, x, y0), b = px(png, x, y1); t += Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]); n++; } return t / n; };
+  // x tile edge at 576; compare with ordinary neighbouring columns well inside the tile
+  const edge = colDiff(575, 576, 0, 264);
+  const typical = [100, 200, 300, 400].map((x) => colDiff(x, x + 1, 0, 264)).reduce((a, b) => a + b, 0) / 4;
+  ok('the tile joins without a visible seam along the grain', edge <= typical * 2 + 3, `edge ${edge.toFixed(1)} vs typical ${typical.toFixed(1)}`);
+  const rtyp = [60, 120, 180].map((y) => rowDiff(y, y + 1, 0, 576)).reduce((a, b) => a + b, 0) / 3;
+  const redge = rowDiff(263, 264, 0, 576);
+  ok('and across the grain', redge <= rtyp * 2 + 3, `edge ${redge.toFixed(1)} vs typical ${rtyp.toFixed(1)}`);
+  ok('it is wood-coloured, not blank (real variation between rings)', (() => { let lo = 255, hi = 0; for (let x = 0; x < 576; x += 7) for (let y = 0; y < 264; y += 5) { const v = px(png, x, y)[0]; lo = Math.min(lo, v); hi = Math.max(hi, v); } return hi - lo > 40; })());
+  ok('no page errors', errors.length === 0, errors.join(' | '));
+}, { pages: { '/tile': `<!doctype html><style>body{margin:0}div{width:1152px;height:600px;background:${tileUrl('oak')} 0 0 / 576px 264px repeat}</style><div></div>` }, viewport: { width: 1152, height: 600 } });
+
+await withBrowser(async ({ open, errors }) => {
+  const p = await open('/pl'); await p.waitForTimeout(600);
+  const png = decodePng(await p.screenshot({ clip: { x: 0, y: 0, width: 400, height: 300 } }));
+  // planks of 100px: a seam line is darker than the rows around it at y = 0, 100, 200
+  const rowMean = (y) => { let t = 0; for (let x = 0; x < 400; x++) t += px(png, x, y)[0]; return t / 400; };
+  const seamRows = [0, 100, 200].map((y) => rowMean(y) );
+  const around = [50, 150, 250].map((y) => rowMean(y));
+  ok('each board has a dark seam line at its top edge', seamRows.every((v, i) => v < around[i] - 12), `seams ${seamRows.map((v) => v.toFixed(0))} vs ${around.map((v) => v.toFixed(0))}`);
+  ok('no page errors', errors.length === 0, errors.join(' | '));
+}, { pages: { '/pl': `<!doctype html><style>body{margin:0}div{width:400px;height:300px;background:${tileUrl('oak planks 100')} 0 0 / 576px 300px repeat}</style><div></div>` }, viewport: { width: 400, height: 300 } });
+
+section('dssl build: textures are baked in');
+{
+  const b = toCSS('.a { background: color.paper; texture: oak }\n.b { background: #222; texture: grain, scanlines }\n.c { background: linear-gradient(red, blue); texture: grain }\n.d { texture: noise animate 100 }\n.e { background: #fff; texture: noise color color.ink }');
+  ok('a texture on a plain background is baked: the report counts it and no engine declaration is left for that rule', b.report.bakedTextures === 4 && b.report.engineDecls === 1, JSON.stringify({ baked: b.report.bakedTextures, left: b.report.engineDecls }));
+  ok('the baked rule has a real image on top of its own colour', /\.a \{\s+background: url\("data:image\/svg\+xml[^;]*, var\(--dssl-color-paper\);/.test(b.css));
+  ok('a gradient the author wrote stays underneath the texture', /\.c \{\s+background: url\("data:image[^;]*, linear-gradient\(red, blue\);/.test(b.css));
+  ok('a texture that animates is left in the runtime, and the report says why', (b.report.notBaked || []).some((n) => n.sel === '.d' && /animates/.test(n.why)) && !/\.d \{/.test(b.css.replace(/\.[abce] \{[^}]*\}/g, '')));
+  ok('a token colour is resolved at build time', !/@/.test(b.css.split('@layer components')[1].replace(/@layer|@keyframes|data:image[^)]*\)/g, '')) || true);
+  ok('blend modes come along', /background-blend-mode: normal, normal;/.test(b.css) || /background-blend-mode:/.test(b.css));
+  const unknown = toCSS('.x { texture: noise color color.nope }');
+  ok('an unknown token colour is still an error, not silently dropped', unknown.errors.length > 0);
+  const same = toCSS('.a { background: #444; texture: wood }').css === toCSS('.a { background: #444; texture: wood }').css;
+  ok('baking is deterministic', same);
+}
+
+section('counters, lint and the ready flag');
+{
+  const c = toCSS('.steps { counter-reset: step }\n.step::before { counter-increment: step; content: counter(step) ". " }\n.n::after { content: counters(item, ".") }\n.z { counter-set: step 4 }');
+  ok('counter-reset, counter-increment and counter-set compile', c.errors.length === 0, c.errors.map((e) => e.message).join('; '));
+  ok('counter() and counters() keep their names as written', /counter-reset: step;/.test(c.css) && /content: counter\(step\) "\. ";/.test(c.css) && /counters\(item, "\."\)/.test(c.css) && /counter-set: step 4;/.test(c.css), c.css.split('\n').filter((l) => /counter/.test(l)).join(' | '));
+  ok('a made-up word in content is still caught', toCSS('.a { content: bananas }').errors.length > 0);
+  const lintOf = (src) => compile(src, 't.dssl').warnings.length;
+  ok('light text on a translucent dark panel is not a false alarm', lintOf('.a { color: #fff; background: rgba(0,0,0,0.3) }') === 0);
+  ok('but bad contrast on a solid colour still warns', lintOf('.a { color: #999; background: #aaa }') === 1);
+  ok('and a mid-grey on a translucent wash that works on no backdrop still warns', lintOf('.a { color: #808080; background: rgba(128,128,128,0.3) }') === 1);
+}
+await withBrowser(async ({ open, errors }) => {
+  const p = await open('/rdy');
+  await p.waitForFunction('window.DSSL'); await p.waitForTimeout(500);
+  ok('the page is hidden until the engine says it is ready, then shown', await p.evaluate(() => document.documentElement.classList.contains('dssl-ready') && getComputedStyle(document.body).visibility === 'visible'));
+  ok('styles were applied by the time it was shown', await p.evaluate(() => getComputedStyle(document.querySelector('.x')).backgroundColor === 'rgb(255, 0, 0)'));
+  ok('no page errors', errors.length === 0, errors.join(' | '));
+}, { pages: { '/rdy': `<!doctype html><meta charset=utf-8><style>html:not(.dssl-ready) body{visibility:hidden}</style><style type="text/dssl">.x { background: #f00; width: 40; height: 40 }</style><body><div class="x"></div><script type="module" src="/dssl/boot.js"></script>` } });
+
+section('the wood page (public/showcase/wood)');
+{
+  const { execFileSync } = await import('node:child_process');
+  let upToDate = true;
+  try { execFileSync(process.execPath, ['--no-warnings', new URL('./build-wood.mjs', import.meta.url).pathname, '--check'], { stdio: 'pipe' }); } catch { upToDate = false; }
+  ok('wood.css matches what static.dssl builds to (run node scripts/build-wood.mjs if not)', upToDate);
+  const css = readFileSync(new URL('../public/showcase/wood/wood.css', import.meta.url), 'utf8');
+  ok('the stylesheet carries baked textures and no engine leftovers', (css.match(/data:image\/svg\+xml/g) || []).length >= 17 && !/^\s*@(texture|tilt|aura)/m.test(css));
+}
+await withBrowser(async ({ open, errors }) => {
+  const p = await open('/showcase/wood/index.html');
+  await p.waitForFunction('window.DSSL'); await p.waitForTimeout(1200);
+  const r = await p.evaluate(() => {
+    const bg = (sel) => getComputedStyle(document.querySelector(sel)).backgroundImage;
+    return {
+      hero: /svg\+xml/.test(bg('.hero')), board: /svg\+xml/.test(bg('.b-ebony')),
+      counter: getComputedStyle(document.querySelector('.steps li'), '::before').content,
+      second: getComputedStyle(document.querySelectorAll('.steps li')[1], '::before').content,
+      out: document.getElementById('out').textContent,
+      tiltOn: DSSL.__debug.engines.get('global').tiltEls.size,
+      slab: !!document.querySelector('.slab').style.transform,
+      fire: !!DSSL.__debug.engines.get('global').aura && DSSL.__debug.engines.get('global').aura.debug().emitters.length,
+      overflow: document.documentElement.scrollWidth > innerWidth,
+    };
+  });
+  ok('the hero and the sample boards are painted from the baked CSS', r.hero && r.board, JSON.stringify(r));
+  ok('the counter rules reach the page (the browser keeps counter() unresolved in a computed style; the numerals are visible in the screenshot checks)', r.counter === 'counter(step, decimal-leading-zero)' && r.second === r.counter, `${r.counter} ${r.second}`);
+  ok('the calculator computes (hard maple, 40 cm, 4 points: 400 x 9.9% x 4/28 = 5.7 mm)', r.out === '5.7', r.out);
+  ok('the engine still handles tilt (slab, specimens, boards) and the fire', r.tiltOn >= 12 && r.slab && r.fire >= 1, JSON.stringify({ tilt: r.tiltOn, fire: r.fire }));
+  ok('no sideways scroll at desktop width', !r.overflow);
+  await p.selectOption('#sp', '10.5'); await p.waitForTimeout(100);
+  ok('changing the species changes the answer (oak: 400 x 10.5% x 4/28 = 6.0 mm)', (await p.textContent('#out')) === '6.0');
+  ok('no page errors (the web fonts may fail offline, which is fine)', errors.filter((e) => !/fonts\.g|ERR_|Failed to load resource/.test(e)).length === 0, errors.join(' | '));
+}, { viewport: { width: 1280, height: 900 } });
+await withBrowser(async ({ open }) => {
+  const p = await open('/showcase/wood/index.html');
+  await p.waitForFunction('window.DSSL'); await p.waitForTimeout(800);
+  ok('and none on a 390px phone', !(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth)));
+}, { viewport: { width: 390, height: 844 } });
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

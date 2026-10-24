@@ -12,6 +12,19 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.11.0",
+    date: "growth phase \u00b7 the wood drop",
+    title: "Real wood, textures that survive the build, and a whole page to prove it.",
+    why: "another AI built a wood website in DSSL and listed what hurt. Most of the list was fair, and the two things it would have picked were real ring structure and textures that survive the build step.",
+    kind: "add",
+    body:
+      "texture: oak, walnut, cherry, maple, pine, mahogany, ebony, birch, oak-planks and walnut-planks. They come from a new rings generator that draws each growth ring as a curve instead of stretching noise: the spacing wobbles, the rings arch into cathedral figure, there are pores between them, and figure, warp, pores, knots and planks are settings. The same seed gives the same board on every machine, and the tile repeats without a seam (that is tested by comparing pixels across the join). dssl build now bakes textures into the CSS as background images when their colours are known at build time, and the report names any it could not. Also: counter-reset, counter-increment and content: counter() work. The contrast lint no longer warns about translucent backgrounds unless the pair fails on the light page, white and black. A page can hide itself until styled with a dssl-ready class. Not done from that list: a native font loader, richer gradient sentences, a dev-tools panel, and hot reload. Heartwood, at /showcase/wood/, is a whole page built from all of this.",
+    code: `.floor { background-color: color.walnut; texture: oak-planks planks 140 }
+.table { texture: walnut figure 0.9 warp 0.7 }
+.steps { counter-reset: step }
+.steps li::before { counter-increment: step; content: counter(step, decimal-leading-zero) }`,
+  },
+  {
     version: "v0.10.0",
     date: "growth phase \u00b7 the polish drop",
     title: "Glass, tilt, a playground that does more, and a quiet bug in colour alpha.",

@@ -37,7 +37,7 @@ export function startServer(pages = {}) {
     if (pages[url]) { res.writeHead(200, { 'content-type': 'text/html' }); return res.end(pages[url]); }
     let file;
     if (url.startsWith('/dssl/')) file = join(ROOT, 'public', url);
-    else if (url.startsWith('/styles/')) file = join(ROOT, 'public', url);
+    else if (url.startsWith('/styles/') || url.startsWith('/showcase/')) file = join(ROOT, 'public', url);
     else file = join(ROOT, url);
     try {
       const body = readFileSync(file);

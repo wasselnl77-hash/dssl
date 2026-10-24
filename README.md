@@ -68,7 +68,7 @@ Both drop a `dssl-engine/` folder next to you: the engine, a starter token set, 
 
 Prefer to click: [dssl-engine.zip](https://dssl-sable.vercel.app/dssl-engine.zip) or [dssl-engine.tar.gz](https://dssl-sable.vercel.app/dssl-engine.tar.gz). Same package, straight from the browser.
 
-Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API). In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.10.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. See `dssl-vscode/PUBLISHING.md` for publishing.
+Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API). In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.11.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. See `dssl-vscode/PUBLISHING.md` for publishing.
 
 AI agents and machine reviewers: this repo ships `llms.txt` (dense, structured facts), `AGENTS.md` (how to work on the codebase) and `PARITY.md` (the honest feature matrix against CSS). The site serves the same `llms.txt` at https://dssl-sable.vercel.app/llms.txt
 
@@ -339,7 +339,7 @@ Gradients read like sentences. A stop can be a hex, a color name, a token, an al
 ## Texture
 
 `texture:` lays a generated image on top of an element's own background (a colour, a gradient, or
-several layers) and takes it off again cleanly. Thirty presets, ten generators, and a setting for
+several layers) and takes it off again cleanly. Forty presets (thirty general ones and ten wood species), eleven generators, and a setting for
 everything, so you can make your own:
 
 ```dssl
@@ -523,7 +523,7 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 - pseudo-elements in any spelling (shadow CSS), themed scrollbars included
 - `raw { }` / `@css { }` for verbatim CSS (`@font-face`, `@keyframes`, `@supports`); unknown at-rules skip their whole block with one clean error
 - `fluid 16 24` sizing sugar on any length property, including `padding-top`, `margin-block` and the other longhands
-- `texture:` (30 presets, 10 generators, your own), `aura-glow` / `aura-particle` / `glow-particle` / `aura-glow-particle` / `aura:` (no presets, you build them), `slider:` (WebKit and Firefox in one line)
+- `texture:` (40 presets including ten wood species, 11 generators, your own; `dssl build` bakes them into the CSS), `aura-glow` / `aura-particle` / `glow-particle` / `aura-glow-particle` / `aura:` (no presets, you build them), `slider:` (WebKit and Firefox in one line)
 - `dssl import file.css`, lint warnings (contrast, focus, target size), and the editor designer with live previews
 - one cascade across every stylesheet: a sheet loaded later beats an earlier one (fixed in 0.8.2)
 - the CLI: `dssl check` (CI, --json, --strict) and `dssl build` (real CSS from the static subset, also with --strict)

@@ -28,7 +28,7 @@ const mix2 = (x, y, t) => mix(x, y, t, 'srgb');
 
 export const BLEND_MODES = ['normal', 'multiply', 'screen', 'overlay', 'soft-light', 'hard-light', 'color-burn', 'color-dodge', 'darken', 'lighten', 'difference', 'exclusion'];
 
-export const GENERATORS = ['noise', 'bump', 'lines', 'dots', 'grid', 'checker', 'weave', 'carbon', 'waves', 'hex'];
+export const GENERATORS = ['noise', 'bump', 'lines', 'dots', 'grid', 'checker', 'weave', 'carbon', 'waves', 'hex', 'rings'];
 
 /** the settings a texture layer understands, with how many value words each takes */
 export const TEXTURE_KEYS = {
@@ -51,6 +51,11 @@ export const TEXTURE_KEYS = {
   blend:     { words: 1, kind: 'word', values: BLEND_MODES, doc: 'how the layer mixes with what is under it' },
   color:     { words: 1, kind: 'color', doc: 'the main colour (dark end of noise, ink of lines and dots)' },
   color2:    { words: 1, kind: 'color', doc: 'the second colour (light end of noise, background cell of patterns)' },
+  figure:    { words: 1, kind: 'number', min: 0, max: 1, doc: 'rings generator: how strongly the growth rings arch into a cathedral figure, 0 is straight grain' },
+  warp:      { words: 1, kind: 'number', min: 0, max: 1, doc: 'rings generator: how much each ring wobbles along its length' },
+  pores:     { words: 1, kind: 'number', min: 0, max: 1, doc: 'rings generator: fine fibre and pore streaks between the rings' },
+  knots:     { words: 1, kind: 'number', min: 0, max: 8, int: true, doc: 'rings generator: how many knots in one tile (the pattern repeats, so keep it small)' },
+  planks:    { words: 1, kind: 'number', min: 24, max: 1200, doc: 'rings generator: lay it out as planks this many px tall, with a seam and a slightly different board each' },
   invert:    { words: 0, kind: 'flag', doc: 'swap the two colours' },
 };
 
@@ -100,6 +105,26 @@ export const PRESETS = {
     ] },
   wood:       { doc: 'long wood grain, along x (use angle 90 for vertical)',
     layers: [{ gen: 'noise', scale: 4, octaves: 3, contrast: 1.8, stretch: [40, 1], intensity: 1, color: '#7a4b24', color2: '#c99a62', blend: 'multiply' }] },
+  oak:        { doc: 'oak: open grain, tan with brown rings',
+    layers: [{ gen: 'rings', scale: 11, color: '#8a5f33', color2: '#c9a574', contrast: 1.3, figure: 0.55, warp: 0.45, pores: 0.5, seed: 3, blend: 'normal' }] },
+  walnut:     { doc: 'walnut: dark chocolate with black-brown rings',
+    layers: [{ gen: 'rings', scale: 9, color: '#2b1a10', color2: '#6a4631', contrast: 1.2, figure: 0.5, warp: 0.55, pores: 0.45, seed: 8, blend: 'normal' }] },
+  cherry:     { doc: 'cherry: warm red-brown with fine rings',
+    layers: [{ gen: 'rings', scale: 8, color: '#7a3a1c', color2: '#bb7443', contrast: 1.1, figure: 0.4, warp: 0.35, pores: 0.35, seed: 5, blend: 'normal' }] },
+  maple:      { doc: 'maple: pale, tight, nearly plain grain',
+    layers: [{ gen: 'rings', scale: 13, color: '#c79a5a', color2: '#ecd6ab', contrast: 0.8, figure: 0.25, warp: 0.3, pores: 0.25, seed: 11, blend: 'normal' }] },
+  pine:       { doc: 'pine: light yellow wood with wide rings and knots',
+    layers: [{ gen: 'rings', scale: 16, color: '#b5742f', color2: '#e6c081', contrast: 1.4, figure: 0.65, warp: 0.5, pores: 0.4, knots: 2, seed: 14, blend: 'normal' }] },
+  mahogany:   { doc: 'mahogany: deep red-brown, straight grain',
+    layers: [{ gen: 'rings', scale: 10, color: '#4a2012', color2: '#8c4727', contrast: 1.1, figure: 0.3, warp: 0.3, pores: 0.4, seed: 6, blend: 'normal' }] },
+  ebony:      { doc: 'ebony: nearly black with faint streaks',
+    layers: [{ gen: 'rings', scale: 12, color: '#0c0908', color2: '#2d2621', contrast: 0.7, figure: 0.2, warp: 0.25, pores: 0.3, seed: 2, blend: 'normal' }] },
+  birch:      { doc: 'birch: creamy pale wood with fine rings',
+    layers: [{ gen: 'rings', scale: 10, color: '#d2ae74', color2: '#f0dfb9', contrast: 0.9, figure: 0.3, warp: 0.35, pores: 0.25, seed: 9, blend: 'normal' }] },
+  'oak-planks': { doc: 'oak laid as planks, with seams',
+    layers: [{ gen: 'rings', scale: 11, color: '#8a5f33', color2: '#c9a574', contrast: 1.3, figure: 0.55, warp: 0.45, pores: 0.5, planks: 110, seed: 3, blend: 'normal' }] },
+  'walnut-planks': { doc: 'walnut laid as planks, with seams',
+    layers: [{ gen: 'rings', scale: 9, color: '#2b1a10', color2: '#6a4631', contrast: 1.2, figure: 0.5, warp: 0.55, pores: 0.45, planks: 96, seed: 8, blend: 'normal' }] },
   bark:       { doc: 'rough vertical bark',
     layers: [{ gen: 'bump', scale: 10, octaves: 4, depth: 5, stretch: [1, 6], light: 150, intensity: 0.8, color: '#000', color2: '#fff', blend: 'overlay' }] },
   leather:    { doc: 'pebbled leather',
@@ -164,6 +189,7 @@ const GEN_DEFAULTS = {
   carbon:  { scale: 20, intensity: 1, color: '#151515', color2: '#262626', blend: 'normal' },
   waves:   { scale: 40, thickness: 1.2, intensity: 0.3, color: '#000', blend: 'normal' },
   hex:     { scale: 28, thickness: 1, intensity: 0.28, color: '#000', blend: 'normal' },
+  rings:   { scale: 10, color: '#7a4b24', color2: '#d1a770', contrast: 1.2, figure: 0.5, warp: 0.4, pores: 0.4, intensity: 1, blend: 'normal' },
 };
 
 /* ------------------------------------------------------------------ *
@@ -452,7 +478,134 @@ function buildHex(spec, rc) {
   return [{ image: svgUrl(svg), size: `${f(W)}px ${f(100 * k)}px`, repeat: 'repeat', position: '0 0', blend: spec.blend || 'normal', tile: W }];
 }
 
-const BUILDERS = { noise: buildNoise, bump: buildBump, lines: buildLines, dots: buildDots, grid: buildGrid, checker: buildChecker, weave: buildWeave, carbon: buildCarbon, waves: buildWaves, hex: buildHex };
+
+/* ------------------------------------------------------------------ *
+ * rings: growth rings, drawn as vector curves
+ *
+ * A board is a log sliced, and the rings you see are where the slice crosses
+ * the growth layers. So this does not stretch noise: it draws each ring as a
+ * curve. The spacing wobbles, the curves arch (cathedral figure) because the
+ * slice cuts the layers at a slant, there are pores between them, and planks
+ * and knots are drawn on top. Everything comes from a seeded generator and
+ * integer harmonics, so the same seed gives the same board on every machine
+ * and the tile has no visible seam.
+ * ------------------------------------------------------------------ */
+
+const TAU = Math.PI * 2;
+const r1 = (n) => String(Math.round(n * 10) / 10);
+const smallUrl = (svg) => `url("data:image/svg+xml,${svg.replace(/[%#<>"]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase())}")`;
+
+/** a smooth path through [x, y] samples (Catmull-Rom as cubic Beziers, ends clamped) */
+function smoothPath(pts) {
+  const n = pts.length;
+  const at = (i) => pts[Math.max(0, Math.min(n - 1, i))];
+  let d = `M${r1(pts[0][0])} ${r1(pts[0][1])}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += `C${r1(c1x)} ${r1(c1y)} ${r1(c2x)} ${r1(c2y)} ${r1(p2[0])} ${r1(p2[1])}`;
+  }
+  return d;
+}
+
+function buildRings(spec, rc) {
+  const { a, b } = layerColors(spec, rc);
+  const late = a, early = b || a;
+  const P = Math.max(3, spec.scale || 10);
+  const W = 576;                                    // one tile along the grain; every harmonic below divides it
+  const fig = spec.figure === undefined ? 0.5 : spec.figure;
+  const warp = spec.warp === undefined ? 0.4 : spec.warp;
+  const pores = spec.pores === undefined ? 0.4 : spec.pores;
+  const contrast = spec.contrast === undefined ? 1.2 : spec.contrast;
+  const seed = spec.seed || 0;
+  const planked = !!spec.planks;
+  const plankH = planked ? Math.max(P * 3, spec.planks) : 0;
+  const plankN = planked ? 3 : 1;
+  const H = planked ? plankH * plankN : P * Math.max(12, Math.round(260 / P));
+  const rgba = (c, alpha) => toRgba(withAlpha(c, n01((alpha === undefined ? 1 : alpha) * c.a)));
+  const STEP = 48;
+
+  let defs = '', body = '';
+  let id = 0;
+  for (let pi = 0; pi < plankN; pi++) {
+    const rand = rng(seed * 7919 + pi * 104729 + 13);
+    const h = planked ? plankH : H;
+    const n = Math.max(3, Math.round(h / P));
+    const Pe = h / n;
+    const ph = [rand() * TAU, rand() * TAU, rand() * TAU];
+    const x0 = rand() * W;
+    const m = 2 + Math.floor(rand() * 3), spacingAmp = 0.12 + rand() * 0.22;
+    const flip = planked && rand() < 0.5;
+    const curve = (kf, x) => {
+      const t = kf / n;
+      // a free board arches from one face to the other; a seamless tile must repeat every n rings, so its envelope has period n
+      const per = Math.pow(Math.sin(Math.PI * t), 2);
+      const env = planked ? Math.pow(Math.max(0, Math.min(1, flip ? 1 - t : t)), 1.4) : per;
+      const env2 = planked ? 0.6 + 0.4 * Math.abs(Math.sin(Math.PI * t)) : per;
+      const bump = Math.pow((1 + Math.cos(TAU * (x - x0) / W)) / 2, 1.3);
+      const arch = fig * 0.3 * h * env * bump;
+      const wob = warp * P * 0.6 * env2 * (0.5 * Math.sin(TAU * x / W + ph[0] + TAU * kf / n) + 0.3 * Math.sin(TAU * 3 * x / W + ph[1] + TAU * 2 * kf / n) + 0.2 * Math.sin(TAU * 7 * x / W + ph[2] + TAU * 3 * kf / n));
+      const u = kf + spacingAmp * Math.sin(TAU * m * kf / n);
+      return u * Pe + arch + wob;
+    };
+    // sampled past both ends of the tile, so the stroke is continuous across the join and the viewport clips it
+    const ringPath = (kf) => { const pts = []; for (let x = -2 * STEP; x <= W + 2 * STEP; x += STEP) pts.push([x, curve(kf, x)]); return smoothPath(pts); };
+    const jit = Array.from({ length: n }, () => [rand(), rand()]);
+
+    const lo = planked ? -2 : -1, hi = planked ? n + 2 : n;
+    let g = '';
+    for (let k = lo; k <= hi; k++) {
+      const [jitter, jop] = jit[((k % n) + n) % n];   // ring k and ring k + n look alike, so the tile repeats cleanly
+      const w = Pe * (0.14 + jitter * 0.26);
+      const op = n01((0.4 + jop * 0.55) * Math.min(1.4, contrast / 1.2));
+      const rid = 'r' + id++;
+      defs += `<path id='${rid}' d='${ringPath(k + 0.8)}' fill='none'/>`;
+      g += `<use href='#${rid}' stroke='${rgba(late, op * 0.28)}' stroke-width='${r1(w * 2.6)}'/><use href='#${rid}' stroke='${rgba(late, op)}' stroke-width='${r1(w)}'/>`;
+    }
+    // knots: elongated along the grain, with rings around them
+    const knotN = spec.knots ? Math.max(0, Math.round(spec.knots / plankN + (pi === 0 ? 0.49 : 0))) : 0;
+    let knots = '';
+    for (let q = 0; q < knotN; q++) {
+      const kx = 90 + rand() * (W - 180), ky = h * (0.25 + rand() * 0.5), rx = 9 + rand() * 12, ry = rx * 0.6;
+      knots += `<ellipse cx='${r1(kx)}' cy='${r1(ky)}' rx='${r1(rx * 4)}' ry='${r1(ry * 3.4)}' fill='${rgba(late, 0.1)}'/>` +
+        `<ellipse cx='${r1(kx)}' cy='${r1(ky)}' rx='${r1(rx * 2.4)}' ry='${r1(ry * 2.3)}' fill='none' stroke='${rgba(late, 0.35)}' stroke-width='1.2'/>` +
+        `<ellipse cx='${r1(kx)}' cy='${r1(ky)}' rx='${r1(rx * 1.6)}' ry='${r1(ry * 1.6)}' fill='none' stroke='${rgba(late, 0.5)}' stroke-width='1.4'/>` +
+        `<ellipse cx='${r1(kx)}' cy='${r1(ky)}' rx='${r1(rx)}' ry='${r1(ry)}' fill='${rgba(late, 0.85)}'/>`;
+    }
+    const tone = (rand() - 0.5) * 0.14;
+    const toneRect = tone > 0 ? `<rect width='${W}' height='${r1(h)}' fill='rgba(255,255,255,${r1(Math.abs(tone) * 10) / 10})'/>` : `<rect width='${W}' height='${r1(h)}' fill='rgba(0,0,0,${r1(Math.abs(tone) * 10) / 10})'/>`;
+    const clip = `c${pi}`;
+    defs += `<clipPath id='${clip}'><rect width='${W}' height='${r1(h)}'/></clipPath>`;
+    body += `<g transform='translate(0 ${r1(pi * plankH)})' clip-path='url(#${clip})'>` +
+      `<rect width='${W}' height='${r1(h)}' fill='${rgba(early)}'/>` + (planked ? toneRect : '') + `<g fill='none'>${g}</g>${knots}</g>`;
+  }
+
+  // fine fibres: streaks stretched along the grain, drawn once over everything
+  const fibre = pores > 0
+    ? `<filter id='p' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'>` +
+      `<feTurbulence type='fractalNoise' baseFrequency='0.014 0.62' numOctaves='3' seed='${seed + 3}' stitchTiles='stitch'/>` +
+      `<feColorMatrix type='matrix' values='0 0 0 0 ${f(late.r / 255)} 0 0 0 0 ${f(late.g / 255)} 0 0 0 0 ${f(late.b / 255)} ${f(pores * 4.2)} 0 0 0 ${f(-pores * 1.95)}'/></filter>` +
+      `<rect width='${W}' height='${H}' filter='url(#p)' opacity='${f(Math.min(1, 0.55 * late.a))}'/>`
+    : '';
+
+  let seams = '';
+  if (planked) {
+    for (let pi = 0; pi < plankN; pi++) {
+      const y = pi * plankH;
+      seams += `<rect y='${r1(y)}' width='${W}' height='1.6' fill='rgba(0,0,0,0.5)'/><rect y='${r1(y + 1.6)}' width='${W}' height='1' fill='rgba(255,255,255,0.1)'/>`;
+    }
+  }
+
+  const rot = spec.angle === 90 || spec.angle === -90 || spec.angle === 270;
+  const inner = `<defs>${defs}</defs>${body}${fibre}${seams}`;
+  const svg = rot
+    ? `<svg xmlns='http://www.w3.org/2000/svg' width='${H}' height='${W}'><g transform='matrix(0 1 1 0 0 0)'>${inner}</g></svg>`
+    : `<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='${H}'>${inner}</svg>`;
+  return [{ image: smallUrl(svg), size: rot ? `${H}px ${W}px` : `${W}px ${H}px`, repeat: 'repeat', position: '0 0', blend: spec.blend || 'normal', tile: Math.max(W, H) }];
+}
+
+const BUILDERS = { rings: buildRings, noise: buildNoise, bump: buildBump, lines: buildLines, dots: buildDots, grid: buildGrid, checker: buildChecker, weave: buildWeave, carbon: buildCarbon, waves: buildWaves, hex: buildHex };
 
 /**
  * Turn parsed layers into the CSS lists for background-image, -size, -repeat,
@@ -475,6 +628,59 @@ export function buildTexture(layers, rc) {
     count: parts.length,
     parts,
   };
+}
+
+
+/* ------------------------------------------------------------------ *
+ * composing with the element's own background (shared by the engine and `dssl build`)
+ * ------------------------------------------------------------------ */
+
+export function splitBgList(value) {
+  const out = []; let depth = 0, cur = '';
+  for (const ch of String(value)) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
+  }
+  if (cur.trim()) out.push(cur.trim());
+  return out;
+}
+/** a list of exactly n entries: the author's, cycled the way CSS cycles them, or the default */
+function expandList(value, n, dflt) {
+  const items = value ? splitBgList(value) : [];
+  if (!items.length) return Array.from({ length: n }, () => dflt);
+  return Array.from({ length: n }, (_, i) => items[i % items.length]);
+}
+
+
+/**
+ * texture sits ON TOP of whatever background the author wrote: the shorthand, the longhands,
+ * or just a colour. `owned` is a Map of prop -> { value, imp }; this edits it in place.
+ */
+export function composeTextureInto(owned, tex) {
+  const sh = owned.get('background');
+  const img = owned.get('background-image');
+  const blendUser = owned.get('background-blend-mode');
+  const texBlends = tex.blend.split(', ');
+  if (sh) {
+    // the author wrote the shorthand: texture layers go first, their value stays the last layer(s)
+    const userLayers = splitBgList(sh.value).length;
+    const texShort = tex.parts.map((p) => `${p.image} ${p.position} / ${p.size} ${p.repeat}`).join(', ');
+    owned.set('background', { value: `${texShort}, ${sh.value}`, imp: sh.imp });
+    owned.delete('background-image');
+    owned.set('background-blend-mode', { value: [...texBlends, ...expandList(blendUser && blendUser.value, userLayers, 'normal')].join(', '), imp: sh.imp });
+    return;
+  }
+  const userLayers = img ? splitBgList(img.value).length : 0;
+  const imp = img ? img.imp : '';
+  const get = (name) => (owned.get(name) || {}).value;
+  const join = (texList, name, dflt) => [...texList.split(/,(?![^(]*\))/).map((x) => x.trim()), ...(userLayers ? expandList(get(name), userLayers, dflt) : [])].join(', ');
+  owned.set('background-image', { value: tex.image + (img ? ', ' + img.value : ''), imp });
+  owned.set('background-size', { value: join(tex.size, 'background-size', 'auto'), imp });
+  owned.set('background-position', { value: join(tex.position, 'background-position', '0% 0%'), imp });
+  owned.set('background-repeat', { value: join(tex.repeat, 'background-repeat', 'repeat'), imp });
+  owned.set('background-blend-mode', { value: [...texBlends, ...(userLayers ? expandList(get('background-blend-mode'), userLayers, 'normal') : [])].join(', '), imp });
 }
 
 /* ------------------------------------------------------------------ *

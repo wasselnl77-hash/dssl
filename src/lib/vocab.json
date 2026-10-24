@@ -53,6 +53,46 @@
       "doc": "long wood grain, along x (use angle 90 for vertical)"
     },
     {
+      "name": "oak",
+      "doc": "oak: open grain, tan with brown rings"
+    },
+    {
+      "name": "walnut",
+      "doc": "walnut: dark chocolate with black-brown rings"
+    },
+    {
+      "name": "cherry",
+      "doc": "cherry: warm red-brown with fine rings"
+    },
+    {
+      "name": "maple",
+      "doc": "maple: pale, tight, nearly plain grain"
+    },
+    {
+      "name": "pine",
+      "doc": "pine: light yellow wood with wide rings and knots"
+    },
+    {
+      "name": "mahogany",
+      "doc": "mahogany: deep red-brown, straight grain"
+    },
+    {
+      "name": "ebony",
+      "doc": "ebony: nearly black with faint streaks"
+    },
+    {
+      "name": "birch",
+      "doc": "birch: creamy pale wood with fine rings"
+    },
+    {
+      "name": "oak-planks",
+      "doc": "oak laid as planks, with seams"
+    },
+    {
+      "name": "walnut-planks",
+      "doc": "walnut laid as planks, with seams"
+    },
+    {
       "name": "bark",
       "doc": "rough vertical bark"
     },
@@ -131,7 +171,8 @@
     "weave",
     "carbon",
     "waves",
-    "hex"
+    "hex",
+    "rings"
   ],
   "textureKeys": [
     {
@@ -227,6 +268,31 @@
     {
       "key": "color2",
       "doc": "the second colour (light end of noise, background cell of patterns)",
+      "words": 1
+    },
+    {
+      "key": "figure",
+      "doc": "rings generator: how strongly the growth rings arch into a cathedral figure, 0 is straight grain",
+      "words": 1
+    },
+    {
+      "key": "warp",
+      "doc": "rings generator: how much each ring wobbles along its length",
+      "words": 1
+    },
+    {
+      "key": "pores",
+      "doc": "rings generator: fine fibre and pore streaks between the rings",
+      "words": 1
+    },
+    {
+      "key": "knots",
+      "doc": "rings generator: how many knots in one tile (the pattern repeats, so keep it small)",
+      "words": 1
+    },
+    {
+      "key": "planks",
+      "doc": "rings generator: lay it out as planks this many px tall, with a seam and a slightly different board each",
       "words": 1
     },
     {

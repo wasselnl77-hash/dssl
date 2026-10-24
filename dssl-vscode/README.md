@@ -32,7 +32,7 @@ Extension id: **`ehs-studio.dssl-vscode`**. See PUBLISHING.md for the publishing
 - **Hover docs** for the semantic vocabulary (`row:`, `bend:`, `stretch:`, `seen`, `pin`...),
   for tokens (resolved value), for workspace motions and behaviors.
 - **Syntax highlighting** via a TextMate grammar for `.dssl`.
-- **Completions for the new vocabulary.** After `texture:` you get the 30 presets, the generators and
+- **Completions for the new vocabulary.** After `texture:` you get the presets, the generators and
   every setting; after `aura-glow:` only glow settings; after `aura-particle:` only particle settings
   (shapes, where particles are born, directions); after `slider:` the clauses. Hovering a preset or a
   setting explains it.
@@ -40,7 +40,7 @@ Extension id: **`ehs-studio.dssl-vscode`**. See PUBLISHING.md for the publishing
   - *Aura*: a slider or picker for every glow and particle setting, colour stops you can add and
     remove, a live preview drawn by the real renderer, a graph of one particle's opacity and size over
     its life, and a live graph of particles alive and frame time.
-  - *Texture*: all 30 presets and 10 generators as thumbnails, up to four stacked layers, every setting
+  - *Texture*: all the presets and 11 generators as thumbnails, up to four stacked layers, every setting
     as a slider, colour pickers.
   - *Slider*: a live range input with the generated rules, and a bar editor for histogram sliders.
 

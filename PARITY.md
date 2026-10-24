@@ -25,7 +25,7 @@ The point of this table is to stop two bad arguments: "DSSL is missing everythin
 | Flexbox / Grid | raw properties pass through + `row:` `column:` `grid:` `stack:` sugar | shipped | shorthands write `display`; the compiler warns when that clobbers an explicit `display:` |
 | `place-items` / alignment | `center: both` | shipped | the engine promotes a formatting context when missing, so alignment cannot silently no-op |
 | Transitions | per-property: `transition: 200 snap transform` | shipped | honors `reduced-motion` |
-| Background patterns and noise | `texture:` (30 presets, 10 generators, your own) | shipped | there is no CSS shorthand for "grain on top of my background"; this one keeps the author's background and removes cleanly. Runtime-only |
+| Background patterns and noise | `texture:` (40 presets including ten wood species, 11 generators, your own) | shipped | there is no CSS shorthand for "grain on top of my background"; this one keeps the author's background and removes cleanly. Runtime-only |
 | Glow, particles, fire | `aura-glow`, `aura-particle`, `glow-particle`, `aura-glow-particle`, `aura:` | shipped | CSS has `box-shadow` and `filter: drop-shadow`, and nothing for particles. No presets by design. Runtime-only |
 | Styling `<input type="range">` | `slider:` writes the `::-webkit-slider-*` and `::-moz-range-*` rules together | shipped | Chrome tested; the Firefox rules are generated but not run yet. Histogram sliders via `graph` |
 | Accessibility hints in the compiler | contrast, removed focus outline, small targets (warnings) | shipped | CSS says nothing; these never fail a build unless you pass `--strict` |
@@ -61,6 +61,25 @@ so the boundary is explicit, not folklore.
 - the overlap policy: translucent boxes refuse to cover things unless you say so
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
+
+## v0.11.0 (wood): rings, species, planks, baked textures
+
+Written after another AI built a wood site in DSSL and listed what hurt. What came of it:
+
+| Their note | What DSSL does now |
+|---|---|
+| `texture: wood` is one generic grain | `oak`, `walnut`, `cherry`, `maple`, `pine`, `mahogany`, `ebony`, `birch`, plus `oak-planks` and `walnut-planks` |
+| Stretched noise with a contour layer is not wood | the `rings` generator draws growth rings as curves, with `figure`, `warp`, `pores` and `knots` |
+| No way to draw planks | `planks <px>`: boards with seams and a slightly different board each |
+| Seamless tiling, stable seed | integer harmonics and a seeded generator: same seed, same board everywhere; tested for seams |
+| `counter-reset` and `counter()` rejected | they work |
+| Contrast false alarms on translucent backgrounds | judged on the light page, white and black; warns only if it fails on all |
+| Flash of unstyled content | `dssl-ready` class on `<html>`, and `dssl build` for the static part (the wood page does this) |
+| Textures missing from `dssl build` | baked into the CSS when colours are known; the report names the ones that could not be |
+| `@font-face` in `raw {}` | **not done.** A native font loader is still a good idea. |
+| Gradients only cover simple cases | **not done.** Plain CSS gradient strings still pass through, which is what the wood page uses. |
+| Dev-tools inspector for which rule produced a style | **not done.** `DSSL.explain()` is still a console call. |
+| Hot reload | **not done.** |
 
 ## v0.10.0: glass, tilt, and a silent colour bug
 
