@@ -4,13 +4,15 @@ The DSSL style language in your editor. Not a re-implementation: this extension 
 the **real parser and resolver** that ship in the engine, so the diagnostics you see are
 the same errors the browser console prints, did-you-mean included.
 
-Works in **VS Code** and **VSCodium** (same extension API; install the `.vsix` in either
-via Extensions panel → ⋯ → *Install from VSIX*).
+Works in **VS Code** and **VSCodium** (same extension API).
 
-Extension id: **`ehs-studio.dssl-vscode`**. An Open VSX listing (the registry VSCodium's
-Extensions tab searches) is staged: it needs an Open VSX access token, then
-`scripts/publish-openvsx.sh` puts it in the tab. See PUBLISHING.md for that flow and the
-Microsoft Marketplace one.
+**VSCodium:** open the Extensions tab, search "DSSL" and install. It is published on
+Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode
+
+**VS Code:** the Microsoft Marketplace listing is not published yet, so install the `.vsix`
+via Extensions panel → ⋯ → *Install from VSIX*.
+
+Extension id: **`ehs-studio.dssl-vscode`**. See PUBLISHING.md for the publishing flow.
 
 ## Features
 

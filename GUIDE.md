@@ -590,11 +590,11 @@ for liveness. `unfreeze()` re-arms everything.
 
 Three ways to get it:
 
-1. Download `dssl-vscode/dssl-vscode-0.9.0.vsix` from the repo files, then
-   Extensions panel, `...`, Install from VSIX. Works in VS Code and VSCodium.
-2. Build it: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
-3. Registry listing: staged for Open VSX (the registry VSCodium searches).
-   See `dssl-vscode/PUBLISHING.md` for exactly what remains.
+1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
+   https://open-vsx.org/extension/ehs-studio/dssl-vscode
+2. VS Code: download `dssl-vscode/dssl-vscode-0.9.0.vsix` from the repo files, then
+   Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
+3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 
 What it does: real-compiler diagnostics (same errors the browser prints,
 did-you-mean included), completions folded from your workspace token registry,

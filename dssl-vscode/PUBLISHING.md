@@ -6,7 +6,7 @@ follows is exactly what it takes to put it in each registry.
 
 ## Open VSX (this is the one for VSCodium)
 
-VSCodium's Extensions tab searches **open-vsx.org** by default. Once published
+(Already published: v0.9.0 is live.) VSCodium's Extensions tab searches **open-vsx.org** by default. Once published
 there, "DSSL" shows up in the tab, searchable, one-click install, updates included.
 
 One-time, on your side (about 2 minutes):
@@ -14,12 +14,12 @@ One-time, on your side (about 2 minutes):
 1. Go to https://open-vsx.org and sign in with your GitHub account.
 2. Open your profile, then **Settings**, then **Access Tokens**, and generate a token.
 3. Accept the Eclipse publisher agreement on the same page. Publishing fails without it.
-4. Put the token in a file that is not in the repo, for example `~/Dokumente/tokens/openvsx token`.
+4. Put the token in a file that is not in the repo, for example `~/Dokumente/tokens/vsx token`.
 
 Then it is one command:
 
 ```sh
-OPENVSX_TOKEN_FILE="$HOME/Dokumente/tokens/openvsx token" bash scripts/publish-openvsx.sh
+OPENVSX_TOKEN_FILE="$HOME/Dokumente/tokens/vsx token" bash scripts/publish-openvsx.sh
 ```
 
 (`OPENVSX_TOKEN` or a first argument work too.) The script creates the `ehs-studio` namespace

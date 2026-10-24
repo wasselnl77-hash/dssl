@@ -913,6 +913,11 @@ input.mood {                       // particles leave the thumb, wherever the va
               DSSL it writes, checked by the real compiler as you edit. <i>Insert at cursor</i> puts it in your file
               and <i>Load from selection</i> reads an existing declaration back into the controls.
             </p>
+            <p className="doc-lead">
+              <b>Install:</b> in VSCodium, search <i>DSSL</i> in the Extensions tab, or open it on{" "}
+              <a href="https://open-vsx.org/extension/ehs-studio/dssl-vscode" target="_blank" rel="noopener noreferrer">Open VSX</a>.
+              In VS Code, install the <code>.vsix</code> from the repo (Extensions, <i>Install from VSIX</i>).
+            </p>
             <CodeBlock file="terminal" code={`node cli/dssl.mjs import styles.css -o styles.dssl    # CSS to DSSL, and a report of what could not carry over`} />
             <p className="doc-lead">
               The importer drops semicolons, turns <code>16px</code> into <code>16</code>, rewrites{" "}
