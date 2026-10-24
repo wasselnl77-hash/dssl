@@ -9,9 +9,10 @@
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
-const ROOT = '/home/z/my-project';
+const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
 const PORT = 8931 + Math.floor(Math.random() * 200);
 
 const MIME = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.json': 'application/json' };

@@ -5,7 +5,7 @@
 - Site (docs, playground, changelog, bench): https://dssl-sable.vercel.app
 - Repo + full docs in the README: https://huggingface.co/EHS-Studio/dssl
 - Install: `curl -fsSL https://dssl-sable.vercel.app/install.sh | sh` (or the zip: https://dssl-sable.vercel.app/dssl-engine.zip)
-- Version: 0.8.0 (engine), MIT license
+- Version: 0.8.1 (engine), MIT license
 - Feature matrix vs CSS: see PARITY.md in the repo
 - For agents working ON the codebase: see AGENTS.md in the repo
 
@@ -30,8 +30,8 @@
 - Gradients as sentences: `gradient: linear 135, color.accent -> color.ok`, `gradient-text:`, `gradient-flow: 6s alternate`. Non-color stops are compile errors.
 - Overlap policy: nothing below 100% opacity overlaps anything unless `overlap: allow`; `deny` is unconditional; pairs with `pointer-events: none` so veils stop eating clicks and text selection.
 - Behaviors: named rule groups applied with `use focus-ring`.
-- Verbatim escape hatch (v0.8.0): `raw { }` / `@css { }` drops real CSS (@font-face, @keyframes, @supports, @import, @property) into the page stylesheet untouched; unknown at-rules skip their whole block with one clean error.
-- Fluid sugar (v0.8.0): `font-size: fluid 16 24` (and any length-ish property) compiles to the linear clamp() between 360px and 1200px viewports; `fluid: 16, 24` still works.
+- Verbatim escape hatch (v0.8.0): `raw { }` / `@css { }` drops real CSS (@font-face, @keyframes, @supports, @import, @property) into the page stylesheet untouched; unknown at-rules skip their whole block with one clean error. Inside raw { } semicolons are required (it is real CSS); a missing one is a warning with a line number.
+- Fluid sugar (v0.8.0): `font-size: fluid 16 24` (and any length-ish property) compiles to the linear clamp() between 360px and 1200px viewports (exactly the first size at 360px and the second at 1200px; px, rem or em, no percentages; shrinking sizes work); `fluid: 16, 24` still works. 0.8.1 fixed the math: 0.8.0 left out the intercept, so sizes were too large on small screens.
 - v0.8.0 review-driven fixes, all regression-tested incl. headless-Chromium computed-style tests of the docs: row/column axis roles (the documented `between center` example laid out wrong before); @font-face no longer crashes the compiler (unknown at-rules skip balanced); @supports inner rules no longer leak unconditionally; `url(...)` is atomic (unquoted form no longer false-errors); `!important` is a loud error that emits nothing; the animation shorthand warns when its motion is undefined instead of suggesting "span"; CSS-order transition values get the exact DSSL conversion in the error hint.
 - v0.7.2 review-driven fixes, all regression-tested: gate prefilter runs before native matches(); hover state events scope candidate recomputation to the touched subtree plus ancestors (was page-wide); checkbox/details states listen to `change`/`toggle`; raw hex alpha (`#ff0000/50` -> color-mix); bare numbers on time properties are ms; `::part()` supported, `::slotted()` rejected with an explanation; SVG properties (`fill`, `stroke*`) and `text-wrap`/`content-visibility` in the vocabulary.
 - Warnings channel (v0.7): things that compile but are probably wrong, e.g. a layout shorthand expanding to `display` and clobbering an earlier explicit `display:` in the same rule.
@@ -62,4 +62,4 @@ Wait for the `dssl-ready` event on `window` before measuring layout: the engine 
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. Install `dssl-vscode/dssl-vscode-0.8.0.vsix` from the repo files. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. Install `dssl-vscode/dssl-vscode-0.8.1.vsix` from the repo files. Source lives in `dssl-vscode/` in the repo.

@@ -8,7 +8,7 @@
  *       Exit 1 on errors, 2 on usage problems. --strict makes warnings fatal.
  *       --json emits machine-readable diagnostics for CI and editors.
  *
- *   dssl build styles.dssl [-o out.css] [--json] [--no-banner]
+ *   dssl build styles.dssl [-o out.css] [--json] [--strict] [--no-banner]
  *       The exit lane: compile the static subset to a real .css file.
  *       Tokens become custom properties, states become :hover, layers become
  *       @layer, motions become @keyframes, raw { } passes through verbatim.
@@ -18,16 +18,20 @@
  * Files are compiled in the order given; every bundle's tokens fold into the
  * next (name a tokens.dssl first, exactly like <link> order in the browser).
  * ========================================================================= */
-import { readFileSync, writeFileSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, statSync, existsSync } from 'node:fs';
 import { dirname, resolve as pathResolve, basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// the engine is plain ESM in public/dssl — import directly, no build step
+// the engine is plain ESM, import it directly, no build step. In a repo checkout
+// it lives in public/dssl/. In the downloaded package (dssl-engine.zip) it sits
+// next to cli/ as dssl/. 0.8.0 only knew the first layout, so the packaged CLI
+// crashed with "module not found" for everyone who installed it.
 const here = pathResolve(dirname(fileURLToPath(import.meta.url)), '..');
-const { parse } = await import('file://' + join(here, 'public/dssl/parser.js'));
-const { resolve } = await import('file://' + join(here, 'public/dssl/resolver.js'));
-const { toCSS } = await import('file://' + join(here, 'public/dssl/static.js'));
-const { VERSION } = await import('file://' + join(here, 'public/dssl/index.js'));
+const engineDir = existsSync(join(here, 'public/dssl/parser.js')) ? join(here, 'public/dssl') : join(here, 'dssl');
+const { parse } = await import('file://' + join(engineDir, 'parser.js'));
+const { resolve } = await import('file://' + join(engineDir, 'resolver.js'));
+const { toCSS } = await import('file://' + join(engineDir, 'static.js'));
+const { VERSION } = await import('file://' + join(engineDir, 'index.js'));
 
 const USAGE = `dssl v${VERSION} — the DSSL style language
 
@@ -38,6 +42,7 @@ const USAGE = `dssl v${VERSION} — the DSSL style language
   dssl build <file>      compile the static subset to a real .css file
                          -o <out.css>   output path (default: <file>.css)
                          --json         machine-readable report
+                         --strict       warnings are errors too (exit 1)
                          --no-banner    omit the generated-file header
   dssl --version         print the version`;
 
@@ -137,7 +142,8 @@ if (cmd === 'check') {
 if (cmd === 'build') {
   const json = args.includes('--json');
   const banner = !args.includes('--no-banner');
-  for (const f of ['--json', '--no-banner']) { const i = args.indexOf(f); if (i !== -1) args.splice(i, 1); }
+  const strict = args.includes('--strict');
+  for (const f of ['--json', '--no-banner', '--strict']) { const i = args.indexOf(f); if (i !== -1) args.splice(i, 1); }
   const outPath = readArg(args, '-o') || readArg(args, '--out');
   if (!args.length) { console.error('dssl build: give me a .dssl file to build'); process.exit(2); }
   const input = args[0];
@@ -150,7 +156,7 @@ if (cmd === 'build') {
       version: VERSION,
       input: r.file,
       output: outputPath,
-      ok: r.errors.length === 0,
+      ok: r.errors.length === 0 && (!strict || r.warnings.length === 0),
       errors: r.errors.map(e => ({ file: e.file || r.name, line: e.line ?? 0, message: e.message, hint: e.hint || null })),
       warnings: r.warnings.map(w => ({ file: w.file || r.name, line: w.line ?? 0, message: w.message, hint: w.hint || null })),
       report: built.report,
@@ -168,7 +174,7 @@ if (cmd === 'build') {
     }
     printDiags(results, true);
   }
-  process.exit(r.errors.length ? 1 : 0);
+  process.exit(r.errors.length || (strict && r.warnings.length) ? 1 : 0);
 }
 
 console.error(`dssl: unknown command "${cmd}"\n\n${USAGE}`);

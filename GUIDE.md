@@ -6,7 +6,7 @@ example in this guide is compiled by `scripts/test-guide-examples.mjs` on every
 release, so the examples cannot drift from the compiler. If an example here
 stops compiling, that is a release blocker, not a docs bug.
 
-Status up front: DSSL is a real, tested style engine at v0.7.2, and it is
+Status up front: DSSL is a real, tested style engine at v0.8.1, and it is
 honest alpha. It needs JavaScript, it writes inline styles, and it has a
 first-paint story you should read before shipping anything serious (see
 "Honest limits"). Within those limits, it is genuinely nicer to write than
@@ -123,9 +123,33 @@ overwriting, and a word written twice warns too.
 ### Sizing that moves: fluid
 
 `font-size: fluid 16 24` (and any length-ish property: width, height, gap,
-padding, margin…) compiles to the linear `clamp()` between 360px and 1200px
-viewports — the formula everyone writes wrong by hand. Custom bounds:
-`font-size: fluid 16 24 400 800`. The comma form still works: `fluid: 16, 24`.
+padding, margin and friends) makes a size that grows smoothly with the window.
+It is 16px on a 360px wide screen, 24px on a 1200px wide one, and in between it
+slides along a straight line. Past either end it stays put.
+
+```dssl
+h1 { font-size: fluid 28 44 }          // 28px on a small phone, 44px on a big desktop
+.stack { gap: fluid 8 16 }             // works on any length property
+.hero { font-size: fluid 16 24 400 800 }   // your own viewport range
+.old { fluid: 16, 24 }                 // the comma form still works
+```
+
+What you get at a few window widths for `fluid 16 24`:
+
+| window | 360 | 375 | 600 | 800 | 1200 |
+|---|---|---|---|---|---|
+| size | 16px | 16.1px | 18.3px | 20.2px | 24px |
+
+A few things worth knowing:
+
+- Sizes can be px (bare numbers are px), rem or em. Both sizes need the same unit.
+- Percentages are refused with an error, because a percentage cannot follow the
+  window width.
+- Going down works too: `fluid 24 16` shrinks as the window grows.
+- If you used `fluid` in 0.8.0, your text will be a little smaller on phones and
+  tablets after updating. That is the fix, not a regression. 0.8.0 had the
+  right slope but forgot where the line starts, so sizes ran ahead of the
+  window and hit their maximum around 840px instead of 1200px.
 
 ### raw { } — the escape hatch
 
@@ -136,10 +160,20 @@ page stylesheet, top-level only:
 ```dssl
 raw {
   @font-face {
-    font-family: Inter
-    src: url(/fonts/inter.woff2)
+    font-family: Inter;
+    src: url(/fonts/inter.woff2);
   }
 }
+```
+
+One thing to remember: inside `raw { }` you are writing real CSS, so semicolons
+are required there, unlike everywhere else in DSSL. If you leave one out, the
+browser would quietly throw the whole rule away. DSSL cannot fix that for you
+(the text is passed through untouched on purpose), but it does warn you with the
+line number:
+
+```
+styles.dssl:3 warning: raw { } is verbatim CSS, so this line needs a ";" at the end
 ```
 
 Unknown at-rules outside `raw { }` are skipped whole, with one clean error
@@ -249,7 +283,7 @@ for liveness. `unfreeze()` re-arms everything.
 
 Three ways to get it:
 
-1. Download `dssl-vscode/dssl-vscode-0.8.0.vsix` from the repo files, then
+1. Download `dssl-vscode/dssl-vscode-0.8.1.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. Works in VS Code and VSCodium.
 2. Build it: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 3. Registry listing: staged for Open VSX (the registry VSCodium searches).
@@ -267,6 +301,7 @@ v0.8.0 answers the honest limits below without giving up the language:
 ```sh
 node cli/dssl.mjs check styles.dssl --strict   # CI: real compiler, exit 1 on errors, --json
 node cli/dssl.mjs build styles.dssl -o styles.css
+node cli/dssl.mjs build styles.dssl -o styles.css --strict   # CI: warnings fail the build too
 ```
 
 `build` compiles the static subset to a real stylesheet: tokens become
@@ -281,6 +316,7 @@ The same output is available in the browser as `DSSL.toCSS(source)`.
 
 ```sh
 node cli/dssl.mjs check public/styles/*.dssl   # compile everything, exit code for CI
+node scripts/test-v081.mjs      # 0.8.1 regression suite (37 assertions)
 node scripts/test-v073.mjs      # 0.8.0 regression suite (65 assertions)
 node scripts/test-guide-examples.mjs        # every guide example compiles
 node scripts/test-guide-browser.mjs         # guide examples asserted in headless Chromium

@@ -57,6 +57,25 @@ so the boundary is explicit, not folklore.
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
 
+## v0.8.1 follow-up corrections
+
+A re-test of 0.8.0 found two bugs, and more showed up while writing the tests:
+
+- `fluid` left out the intercept of its line, so `fluid 16 24` was 19.6px on a
+  375px phone instead of 16.1px and reached 24px at about 840px instead of 1200px.
+  Fixed, and the tests now evaluate the emitted `clamp()` at real window widths.
+  The same fix repaired shrinking sizes (`fluid 24 16`, which produced a backwards
+  `clamp()`) and rem sizes (the slope was 16 times too small). Percentages and
+  mixed units are now refused with a message instead of producing nonsense.
+- A multi-line `raw { }` started with the text `undefined`, and anything written
+  on the same line as `raw {` was dropped. The guide's own example also had no
+  semicolons, which is not valid CSS. All three fixed, and a missing semicolon
+  inside `raw { }` is now a warning with the right line number.
+- `dssl build` now takes `--strict`, like `dssl check`.
+- The `dssl` command in the downloadable package crashed on start (module not found),
+  because it looked for the engine in `public/dssl/` and the package keeps it in
+  `dssl/`. It now finds it in either place, and a test runs it from the package layout.
+
 ## v0.8.0 review-driven corrections
 
 The second external review (repro snippets, headless browser) found five bugs and

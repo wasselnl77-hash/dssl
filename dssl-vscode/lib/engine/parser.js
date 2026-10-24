@@ -255,7 +255,13 @@ export function parse(source, file = 'inline.dssl') {
         node.css = rest.slice(open + 1, close);
         return rest.slice(close + 1);
       }
+      // multi-line: start the body empty (it used to start undefined, which
+      // put a literal "undefined" in front of the CSS) and feed whatever
+      // followed the "{" on this same line, so `raw { @font-face {` keeps
+      // its first line.
+      node.css = '';
       rawCapture = { node, depth: 1 };
+      feedRawCapture(rest.slice(open + 1), line);
       return '';
     }
     if (meta.kind === 'bogus') {

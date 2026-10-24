@@ -437,7 +437,7 @@ input::-webkit-slider-thumb { background: color.accent }
                 <tr><td><code>cover</code></td><td><code>cover: fixed</code></td><td>position + inset: 0</td></tr>
                 <tr><td><code>sticky</code></td><td><code>sticky: 0</code></td><td>position: sticky; top: 0px</td></tr>
                 <tr><td><code>font</code></td><td><code>font: 16/1.4 ink</code></td><td>font-size / line-height / color</td></tr>
-                <tr><td><code>fluid</code></td><td><code>fluid: 16, 24</code></td><td>clamp() interpolating 16→24px across 360→1200px</td></tr>
+                <tr><td><code>fluid</code></td><td><code>fluid: 16, 24</code></td><td>a size that grows smoothly from 16px at a 360px window to 24px at 1200px (px, rem or em)</td></tr>
                 <tr><td><code>shadow</code> / <code>radius</code></td><td><code>shadow: lg</code></td><td>token presets (sm/md/lg/xl) or raw values</td></tr>
                 <tr><td><code>circle</code></td><td><code>circle: 36</code></td><td>width + height + border-radius: 50%</td></tr>
                 <tr><td><code>grow</code> / <code>shrink</code> / <code>basis</code></td><td><code>grow: 1</code></td><td>flex-grow / flex-shrink / flex-basis</td></tr>

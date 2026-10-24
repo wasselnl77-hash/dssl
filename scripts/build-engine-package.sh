@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Rebuild public/dssl-engine.zip from the current engine + package texts.
+# Rebuild public/dssl-engine.zip and public/dssl-engine.tar.gz from the current engine + package texts.
 # Usage: bash scripts/build-engine-package.sh
 set -euo pipefail
-ROOT=/home/z/my-project
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
@@ -26,5 +26,8 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
             full = os.path.join(base, f)
             z.write(full, os.path.relpath(full, stage))
 PY
+rm -f "$ROOT/public/dssl-engine.tar.gz"
+tar -czf "$ROOT/public/dssl-engine.tar.gz" -C "$STAGE" dssl-engine
+echo "built $ROOT/public/dssl-engine.tar.gz"
 echo "built $ROOT/public/dssl-engine.zip:"
 python3 -m zipfile -l "$ROOT/public/dssl-engine.zip"

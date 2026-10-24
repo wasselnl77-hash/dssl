@@ -949,19 +949,38 @@ const FLUID_PROPS = new Set(('font-size,width,height,inline-size,block-size,min-
   'gap,row-gap,column-gap,padding,margin,inset,top,right,bottom,left').split(','));
 
 function buildFluidParts(parts, ctx, prop = 'font-size') {
-  const px = (s) => {
-    const m = String(s).match(/^([0-9.]+)\s*(px|rem|em|%)?$/);
-    if (!m) {
-      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `fluid: "${s}" is not a size`, hint: 'fluid takes two sizes and optionally the viewport bounds — fluid 16 24, or fluid 16 24 360 1200' });
-      return '0px';
-    }
-    return m[2] ? `${m[1]}${m[2]}` : `${m[1]}px`;
+  const bad = (s, why) => {
+    ctx.errors.push({ file: ctx.file, line: ctx.line, message: `fluid: "${s}" ${why}`, hint: 'fluid takes two sizes and optionally the viewport bounds, like: fluid 16 24, or fluid 16 24 360 1200' });
   };
-  const min = px(parts[0]); const max = px(parts[1]);
-  const vmin = px(parts[2] || '360'); const vmax = px(parts[3] || '1200');
-  const mv = parseFloat(min), xv = parseFloat(max);
-  const slope = ((xv - mv) / (parseFloat(vmax) - parseFloat(vmin))) * 100;
-  return [{ prop, value: `clamp(${min}, calc(${min} + ${slope.toFixed(3)}vw), ${max})` }];
+  // sizes may be px (bare numbers are px), rem or em. Percentages cannot be
+  // interpolated against the viewport, so they are refused instead of
+  // silently producing a clamp() that does not do what it says.
+  const size = (s) => {
+    const m = String(s).match(/^(-?[0-9.]+)\s*(px|rem|em|%)?$/);
+    if (!m) { bad(s, 'is not a size'); return null; }
+    if (m[2] === '%') { bad(s, 'cannot be a percentage, use px, rem or em'); return null; }
+    return { n: parseFloat(m[1]), unit: m[2] || 'px' };
+  };
+  const a = size(parts[0]); const b = size(parts[1]);
+  const v0 = size(parts[2] || '360'); const v1 = size(parts[3] || '1200');
+  if (!a || !b || !v0 || !v1) return [{ prop, value: '0px' }];
+  if (a.unit !== b.unit) { bad(`${parts[0]} ${parts[1]}`, 'mixes units, give both sizes the same unit'); return [{ prop, value: '0px' }]; }
+  if (v0.unit !== 'px' || v1.unit !== 'px') { bad(`${parts[2]} ${parts[3]}`, 'viewport bounds are px'); return [{ prop, value: '0px' }]; }
+  if (v1.n <= v0.n) { bad(`${parts[2]} ${parts[3]}`, 'needs the larger viewport second'); return [{ prop, value: '0px' }]; }
+  // a straight line through (v0, a) and (v1, b):
+  //   size(viewport) = intercept + slope * viewport
+  // The vw term is slope * 100, and the intercept is what is left at a
+  // viewport of 0. v0.8.0 forgot the intercept, so the size ran ahead of the
+  // line and hit its maximum long before the upper viewport. rem and em are
+  // worked out against a 16px root for the slope only; the intercept stays
+  // in the unit you wrote.
+  const f = a.unit === 'px' ? 1 : 16;
+  const slopePxPerPx = ((b.n - a.n) * f) / (v1.n - v0.n);
+  const vw = slopePxPerPx * 100;
+  const intercept = a.n - (slopePxPerPx * v0.n) / f;
+  const num = (x) => String(+x.toFixed(3));
+  const lo = Math.min(a.n, b.n), hi = Math.max(a.n, b.n); // clamp() needs lower first even for shrinking sizes
+  return [{ prop, value: `clamp(${num(lo)}${a.unit}, calc(${num(intercept)}${a.unit} + ${num(vw)}vw), ${num(hi)}${a.unit})` }];
 }
 
 /* ------------------------------------------------------------------ *
@@ -1390,6 +1409,22 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           // untouched; it rides the same document stylesheet as the
           // pseudo-element rules and survives `dssl build` verbatim.
           if ((node.css || '').trim()) raws.push({ css: node.css.trim(), file, line: node.line, order: order++ });
+          // raw is real CSS, so DSSL's no-semicolon habit does not carry over.
+          // A declaration line that is followed by another declaration or a
+          // closing brace, with no ";" between, is almost always that slip.
+          {
+            const rl = (node.css || '').replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).split('\n');
+            const decl = /^[a-zA-Z-]+\s*:\s*\S/;
+            const nextReal = (i) => { for (let j = i + 1; j < rl.length; j++) { const t = rl[j].trim(); if (t) return t; } return '}'; };
+            for (let i = 0; i < rl.length; i++) {
+              const t = rl[i].trim();
+              if (!decl.test(t) || /[;{},]$/.test(t)) continue;
+              const nx = nextReal(i);
+              if (nx.startsWith('}') || decl.test(nx)) {
+                warnings.push({ file, line: node.line + i, message: `raw { } is verbatim CSS, so this line needs a ";" at the end ("${t.slice(0, 40)}")`, hint: 'unlike the rest of DSSL, semicolons are required inside raw { }' });
+              }
+            }
+          }
           break;
         }
         case 'behavior':

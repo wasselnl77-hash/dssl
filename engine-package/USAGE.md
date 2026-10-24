@@ -101,10 +101,11 @@ state (the graceful no-JS look). The report counts what stays runtime-only
 
 In the browser the same output is `DSSL.toCSS(source)` → `{ css, report }`.
 
-Two more v0.8.0 tools worth knowing: `raw { }` (alias `@css { }`) drops
-verbatim CSS like `@font-face` into the page stylesheet, and
-`font-size: fluid 16 24` compiles to the linear `clamp()` between 360 and
-1200px viewports.
+Two more tools worth knowing: `raw { }` (alias `@css { }`) drops
+verbatim CSS like `@font-face` into the page stylesheet (it is real CSS, so
+semicolons are required inside it), and `font-size: fluid 16 24` gives you a
+size that grows smoothly from 16px on a 360px wide window to 24px on a 1200px
+wide one. `dssl build --strict` makes warnings fail the build, for CI.
 
 ## Files in this package
 

@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { VERSION } from '../public/dssl/index.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra) => {
@@ -131,13 +132,13 @@ const lastVal = (decls, prop) => decls.filter(d => d.prop === prop).pop()?.value
 /* ---- feature: fluid sugar ---- */
 {
   const inline = compileDoc('.a { font-size: fluid 16 24 }');
-  ok('7a. font-size: fluid 16 24 → clamp', val(declsOf(inline.doc), 'font-size') === 'clamp(16px, calc(16px + 0.952vw), 24px)');
+  ok('7a. font-size: fluid 16 24 → clamp', val(declsOf(inline.doc), 'font-size') === 'clamp(16px, calc(12.571px + 0.952vw), 24px)');
   const bounds = compileDoc('.a { font-size: fluid 16 24 400 800 }');
-  ok('7b. custom viewport bounds change the slope', val(declsOf(bounds.doc), 'font-size') === 'clamp(16px, calc(16px + 2.000vw), 24px)');
+  ok('7b. custom viewport bounds change the slope', val(declsOf(bounds.doc), 'font-size') === 'clamp(16px, calc(8px + 2vw), 24px)');
   const gap = compileDoc('.a { gap: fluid 8 16 }');
-  ok('7c. gap takes inline fluid too', val(declsOf(gap.doc), 'gap') === 'clamp(8px, calc(8px + 0.952vw), 16px)');
+  ok('7c. gap takes inline fluid too', val(declsOf(gap.doc), 'gap') === 'clamp(8px, calc(4.571px + 0.952vw), 16px)');
   const legacy = compileDoc('.a { fluid: 16, 24 }');
-  ok('7d. the fluid: 16, 24 form still works', val(declsOf(legacy.doc), 'font-size') === 'clamp(16px, calc(16px + 0.952vw), 24px)');
+  ok('7d. the fluid: 16, 24 form still works', val(declsOf(legacy.doc), 'font-size') === 'clamp(16px, calc(12.571px + 0.952vw), 24px)');
 }
 
 /* ---- feature: toCSS — the exit lane ---- */
@@ -209,7 +210,7 @@ raw { @font-face { font-family: X; src: url(x.woff2) } }`;
   const missing = run(['check', join(dir, 'nope.dssl')]);
   ok('9i. missing file exits 2', missing.code === 2);
   const v = run(['--version']);
-  ok('9j. --version prints 0.8.0', v.out.trim() === '0.8.0');
+  ok('9j. --version prints the engine version', v.out.trim() === VERSION);
   rmSync(dir, { recursive: true, force: true });
 }
 

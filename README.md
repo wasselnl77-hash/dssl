@@ -68,7 +68,7 @@ Both drop a `dssl-engine/` folder next to you: the engine, a starter token set, 
 
 Prefer to click: [dssl-engine.zip](https://dssl-sable.vercel.app/dssl-engine.zip) or [dssl-engine.tar.gz](https://dssl-sable.vercel.app/dssl-engine.tar.gz). Same package, straight from the browser.
 
-Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API): download `dssl-vscode/dssl-vscode-0.8.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. An Open VSX listing (so it appears in VSCodium's Extensions tab, searchable) is staged and publishes with one Open VSX token; see `dssl-vscode/PUBLISHING.md`.
+Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API): download `dssl-vscode/dssl-vscode-0.8.1.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. An Open VSX listing (so it appears in VSCodium's Extensions tab, searchable) is staged and publishes with one Open VSX token; see `dssl-vscode/PUBLISHING.md`.
 
 AI agents and machine reviewers: this repo ships `llms.txt` (dense, structured facts), `AGENTS.md` (how to work on the codebase) and `PARITY.md` (the honest feature matrix against CSS). The site serves the same `llms.txt` at https://dssl-sable.vercel.app/llms.txt
 
@@ -387,9 +387,11 @@ overlap) stays out and gets counted in the report, so the boundary is explicit
 instead of folklore.
 
 Two more tools from v0.8.0: `raw { }` (alias `@css { }`) drops verbatim CSS
-like `@font-face` or `@keyframes` into the page stylesheet, and
-`font-size: fluid 16 24` compiles to the linear `clamp()` between 360 and
-1200px viewports.
+like `@font-face` or `@keyframes` into the page stylesheet (it is real CSS, so
+semicolons are required inside it, and DSSL warns if you forget one), and
+`font-size: fluid 16 24` gives you a size that grows smoothly from 16px on a
+360px wide window to 24px on a 1200px wide one. `dssl build --strict` makes
+warnings fail the build, for CI.
 
 ## Performance: freeze, explain, and the cost of live
 
@@ -420,7 +422,7 @@ const rep = DSSL.explain(document.querySelector('.doc-card'))
 
 The matcher also pre-filters every rule through a cheap class/tag/id gate extracted from the selector's rightmost compound, so a recompute skips obvious non-matches instead of asking the browser rule by rule. The gate only ever says no; anything it does not fully understand falls back to native matching.
 
-## What works today (v0.8.0)
+## What works today (v0.8.1)
 
 - the full selector surface, including `:nth-child`, `:not`, `:is`, `:where`, `:has`
 - flexbox and grid with `row:` / `column:` / `grid:` / `stack:` / `center:` sugar — place words now own an axis (`between` is main-axis, `stretch` is cross-axis) and conflicts warn instead of silently overwriting
@@ -434,7 +436,7 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 - pseudo-elements in any spelling (shadow CSS), themed scrollbars included
 - `raw { }` / `@css { }` for verbatim CSS (`@font-face`, `@keyframes`, `@supports`); unknown at-rules skip their whole block with one clean error
 - `fluid 16 24` sizing sugar on any length property
-- the CLI: `dssl check` (CI, --json) and `dssl build` (real CSS from the static subset)
+- the CLI: `dssl check` (CI, --json, --strict) and `dssl build` (real CSS from the static subset, also with --strict)
 - compiler warnings for cascade-order footguns and duplicate axis words
 - `DSSL.freeze()` / `DSSL.unfreeze()` / `DSSL.explain()` / `DSSL.toCSS()`
 - bare font names, `hyphens: manual`, loud did-you-mean errors
@@ -455,7 +457,7 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 
 ## Status
 
-v0.8.0, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite — and the docs examples are rendered and asserted in a real browser, so the guide cannot lie. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; when a page must work without JavaScript, build the static subset with `dssl build` or pick another tool for that page. Freeze makes big static pages viable; live interaction is what the engine is for.
+v0.8.1, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite, and the docs examples are rendered and asserted in a real browser, so the guide cannot lie. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; when a page must work without JavaScript, build the static subset with `dssl build` or pick another tool for that page. Freeze makes big static pages viable; live interaction is what the engine is for.
 
 ## License
 

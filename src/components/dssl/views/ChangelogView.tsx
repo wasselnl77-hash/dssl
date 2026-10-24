@@ -12,6 +12,29 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.8.1",
+    date: "growth phase · the follow-up",
+    title: "Two more bugs from the re-test, both fixed, and the tests now check the math.",
+    why: "after 0.8.0 shipped, the same reviewer ran it again. Most things held up. Two did not: the fluid sizing sugar computed the wrong line, and the guide's own raw example produced broken CSS. Both slipped past the tests for the same reason as before: the tests asked whether the code compiled, not whether the result was right.",
+    kind: "spec",
+    body:
+      "fluid 16 24 is supposed to be 16px on a 360px window and 24px on a 1200px one, sliding smoothly in between. The clamp() it produced had the right slope but forgot where the line starts, so it was already 19.6px on a 375px phone and hit its maximum around 840px. It now starts and ends where it says. While writing the tests, three more things turned up and are fixed by the same change: shrinking sizes like fluid 24 16 made a backwards clamp(), rem sizes got a slope 16 times too small, and percentages (which cannot follow the window width) now give a clear error instead of nonsense. If you used fluid in 0.8.0, your text will be a bit smaller on phones and tablets now. That is the fix. The raw { } block had its own problems: a multi-line block started with the word undefined, anything on the same line as raw { was dropped, and the example in the guide had no semicolons, which is not valid CSS. The first two are fixed, the guide example is corrected, and a missing semicolon inside raw { } is now a warning that names the line, since raw is real CSS and DSSL cannot guess what you meant. dssl build also takes --strict now, so CI can fail on warnings the same way dssl check can. The new tests do not compare strings. They work out what the emitted clamp() gives at real window widths (360, 375, 600, 800, 1200 and beyond) and check it against the sizes you asked for, and they were run against the old 0.8.0 engine first, where two dozen of them fail. One more thing turned up while testing the download: the dssl command inside dssl-engine.zip crashed on start with module not found, because it looked for the engine in public/dssl and the package keeps it in dssl. It now finds the engine in either place, and a test runs it from the package layout.",
+    code: `// what fluid 16 24 gives you, by window width
+//   360px  ->  16px      (the lower size, exactly)
+//   375px  ->  16.1px    (0.8.0 said 19.6px)
+//   800px  ->  20.2px    (0.8.0 said 23.6px)
+//  1200px  ->  24px      (the upper size, exactly)
+h1 { font-size: fluid 16 24 }
+
+// raw is real CSS, so it needs its semicolons
+raw {
+  @font-face {
+    font-family: Inter;
+    src: url(/fonts/inter.woff2);
+  }
+}`,
+  },
+  {
     version: "v0.8.0",
     date: "growth phase · the exit drop",
     title: "A second review found five bugs. The answer fixes them and adds the exit lane.",
