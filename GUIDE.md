@@ -729,7 +729,7 @@ Three ways to get it:
 
 1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
    https://open-vsx.org/extension/ehs-studio/dssl-vscode
-2. VS Code: download `dssl-vscode/dssl-vscode-0.12.0.vsix` from the repo files, then
+2. VS Code: download `dssl-vscode/dssl-vscode-0.12.1.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
 3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 
@@ -799,6 +799,9 @@ node scripts/test-browser-v090.mjs      # 0.9.0 in Chrome: pixels, lifecycle, re
 node scripts/test-v0100.mjs             # 0.10.0: glass, tilt, named-colour alpha, playground examples, HTML filter
 node scripts/test-designer.mjs          # the designer's state to DSSL and back, plus a random sweep
 node scripts/test-designer-browser.mjs  # the designer panel, driven like a person would
+node scripts/test-in-editor.mjs         # the extension inside a REAL VS Code or VSCodium: diagnostics, completions, hover, commands (needs a display)
+node scripts/test-editor-ui.mjs         # and clicking through that real editor: typing, hover, the designer, Insert at cursor
+node scripts/test-all.mjs --editor      # everything above, plus the two real-editor suites
 node scripts/test-designer-host.mjs     # the extension's wiring, against a fake of the editor API
 node scripts/test-v082.mjs              # 0.8.2: one cascade across stylesheets, fluid longhands
 node scripts/test-v081.mjs              # 0.8.1: fluid math, raw blocks, packaged CLI
@@ -827,6 +830,10 @@ Read this before choosing DSSL for a real site.
   JS (`@signal`, `animate:`, deform, overlap) stays out and is counted in the
   report, so you always know what a no-JS page gives up. If a page must work
   without JS AND uses the dynamic features, use CSS.
+- **The editor extension is tested in one editor.** It runs in a real VSCodium (1.135, Linux), driven both through the
+  extension host and by clicking through the window (`test-in-editor.mjs`, `test-editor-ui.mjs`). The Microsoft build of
+  VS Code, Windows and macOS share the same extension API but have not been run. Those suites need a display and an
+  editor, so they are not part of `test-all.mjs` unless you pass `--editor`.
 - **First paint.** Styles are applied by the engine after it loads, so large
   pages can flash unstyled content (CLS). The build output fixes this for
   static pages (real CSS paints before any JS). For live pages, the docs site

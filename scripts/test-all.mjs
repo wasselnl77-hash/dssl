@@ -10,6 +10,7 @@ import { findChrome } from './lib/browser-harness.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const skipBrowser = process.argv.includes('--no-browser');
+const withEditor = process.argv.includes('--editor');   // also run the extension inside a real VS Code / VSCodium (needs a display)
 const SUITES = [
   ['engine 0.5', 'test-v050.mjs'], ['engine 0.6', 'test-v060.mjs'], ['engine 0.7', 'test-v070.mjs'], ['parser lines 0.7.1', 'test-v071.mjs'],
   ['review fixes 0.7.2', 'test-v072.mjs'], ['exit lane 0.8.0', 'test-v073.mjs'], ['follow-up 0.8.1', 'test-v081.mjs'], ['cascade 0.8.2', 'test-v082.mjs'],
@@ -24,6 +25,7 @@ if (!skipBrowser && !findChrome()) {
   process.exit(2);
 }
 const rows = [];
+if (withEditor) SUITES.push(['extension inside a real editor', 'test-in-editor.mjs', true], ['designer and typing in a real editor', 'test-editor-ui.mjs', true]);
 for (const [name, file, browser] of SUITES) {
   if (browser && skipBrowser) { rows.push([name, 'skipped', '']); continue; }
   const t0 = Date.now();

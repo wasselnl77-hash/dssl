@@ -61,3 +61,6 @@ mini-services/
 
 # local screenshots, never published
 .zscripts/
+
+# real-editor test scratch (scripts/test-in-editor.mjs)
+/.vsc-test/

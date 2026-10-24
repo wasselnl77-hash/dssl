@@ -71,6 +71,7 @@ function registerCompletion() {
         return result.items.map((it) => {
           const item = new vscode.CompletionItem(it.label, KIND[it.kind] || vscode.CompletionItemKind.Text);
           item.detail = it.detail;
+          if (it.sort) item.sortText = it.sort + it.label;
           if (it.documentation) item.documentation = new vscode.MarkdownString(it.documentation);
           return item;
         });

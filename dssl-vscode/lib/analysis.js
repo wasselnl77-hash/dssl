@@ -164,7 +164,11 @@ export function contextAt(text, offset) {
   const tokenDot = lineToCursor.match(/([\w-]+)\.([\w-]*)$/);
   // declaration line: "prop: value..." anchored at line start, but a line
   // that also opens a block ("a:hover {") is a selector, not a declaration
-  let declMatch = lineToCursor.match(/^(\s*)(-{0,2}[.\w-]+)\s*:\s*([\s\S]*)$/);
+  // 0.12.0: the declaration is the part after the last "{", ";" or "}" on the line, so `.t { texture: |` and
+  // `.a { color: red; background: |` complete values too. Before this only a declaration that started its line did.
+  const cut = Math.max(lineToCursor.lastIndexOf('{'), lineToCursor.lastIndexOf(';'), lineToCursor.lastIndexOf('}'));
+  const statement = cut >= 0 ? lineToCursor.slice(cut + 1) : lineToCursor;
+  let declMatch = statement.match(/^(\s*)(-{0,2}[.\w-]+)\s*:\s*([\s\S]*)$/);
   if (declMatch && declMatch[3].includes('{')) declMatch = null;
   // the value prefix is the trailing word segment: after "gap " (typed +
   // space) it is empty, so completions re-open for the next word
@@ -222,12 +226,16 @@ export function completionsAt(analysis, path, text, offset) {
         items.push({ label: k, kind: 'keyword', detail: 'animate option', documentation: ANIMATE_EXTRAS[k] || 'animate option' });
       }
     }
-    items.push(...domainItems(prop));
-    for (const k of CSS_KEYWORDS) {
-      items.push({ label: k, kind: 'keyword', detail: 'keyword' });
-    }
+    // the words that belong to THIS property (presets after texture:, settings after glass:) sort first, then tokens, then the long
+    // list of generic CSS keywords; otherwise the editor buries `oak` under a hundred vendor keywords
+    const mark = (list, sort) => { for (const it of list) it.sort = sort; return list; };
+    mark(items, '0');
+    items.push(...mark(domainItems(prop), '0'));
     for (const key of Object.keys(analysis.registry)) {
-      items.push({ label: key, kind: 'value', detail: 'token = ' + analysis.registry[key], documentation: `token ${key} = ${analysis.registry[key]}` });
+      items.push({ label: key, kind: 'value', detail: 'token = ' + analysis.registry[key], documentation: `token ${key} = ${analysis.registry[key]}`, sort: '1' });
+    }
+    for (const k of CSS_KEYWORDS) {
+      items.push({ label: k, kind: 'keyword', detail: 'keyword', sort: '2' });
     }
     return { items, context: 'value' };
   }

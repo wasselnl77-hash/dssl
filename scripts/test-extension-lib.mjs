@@ -4,7 +4,7 @@
  * behave through the exact code the .vsix ships. Run before packaging. */
 import { resolve } from '../dssl-vscode/lib/engine/resolver.js';
 import { parse, STATE_WORDS } from '../dssl-vscode/lib/engine/parser.js';
-import { analyzeWorkspace, diagnosticsFor } from '../dssl-vscode/lib/analysis.js';
+import { analyzeWorkspace, diagnosticsFor, completionsAt } from '../dssl-vscode/lib/analysis.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; console.log(`  ok  ${name}`); } else { fail++; console.log(`FAIL  ${name}`); } };
@@ -39,6 +39,23 @@ ok('STATE_WORDS exported by bundled parser', STATE_WORDS instanceof Set && STATE
 // 5. TIME_PROPS fix reachable through the bundle: bare delay becomes ms
 const tDoc = compileDoc('card { transition-delay: 200 }', 't.dssl');
 ok('bare transition-delay becomes 200ms', /200\s*ms|200ms/.test(JSON.stringify(tDoc.rules[0].decls)));
+
+// completions where the declaration does not start the line (found by driving a real editor, 0.12.0)
+{
+  const an = analyzeWorkspace(new Map([['/w/a.dssl', '.a { color: red }']]));
+  const labels = (text) => completionsAt(an, '/w/a.dssl', text, text.length).items.map((x) => x.label);
+  const oneLine = labels('.t { texture: ');
+  ok('one-line rule: after "texture: " the presets are offered', oneLine.includes('oak') && oneLine.includes('rings') && !oneLine.includes('::after'), oneLine.slice(0, 5).join());
+  const second = labels('.t { color: red; glass: ');
+  ok('the words for the property sort before generic CSS keywords', (() => { const it = completionsAt(an, '/w/a.dssl', '.t { texture: ', 14).items; const oak = it.find((x) => x.label === 'oak'), kw = it.find((x) => x.label === 'absolute'); return oak && kw && (oak.sort + oak.label) < (kw.sort + kw.label); })());
+  ok('a second declaration on the line completes too', second.includes('saturate') && second.includes('tint'), second.slice(0, 5).join());
+  const afterBrace = labels('.t { tilt: ');
+  ok('tilt settings after the brace', afterBrace.includes('lift') && afterBrace.includes('glare'));
+  const fresh = labels('.t { ');
+  ok('right after "{" it still offers property names, not values', fresh.includes('background') && !fresh.includes('oak'));
+  ok('a normal multi-line declaration still works', labels('.t {\n  texture: ').includes('oak'));
+  ok('a nested selector line is still not a declaration', !labels('.t {\n  a:hover').includes('oak'));
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

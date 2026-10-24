@@ -279,7 +279,7 @@ function buildTextureTab() {
   const settings = h('div', {});
   const swatch = h('div', { class: 'swatch', id: 'tex-swatch' });
   const baseColor = h('input', { type: 'color', value: s.base, onchange: (e) => { s.base = e.target.value; swatch.style.backgroundColor = s.base; } });
-  const numeric = ['scale', 'intensity', 'contrast', 'threshold', 'octaves', 'seed', 'depth', 'light', 'angle', 'thickness', 'radius', 'softness', 'contour', 'animate'];
+  const numeric = ['scale', 'intensity', 'contrast', 'threshold', 'octaves', 'seed', 'depth', 'light', 'angle', 'thickness', 'radius', 'softness', 'contour', 'animate', ...core.RINGS_ONLY];
 
   function rebuild() {
     layerBar.replaceChildren(...s.layers.map((l, i) => h('button', { class: 'mini' + (i === tex.sel ? ' on' : ''), onclick: () => { tex.sel = i; rebuild(); } }, `${i + 1}. ${l.name}`)),
@@ -291,7 +291,9 @@ function buildTextureTab() {
     const eff = (k) => (L.set[k] !== undefined ? L.set[k] : base[k]);
     const info = h('div', { class: 'note' }, PRESETS[L.name] ? `${L.name}: ${PRESETS[L.name].doc}` : `${L.name} (a generator: set it up yourself)`);
     settings.append(info);
+    const isRings = (base.gen || L.name) === 'rings';
     for (const k of numeric) {
+      if (core.RINGS_ONLY.includes(k) && !isRings) continue;   // wood settings only show for wood
       const def = TEXTURE_KEYS[k];
       const dflt = base[k] !== undefined ? base[k] : (def.min + Math.min(def.max, 20) / 2);
       const step = def.int ? 1 : def.max <= 2 ? 0.05 : def.max <= 40 ? 0.1 : 1;
@@ -304,6 +306,7 @@ function buildTextureTab() {
       num('stretch y', () => (L.set.stretch || st)[1], (v) => { L.set.stretch = [(L.set.stretch || st)[0], v]; }, 1, 80, 1),
       select('blend', () => eff('blend') || 'normal', (v) => { L.set.blend = v; }, ['normal', 'multiply', 'screen', 'overlay', 'soft-light', 'hard-light', 'color-burn', 'color-dodge', 'darken', 'lighten', 'difference', 'exclusion']),
       select('type', () => eff('type') || 'fractal', (v) => { L.set.type = v; }, ['fractal', 'turbulence']),
+      select('mirror tile (symmetrical)', () => L.set.symmetrical || 'none', (v) => { L.set.symmetrical = v === 'none' ? undefined : v; }, ['none', 'both', 'x', 'y']),
       check('invert', () => !!L.set.invert, (v) => { L.set.invert = v || undefined; }),
       h('div', { class: 'pair' },
         check('own colour', () => !!L.color, (v) => { L.color = v ? (L.color || { hex: '#000000', a: 1 }) : null; rebuild(); }),

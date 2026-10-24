@@ -121,5 +121,18 @@ section('random sweep: everything the panel can write compiles and reads back');
   ok(`${n} random designs all compile and read back (aura both styles, texture, slider)`, bad.length === 0, `${bad.length} problems; first: ${bad[0]}`);
 }
 
+// 0.11/0.12: the wood settings and the mirrored tile survive the designer both ways
+{
+  const mk = (set) => ({ layers: [{ name: 'oak', set, color: null, color2: null }], base: '#b8a58a' });
+  const t1 = core.textureToDssl(mk({ planks: 120, knots: 2, figure: 0.8, symmetrical: 'both' }));
+  ok('wood settings are written (planks, knots, figure, symmetrical)', /^texture: oak /.test(t1) && /planks 120/.test(t1) && /knots 2/.test(t1) && /figure 0.8/.test(t1) && /symmetrical(?! (x|y|both))/.test(t1), t1);
+  ok('and the result compiles', compiles(t1).ok, JSON.stringify(compiles(t1)));
+  const back = core.textureFromDssl(t1).state.layers[0];
+  ok('and reads back into the same controls', back.name === 'oak' && back.set.planks === 120 && back.set.knots === 2 && back.set.figure === 0.8 && back.set.symmetrical === 'both', JSON.stringify(back));
+  ok('x and y are kept', /symmetrical x/.test(core.textureToDssl(mk({ symmetrical: 'x' }))) && core.textureFromDssl('texture: oak symmetrical y').state.layers[0].set.symmetrical === 'y');
+  ok('a preset that already says nothing special writes just its name', core.textureToDssl(mk({})) === 'texture: oak');
+  ok('RINGS_ONLY lists exactly the settings that only mean something for wood', JSON.stringify(core.RINGS_ONLY) === JSON.stringify(['figure', 'warp', 'pores', 'knots', 'planks']));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

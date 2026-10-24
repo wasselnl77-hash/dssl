@@ -155,7 +155,9 @@ export function auraFromDssl(text) {
 export const defaultTextureLayer = (name = 'grain') => ({ name, set: {}, color: null, color2: null });
 export const defaultTextureState = () => ({ layers: [defaultTextureLayer('wood')], base: '#b8a58a' });
 
-const TEXTURE_NUMERIC = ['scale', 'intensity', 'contrast', 'threshold', 'octaves', 'seed', 'depth', 'light', 'angle', 'thickness', 'radius', 'softness', 'contour', 'animate'];
+const TEXTURE_NUMERIC = ['scale', 'intensity', 'contrast', 'threshold', 'octaves', 'seed', 'depth', 'light', 'angle', 'thickness', 'radius', 'softness', 'contour', 'animate', 'figure', 'warp', 'pores', 'knots', 'planks'];
+/** the settings that only mean something for the rings (wood) generator */
+export const RINGS_ONLY = ['figure', 'warp', 'pores', 'knots', 'planks'];
 
 /** what a preset or generator would use with no overrides, to know what to leave out of the output */
 function baselineFor(name) {
@@ -170,6 +172,7 @@ export function textureLayerToDssl(layer) {
   if (layer.set.stretch && (layer.set.stretch[0] !== (base.stretch || [1, 1])[0] || layer.set.stretch[1] !== (base.stretch || [1, 1])[1])) w.push('stretch', fmt(layer.set.stretch[0]), fmt(layer.set.stretch[1]));
   if (layer.set.type && layer.set.type !== base.type) w.push('type', layer.set.type);
   if (layer.set.blend && layer.set.blend !== base.blend) w.push('blend', layer.set.blend);
+  if (layer.set.symmetrical && layer.set.symmetrical !== base.symmetrical) w.push('symmetrical', ...(layer.set.symmetrical === 'both' ? [] : [layer.set.symmetrical]));
   if (layer.set.invert) w.push('invert');
   if (layer.color) w.push('color', colorToDssl(layer.color));
   if (layer.color2) w.push('color2', colorToDssl(layer.color2));
@@ -181,7 +184,7 @@ export const textureToDssl = (state) => (state.layers.length ? `texture: ${state
 function fromParsedTexture(parsed) {
   const layer = defaultTextureLayer(parsed.preset || parsed.gen);
   const base = baselineFor(layer.name);
-  for (const k of [...TEXTURE_NUMERIC, 'stretch', 'type', 'blend', 'invert']) if (parsed[k] !== undefined && JSON.stringify(parsed[k]) !== JSON.stringify(base[k])) layer.set[k] = parsed[k];
+  for (const k of [...TEXTURE_NUMERIC, 'stretch', 'type', 'blend', 'invert', 'symmetrical']) if (parsed[k] !== undefined && JSON.stringify(parsed[k]) !== JSON.stringify(base[k])) layer.set[k] = parsed[k];
   if (parsed.color !== undefined && parsed.color !== base.color) layer.color = dsslToColor(parsed.color);
   if (parsed.color2 !== undefined && parsed.color2 !== base.color2) layer.color2 = dsslToColor(parsed.color2);
   return layer;

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.12.1
+
+Found by running the extension inside a real VSCodium and clicking through it (`node scripts/test-editor-ui.mjs`):
+
+- **Completions in a one-line rule.** `.t { texture: |` offered selectors and pseudo-elements instead of texture
+  words, because only a declaration that started its line was recognised. A declaration after `{` or `;` now
+  completes too.
+- **The right words come first.** After `texture:` the presets and settings now sort above the long list of generic
+  CSS keywords, so `oak` is not buried under a hundred vendor keywords.
+- **The designer knows wood.** The Texture tab now has `figure`, `warp`, `pores`, `knots` and `planks` (shown only for
+  the rings generator and the wood species) and a `mirror tile` choice for `symmetrical`. Before, these were written
+  and read back wrongly, and could not be tuned at all.
+
 ## 0.12.0
 
 - Bundled engine updated to 0.12.0: `texture: ... symmetrical`, a `fonts { }` block, richer `gradient:` sentences

@@ -90,4 +90,4 @@ Wait for the `dssl-ready` event on `window` before measuring layout: the engine 
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.12.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.12.1.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.
