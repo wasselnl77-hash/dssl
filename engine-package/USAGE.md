@@ -68,13 +68,15 @@ Bare numbers are pixels. States like `hover` are nested blocks. The engine keeps
 - `DSSL.load(urls)` fetch and apply one or more `.dssl` files (fetched in parallel, applied in order)
 - `DSSL.apply(source, { name, scope })` apply a source string
 - `DSSL.compile(source)` parse and resolve without touching the DOM, returns `ok`, `errors` and stats
-- `DSSL.signal(name, value)` drive styles from JS with `@signal` conditions in your `.dssl`
+- `DSSL.signal(name, value)` drive styles from JS with `@signal` conditions in your `.dssl`; `DSSL.signal(name, value, el)` for one subtree only. Booleans and numbers stay booleans and numbers
 - `DSSL.refresh()` force a full recompute
 - `DSSL.replay(selector)` replay entrance motions on matching elements
 - `DSSL.errors()` a function: the last reported errors (also grouped in the console, with did-you-mean hints)
 - `DSSL.version` the engine version, a string (not a function)
 - `DSSL.toCSS(source | [sources], opts)` compile to plain CSS (the `dssl build` lane): `{ css, map, report }`
-- `DSSL.getSignal(name)` read a signal back
+- `DSSL.getSignal(name)` read a signal back (`DSSL.getSignal(name, el)` for the value an element sees)
+- `DSSL.flush()` / `await DSSL.settled()` style everything that is waiting right now, so `offsetTop` and computed styles are final; `DSSL.computed(el, prop)` is the final computed value
+- `DSSL.pauseMotion()`, `DSSL.stepMotion(ms)`, `DSSL.resumeMotion()` freeze, step and release every animation, for tests
 - `DSSL.refresh(el)` / `DSSL.freeze(el)` / `DSSL.unfreeze(el)` one subtree: restyle it, or style it once and leave it alone
 - `DSSL.explain(el)`, `await DSSL.inspect()`, `await DSSL.watch()`, `await DSSL.lint(root)` find out why a style is what it is, hot reload, check the live page
 - `DSSL.play(el, 'motion', opts)` run a motion once from JS (a promise), `DSSL.motion('full')` ignore reduced motion, `DSSL.auraZ(n)` aura canvas z-index

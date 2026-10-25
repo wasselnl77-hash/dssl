@@ -12,6 +12,20 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.15.0",
+    date: "growth phase \u00b7 the second game review",
+    title: "Smoke that stops, scoped signals, and rules that tell you they never win.",
+    why: "the builder came back after shipping a real game and listed what still hurt. Most of it was aura edge cases and silent losses.",
+    kind: "add",
+    body:
+      "Aura keeps up with moving things under reduced motion (it used to redraw twice a second), stops emitting from anything you cannot see (opacity 0, display none, visibility hidden, on it or any ancestor), and takes z 5 to sit under a hill. There is no specificity, so a rule in an earlier file that a later rule always beats used to lose without a word; dssl check, the console and DSSL.lint now name both rules. Signals keep their type, DSSL.signal(name, value, el) scopes one to a subtree, and a signal restyles only the elements its rules select. await DSSL.settled() makes styling final the moment you need it, DSSL.computed(el, prop) reads the real value, and DSSL.pauseMotion(), stepMotion(ms) and resumeMotion() freeze and step every animation for tests. animate takes a list (blink and waddle on one element, also on ::before and in dssl build), DSSL.play takes a pseudo element, outline-shape draws an outline that follows the picture's alpha, rotate: 5 is 5deg, a state can sit inside ::after, and a CSS-style font: is now an error that says what DSSL's font: means. DSSL.lint skips invisible text and respects text-stroke and tight shadows. The dssl command takes --engine ./dssl. Not verified: Firefox and Safari.",
+    code: `.duck { animate: blink 300 infinite, waddle 900 infinite alternate }
+.sprite { outline-shape: 3 color.ink }
+.btn { ::after { content: ""; opacity: 0; hover { opacity: 1 } } }
+DSSL.signal('screen', 'shop', paneB)
+await DSSL.settled()`,
+  },
+  {
     version: "v0.14.0",
     date: "growth phase \u00b7 made for games",
     title: "A review from an agent that built a game, and all twelve problems fixed.",

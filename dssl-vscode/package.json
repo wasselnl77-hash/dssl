@@ -2,7 +2,7 @@
   "name": "dssl-vscode",
   "displayName": "DSSL Language Support",
   "description": "The DSSL style language in your editor: syntax highlighting, real-compiler diagnostics (the same errors the browser console shows), completions from the live token registry and for textures, auras and sliders, hover docs, an interactive designer with sliders and live previews for aura, texture and range sliders, and a CSS to DSSL converter. Works in VS Code and VSCodium.",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "publisher": "ehs-studio",
   "icon": "icon.png",
   "license": "MIT",

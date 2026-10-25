@@ -346,6 +346,14 @@
     {
       "key": "unclipped",
       "doc": "let the light spill out of a parent that clips (overflow: hidden, auto, scroll). Without it the aura is cut at that edge, like the element itself"
+    },
+    {
+      "key": "always",
+      "doc": "keep emitting even when the element cannot be seen (opacity 0, display: none, visibility: hidden, on it or an ancestor): for an invisible anchor that smoke or sparks come out of"
+    },
+    {
+      "key": "z",
+      "doc": "the z-index of the layer this light is drawn on: `z 5` puts it under a hill with z-index 10. It meets elements in the page's root stacking context"
     }
   ],
   "particleKeys": [
@@ -428,6 +436,14 @@
     {
       "key": "unclipped",
       "doc": "let the particles leave a parent that clips (overflow: hidden, auto, scroll). Without it they are cut at that edge"
+    },
+    {
+      "key": "always",
+      "doc": "keep emitting even when the element cannot be seen (opacity 0, display: none, visibility: hidden, on it or an ancestor): for an invisible anchor that smoke or sparks come out of"
+    },
+    {
+      "key": "z",
+      "doc": "the z-index of the layer these particles are drawn on: `z 5` puts them under a hill with z-index 10. It meets elements in the page's root stacking context"
     }
   ],
   "sliderClauses": [

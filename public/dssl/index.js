@@ -19,7 +19,7 @@ import { resolve, DEFAULT_TOKENS, EASINGS } from './resolver.js';
 import { toCSS as docToCSS } from './static.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.14.0';
+export const VERSION = '0.15.0';
 
 let counter = 0;
 const loadedUrls = new Set();   // every .dssl file fetched by load(), so DSSL.watch() knows what to follow
@@ -173,8 +173,15 @@ export function toCSS(input, opts = {}) {
   return { ...built, ok: errors.length === 0, errors, warnings };
 }
 
-export function signal(name, value) { for (const e of engines.values()) e.signal(name, value); }
-export function getSignal(name) { return engines.get('global')?.getSignal(name); }
+/** DSSL.signal('screen', 'menu') for the whole page; DSSL.signal('hp', 2, el) only for el and what is inside it (the nearest wins).
+ *  Booleans and numbers are kept as they are: DSSL.getSignal('toasting') is true, not "true". */
+export function signal(name, value, el) { for (const e of engines.values()) e.signal(name, value, el); }
+export function getSignal(name, el) { return engines.get('global')?.getSignal(name, el); }
+/** DSSL.flush() styles everything that is waiting, right now, so that computed styles and layout (offsetTop...) are final on the next line.
+ *  Styling normally happens a moment after a change, in a microtask. */
+export function flush() { for (const e of engines.values()) e.flush(); }
+/** await DSSL.settled(): the same, for code that can wait. It also lets anything the flush itself queued finish. */
+export async function settled() { flush(); await Promise.resolve(); flush(); }
 /**
  * DSSL.play(el, 'boing', { duration, delay, easing, iterations, hold, essential, jitter }) runs a motion once from JavaScript and
  * returns a promise for the animation, which settles when it ends. `hold: true` keeps the final frame instead of snapping back
@@ -199,9 +206,34 @@ export function play(el, name, opts = {}) {
   const jit = opts.jitter ? Math.round(Math.random() * ms(opts.jitter, 0)) : 0;
   let anim;
   try {
-    anim = el.animate(frames, { duration: ms(opts.duration, 400), delay: ms(opts.delay, 0) + jit, easing, iterations: opts.iterations === 'infinite' ? Infinity : (opts.iterations || 1), direction: opts.direction || 'normal', fill: opts.hold ? 'forwards' : (opts.fill || 'none') });
+    const pseudoElement = opts.pseudo ? (String(opts.pseudo).startsWith(':') ? String(opts.pseudo) : '::' + opts.pseudo) : undefined;   // 0.15.0: DSSL.play(el, 'pop', { pseudo: '::after' })
+    anim = el.animate(frames, { ...(pseudoElement ? { pseudoElement } : {}), duration: ms(opts.duration, 400), delay: ms(opts.delay, 0) + jit, easing, iterations: opts.iterations === 'infinite' ? Infinity : (opts.iterations || 1), direction: opts.direction || 'normal', fill: opts.hold ? 'forwards' : (opts.fill || 'none') });
   } catch (e) { return Promise.reject(e); }
+  if (eng && eng.motionHeld) { try { anim.pause(); } catch { /* ignore */ } }
   return anim.finished.then(() => anim, () => anim);   // a cancelled animation settles too, so awaiting it never hangs
+}
+
+/**
+ * For tests and for stepping a game one tick at a time. DSSL.pauseMotion() freezes every animation on the page (and every one DSSL
+ * starts afterwards); DSSL.stepMotion(100) moves them all forward by 100 ms, whatever the clock says; DSSL.resumeMotion() lets them run.
+ * DSSL.computed(el, 'translate') is the final computed value right now, with nothing left waiting to be styled.
+ */
+export function pauseMotion() { for (const e of engines.values()) e.motionHeld = true; flush(); let n = 0; for (const a of document.getAnimations()) { try { a.pause(); n++; } catch { /* ignore */ } } return n; }
+export function stepMotion(ms = 16.7) {
+  const n = pauseMotion();
+  for (const a of document.getAnimations()) {
+    try {
+      const t = Number(a.currentTime) || 0;
+      a.currentTime = t + ms;
+    } catch { /* ignore */ }
+  }
+  return n;
+}
+export function resumeMotion() { for (const e of engines.values()) e.motionHeld = false; let n = 0; for (const a of document.getAnimations()) { try { if (a.playState === 'paused') { a.play(); n++; } } catch { /* ignore */ } } return n; }
+export function computed(el, prop, pseudo) {
+  flush();
+  const cs = getComputedStyle(el, pseudo || null);
+  return prop.includes('-') ? cs.getPropertyValue(prop) : (cs[prop] !== undefined ? cs[prop] : cs.getPropertyValue(prop));
 }
 
 /** DSSL.auraZ(20): the z-index of the one canvas aura draws on (default: above everything). Menus and overlays with a higher z-index then cover it. */
@@ -317,7 +349,7 @@ export async function watch(o = {}) {
 }
 
 export const DSSL = {
-  version: VERSION, compile, apply, load, toCSS, signal, getSignal, refresh, replay, errors,
+  version: VERSION, compile, apply, load, toCSS, signal, getSignal, flush, settled, computed, pauseMotion, stepMotion, resumeMotion, refresh, replay, errors,
   freeze, unfreeze, explain, inspect, watch, play, motion, auraZ, lint,
   __debug: { engines },
 };

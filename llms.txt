@@ -5,7 +5,7 @@
 - Site (docs, playground, changelog, bench): https://dssl-sable.vercel.app
 - Repo + full docs in the README: https://huggingface.co/EHS-Studio/dssl
 - Install: `curl -fsSL https://dssl-sable.vercel.app/install.sh | sh` (or the zip: https://dssl-sable.vercel.app/dssl-engine.zip)
-- Version: 0.14.0 (engine), MIT license
+- Version: 0.15.0 (engine), MIT license
 - Feature matrix vs CSS: see PARITY.md in the repo
 - For agents working ON the codebase: see AGENTS.md in the repo
 
@@ -43,10 +43,11 @@ DSSL.load(['/styles/site.dssl'])   // fetch + apply, in order
 DSSL.apply(src, { scope, name })   // scoped engines for widgets
 DSSL.compile(src)                  // parse + resolve, no DOM (powers editors)
 DSSL.toCSS(src)                    // v0.8.0: the exit lane -> { css, report }
-DSSL.signal('menuOpen', true)      // the JS -> styles bridge
+DSSL.signal('menuOpen', true)      // the JS -> styles bridge; DSSL.signal(name, value, el) for one subtree
+await DSSL.settled() / DSSL.flush() // style everything waiting now (offsetTop is final after it)
 DSSL.freeze() / DSSL.unfreeze()    // the speed handbrake
 DSSL.explain(el, { quiet: true })  // matched rules, file/line, winning decls per property
-DSSL.replay(sel) / DSSL.refresh([el]) / DSSL.errors() (a function) / DSSL.version (a string) / DSSL.getSignal(name) / DSSL.freeze([el]) / DSSL.unfreeze([el]) / await DSSL.inspect() / await DSSL.watch() / await DSSL.lint(root) / DSSL.play(el, motion, opts) / DSSL.motion('full'|'reduced'|'auto') / DSSL.auraZ(n)
+DSSL.replay(sel) / DSSL.refresh([el]) / DSSL.errors() (a function) / DSSL.version (a string) / DSSL.getSignal(name) / DSSL.freeze([el]) / DSSL.unfreeze([el]) / await DSSL.inspect() / await DSSL.watch() / await DSSL.lint(root) / DSSL.play(el, motion, opts) / DSSL.motion('full'|'reduced'|'auto') / DSSL.auraZ(n) / DSSL.computed(el, prop) / DSSL.pauseMotion() / DSSL.stepMotion(ms) / DSSL.resumeMotion()
 ```
 
 ## 0.9.0: texture, aura, sliders, lint, import
@@ -62,6 +63,15 @@ DSSL.replay(sel) / DSSL.refresh([el]) / DSSL.errors() (a function) / DSSL.versio
 - `tilt: 10 lift 1.04 perspective 900 speed 0.18 invert glare` turns toward the pointer in 3D. Runtime only. `glare` keeps `--dssl-gx` and `--dssl-gy` pointing at the pointer. Ignores touch, flat under reduced motion, stops on freeze. Do not combine with `bend` or `fold`.
 - Alpha on a named colour works: `white/12`, `currentColor/20`. It used to compile to `white/12px`.
 - The playground has a canvas.html tab, `?example=` links, lint warnings and an "as CSS" tab. The canvas keeps a short allow-list of tags and drops scripts, handlers, styles and ids.
+
+## 0.15.0: the second game review
+- Aura: it follows moving things under reduced motion (a quick look every 100ms, a full frame whenever something moved), skips emitters that cannot be seen (opacity 0 or display: none or visibility: hidden on it or any ancestor, and what they let go fades with them; the word `always` keeps an invisible anchor emitting), and takes `z N` to draw a layer on its own canvas at that z-index (`aura-glow: #f80 40 z 5` goes under a hill with z-index 10; it meets elements in the root stacking context).
+- `dssl check` and the console name rules that can never apply: a rule that a LATER rule matches everywhere and overrides (`.prop.broc { z-index: 1 }` before a plain `.prop { z-index: 2 }`; there is no specificity). The same selector again is left alone, that is an override.
+- Signals keep their type (`getSignal('x')` is `true`, not `"true"`; `0` is off). `DSSL.signal(name, value, el)` scopes one to a subtree (the nearest wins). A signal restyles only the elements its rules select. `await DSSL.settled()` / `DSSL.flush()` make styling final right away.
+- `animate: blink 300 infinite, waddle 900 infinite alternate` runs several motions on one element (also on ::before and ::after, and in `dssl build`). `DSSL.play(el, 'pop', { pseudo: '::after' })`.
+- `outline-shape: 3 color.ink` outlines the shape's alpha, not its box (four hard drop-shadows, square corners; uses `filter`). `rotate: 5` is 5deg. A state inside a pseudo-element block (`::after { hover { opacity: 1 } }`) is that pseudo-element in that state. `font: bold 16px Arial` is now an error that says DSSL's `font:` is size/line-height and colour.
+- `DSSL.lint` skips invisible text and judges text-stroke and tight text-shadow. `dssl ... --engine ./dssl` (or DSSL_ENGINE) finds the engine anywhere. `DSSL.pauseMotion()`, `stepMotion(ms)`, `resumeMotion()` and `DSSL.computed(el, prop)` for tests.
+- Gradients: the first layer is the one on top.
 
 ## 0.14.0: made for games (from a review by an agent that built one)
 - Reduced motion is never silent. A plain `animate:` does not run when the system asks for reduced motion; the console now says so once, and says how to get out: put `essential` in the motion block or on the animate line, or `DSSL.motion('full')` / `<html data-dssl-motion="full">` to run everything (`'reduced'` holds all still, `'auto'` follows the system).
@@ -111,4 +121,4 @@ Wait for the `dssl-ready` event on `window` before measuring layout: the engine 
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.14.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.15.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.

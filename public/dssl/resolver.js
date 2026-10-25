@@ -710,6 +710,38 @@ const DEFORM_TO_TRANSFORM = {
   fold: 'transform', stretch: 'transform',
 };
 
+/** one motion of an animate: line: `bob 1200 infinite alternate delay 100 jitter 600 essential` */
+function animateOne(t, ctx) {
+  const atoms = t.split(/\s+/);
+  const spec = { motion: atoms[0], duration: 400, easing: EASINGS.smooth, fill: 'both', delay: 0 };
+  const toMs = (a) => (a.endsWith('s') && !a.endsWith('ms') ? parseFloat(a) * 1000 : parseFloat(a));
+  for (let k = 1; k < atoms.length; k++) {
+    const a = atoms[k];
+    // 0.14.0: the words that used to be CSS longhands which did nothing here
+    if (a === 'delay' || a === 'jitter' || a === 'iterations') {
+      const v = atoms[k + 1];
+      if (v === undefined || !/^\d+(\.\d+)?(ms|s)?$/.test(v)) { ctx.errors.push({ file: ctx.file, line: ctx.line, message: `${a} needs a number`, hint: a === 'iterations' ? 'animate: boing 300 iterations 3' : `animate: bob 1200 infinite ${a} 600` }); continue; }
+      if (a === 'iterations') spec.iterations = parseFloat(v); else spec[a] = toMs(v);
+      k++;
+      continue;
+    }
+    if (a === 'essential') { spec.essentialHere = true; continue; }
+    if (/^\d+(ms|s)?$/.test(a)) {
+      const ms = toMs(a);
+      if (k === 1) spec.duration = ms; else spec.delay = ms;
+      continue;
+    }
+    if (EASINGS[a]) { spec.easing = EASINGS[a]; continue; }
+    if (['both', 'forwards', 'backwards', 'none', 'auto'].includes(a)) { spec.fill = a; continue; }
+    // v0.5.0 - looping: `infinite` runs forever, `alternate` ping-pongs.
+    // animate: pulse 1600 infinite alternate  - was impossible before.
+    if (a === 'infinite') { spec.iterations = Infinity; continue; }
+    if (['alternate', 'alternate-reverse', 'reverse', 'normal'].includes(a)) { spec.direction = a; continue; }
+    ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown animate part "${a}"`, hint: didYouMean(a, Object.keys(EASINGS).concat(['both', 'forwards', 'backwards', 'infinite', 'alternate', 'delay', 'jitter', 'iterations', 'essential'])) });
+  }
+  return [{ prop: '@animate', value: spec }];
+}
+
 const SEMANTIC = {
   size(v, ctx) {
     const parts = v.split(/\s+/).filter(Boolean);
@@ -795,6 +827,14 @@ const SEMANTIC = {
     const out = [];
     const slash = v.split('/');
     const head = slash[0].trim().split(/\s+/).filter(Boolean);
+    // 0.15.0: DSSL's font: is size/line-height and a colour, NOT the CSS shorthand (weight, style, family). A CSS-looking value used to
+    // become a 700px font; say what it is instead.
+    const sized = (x) => /^\d*\.?\d+(px|em|rem|%|pt|vw|vh|ch)$/.test(x);
+    if (/["',]/.test(v) || /^(italic|oblique|bold|bolder|lighter|normal|small-caps|condensed|expanded|caption|icon|menu|message-box|small-caption|status-bar|system-ui|serif|sans-serif|monospace)$/.test(head[0] || '')
+      || (/^[1-9]00$/.test(head[0] || '') && head[1] !== undefined && sized(head[1]))) {
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `font: "${v.trim()}" looks like the CSS font shorthand, but DSSL's font: means size, line height and colour`, hint: 'font: 16/1.5 color.ink  sets size, line-height and colour. Weight and family are their own lines: font-weight: 700  and  font-family: "Fraunces", serif' });
+      return [];
+    }
     out.push({ prop: 'font-size', value: len(head[0] || '16', ctx) });
     if (slash[1]) {
       const tail = slash[1].trim().split(/\s+/).filter(Boolean);
@@ -928,34 +968,14 @@ const SEMANTIC = {
   animate(v, ctx) {
     const t = v.trim();
     if (t === 'none') return [{ prop: '@animate', value: null }];
-    const atoms = t.split(/\s+/);
-    const spec = { motion: atoms[0], duration: 400, easing: EASINGS.smooth, fill: 'both', delay: 0 };
-    const toMs = (a) => (a.endsWith('s') && !a.endsWith('ms') ? parseFloat(a) * 1000 : parseFloat(a));
-    for (let k = 1; k < atoms.length; k++) {
-      const a = atoms[k];
-      // 0.14.0: the words that used to be CSS longhands which did nothing here
-      if (a === 'delay' || a === 'jitter' || a === 'iterations') {
-        const v = atoms[k + 1];
-        if (v === undefined || !/^\d+(\.\d+)?(ms|s)?$/.test(v)) { ctx.errors.push({ file: ctx.file, line: ctx.line, message: `${a} needs a number`, hint: a === 'iterations' ? 'animate: boing 300 iterations 3' : `animate: bob 1200 infinite ${a} 600` }); continue; }
-        if (a === 'iterations') spec.iterations = parseFloat(v); else spec[a] = toMs(v);
-        k++;
-        continue;
-      }
-      if (a === 'essential') { spec.essentialHere = true; continue; }
-      if (/^\d+(ms|s)?$/.test(a)) {
-        const ms = toMs(a);
-        if (k === 1) spec.duration = ms; else spec.delay = ms;
-        continue;
-      }
-      if (EASINGS[a]) { spec.easing = EASINGS[a]; continue; }
-      if (['both', 'forwards', 'backwards', 'none', 'auto'].includes(a)) { spec.fill = a; continue; }
-      // v0.5.0 - looping: `infinite` runs forever, `alternate` ping-pongs.
-      // animate: pulse 1600 infinite alternate  - was impossible before.
-      if (a === 'infinite') { spec.iterations = Infinity; continue; }
-      if (['alternate', 'alternate-reverse', 'reverse', 'normal'].includes(a)) { spec.direction = a; continue; }
-      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown animate part "${a}"`, hint: didYouMean(a, Object.keys(EASINGS).concat(['both', 'forwards', 'backwards', 'infinite', 'alternate', 'delay', 'jitter', 'iterations', 'essential'])) });
+    // 0.15.0: several motions on one element: animate: blink 300 infinite, waddle 900 infinite alternate
+    const parts = topSplit(t, ',').map((x) => x.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      const out = [];
+      for (const part of parts) for (const d of animateOne(part, ctx)) out.push(d);
+      return out;
     }
-    return [{ prop: '@animate', value: spec }];
+    return animateOne(t, ctx);
   },
   // v0.4.0 - choreography: a parent with `stagger: 60` offsets each element
   // child's animation delay by its DOM position. Pairs with `seen` + `animate`
@@ -1070,6 +1090,32 @@ const SEMANTIC = {
     const out = [{ prop: '-webkit-text-stroke', value: `${width} ${color}` }];
     if (!inside) out.push({ prop: 'paint-order', value: 'stroke fill' });
     return out;
+  },
+  // 0.15.0: an outline that follows the SHAPE's alpha (a sprite, an icon, a cut-out), not its box. It is four drop-shadows with no blur,
+  // one in each direction, which is what people write by hand. The corners come out square. It uses `filter`, so it replaces another filter on the same rule.
+  //   outline-shape: 3 color.ink      outline-shape: none
+  'outline-shape'(v, ctx) {
+    const atoms = (v || '').trim().split(/\s+/).filter(Boolean);
+    if (atoms.length === 1 && atoms[0] === 'none') return [{ prop: 'filter', value: 'none' }];
+    if (!atoms.length || !/^\d+(\.\d+)?(px)?$/.test(atoms[0])) {
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: 'outline-shape needs a width first', hint: 'outline-shape: 3 color.ink' });
+      return [];
+    }
+    const w = parseFloat(atoms[0]);
+    const color = atoms[1] ? resolveValue(atoms.slice(1).join(' '), { ...ctx, unitless: false, bareIdents: false }) : 'currentcolor';
+    const at = (x, y) => `drop-shadow(${x}px ${y}px 0 ${color})`;
+    return [{ prop: 'filter', value: [at(w, 0), at(-w, 0), at(0, w), at(0, -w)].join(' ') }];
+  },
+  // 0.15.0: an angle is a bare number like every other length: rotate: 5 is 5deg (the other forms, 5deg, 0.1turn, x 30, pass through)
+  rotate(v, ctx) {
+    const t = (v || '').trim();
+    const num = '-?\\d*\\.?\\d+';
+    let out;
+    if (new RegExp(`^${num}$`).test(t)) out = t + 'deg';
+    else if (new RegExp(`^[xyz]\\s+${num}$`).test(t)) out = t + 'deg';
+    else if (new RegExp(`^${num}\\s+${num}\\s+${num}\\s+${num}$`).test(t)) out = t + 'deg';
+    else out = resolveValue(t, { ...ctx, unitless: true });
+    return [{ prop: 'rotate', value: out }];
   },
   'gradient-text'(v, ctx) {
     const img = buildGradient(v, ctx);
@@ -1622,23 +1668,37 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null, baseMotion
             media: ctx.media, signals: ctx.signals, containers: ctx.containers,
             layer: ctx.layer, order: order++, decls: [], file, line: node.line,
           };
-          for (const d of node.children) {
-            if (d.kind !== 'decl') { errors.push({ file, line: d.line, message: 'only declarations may appear inside a pseudo-element block (v0.2)' }); continue; }
-            if (d.prop === 'content' && d.value === '') { srule.decls.push({ prop: 'content', value: '""', line: d.line }); continue; }
-            const resolved = resolveDecl(d.prop, d.value, { file, line: d.line, errors, warnings, tokens: tokenMap, tokenNames: tokenNames(), prop: d.prop, unitless: false });
-            // v0.5.0 - engine-native properties have no pseudo-element story:
-            // there is no DOM handle to nudge, animate, stack or stagger. They
-            // used to leak into the shadow sheet as junk CSS the browser
-            // silently dropped - exactly the silence this language refuses.
-            for (const r of resolved) {
-              if (r.prop.startsWith('@') && r.prop !== '@animate') {   // 0.14.0: animate: becomes a CSS animation on a pseudo-element
-                errors.push({ file, line: d.line, message: `"${d.prop}" is engine-native and has no meaning on ::${node.name} - a pseudo-element has no DOM handle`, hint: 'put it on the element itself, not inside the pseudo block' });
+          // 0.15.0: a state inside the pseudo-element block styles that pseudo-element in that state:
+          //   .btn { ::after { content: ""; hover { opacity: 1 } } }   is   .btn:hover::after
+          const fill = (target, kids) => {
+            for (const d of kids) {
+              if (d.kind === 'state' && target === srule) {
+                if (d.name === 'seen') { errors.push({ file, line: d.line, message: '"seen" is engine-native and has no meaning on a pseudo-element', hint: 'put seen { } on the element itself' }); continue; }
+                const st = { id: ruleId++, sel: base + ':' + d.name, pseudo: node.name, media: ctx.media, signals: ctx.signals, containers: ctx.containers, layer: ctx.layer, order: order++, decls: [], file, line: d.line };
+                fill(st, d.children);
+                stateRules.push(st);
                 continue;
               }
-              srule.decls.push({ ...r, line: d.line });
+              if (d.kind !== 'decl') { errors.push({ file, line: d.line, message: 'only declarations and states (hover { }) may appear inside a pseudo-element block' }); continue; }
+              if (d.prop === 'content' && d.value === '') { target.decls.push({ prop: 'content', value: '""', line: d.line }); continue; }
+              const resolved = resolveDecl(d.prop, d.value, { file, line: d.line, errors, warnings, tokens: tokenMap, tokenNames: tokenNames(), prop: d.prop, unitless: false });
+              // v0.5.0 - engine-native properties have no pseudo-element story:
+              // there is no DOM handle to nudge, animate, stack or stagger. They
+              // used to leak into the shadow sheet as junk CSS the browser
+              // silently dropped - exactly the silence this language refuses.
+              for (const r of resolved) {
+                if (r.prop.startsWith('@') && r.prop !== '@animate') {   // 0.14.0: animate: becomes a CSS animation on a pseudo-element
+                  errors.push({ file, line: d.line, message: `"${d.prop}" is engine-native and has no meaning on ::${node.name} - a pseudo-element has no DOM handle`, hint: 'put it on the element itself, not inside the pseudo block' });
+                  continue;
+                }
+                target.decls.push({ ...r, line: d.line });
+              }
             }
-          }
+          };
+          const stateRules = [];
+          fill(srule, node.children);
           if (srule.decls.length) shadowRules.push(srule);
+          for (const st of stateRules) if (st.decls.length) shadowRules.push(st);
           break;
         }
         case 'tokens': {

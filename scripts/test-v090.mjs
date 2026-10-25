@@ -301,7 +301,7 @@ section('dssl build: what stays in the runtime');
 
 /* ------------------------------------------------------------------ */
 section('release');
-ok('the engine version is 0.9 or later', /^0\.(9|1[0-4])\./.test(VERSION), VERSION);
+ok('the engine version is 0.9 or later', /^0\.(9|1[0-5])\./.test(VERSION), VERSION);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

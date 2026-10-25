@@ -36,12 +36,24 @@ import { fileURLToPath } from 'node:url';
 // next to cli/ as dssl/. 0.8.0 only knew the first layout, so the packaged CLI
 // crashed with "module not found" for everyone who installed it.
 const here = pathResolve(dirname(fileURLToPath(import.meta.url)), '..');
-const engineDir = existsSync(join(here, 'public/dssl/parser.js')) ? join(here, 'public/dssl') : join(here, 'dssl');
+// 0.15.0: `--engine ./dssl` (or DSSL_ENGINE=./dssl) points at the engine folder wherever it is, so the CLI file can live anywhere
+let engineDir = existsSync(join(here, 'public/dssl/parser.js')) ? join(here, 'public/dssl') : join(here, 'dssl');
+{
+  const i = process.argv.indexOf('--engine');
+  let want = process.env.DSSL_ENGINE || null;
+  if (i !== -1) { want = process.argv[i + 1] || null; process.argv.splice(i, want === null ? 1 : 2); if (want === null) { console.error('dssl: --engine needs a folder, e.g. --engine ./dssl'); process.exit(2); } }
+  if (want) {
+    const dir = pathResolve(want);
+    if (!existsSync(join(dir, 'parser.js'))) { console.error(`dssl: ${dir} has no parser.js, so it is not the engine folder (the folder that holds parser.js, resolver.js, index.js...)`); process.exit(2); }
+    engineDir = dir;
+  }
+}
 const { parse } = await import('file://' + join(engineDir, 'parser.js'));
 const { resolve } = await import('file://' + join(engineDir, 'resolver.js'));
 const { toCSS } = await import('file://' + join(engineDir, 'static.js'));
 const { VERSION } = await import('file://' + join(engineDir, 'index.js'));
 const { importCss } = await import('file://' + join(engineDir, 'import.js'));
+const { shadowWarnings } = await import('file://' + join(engineDir, 'lint.js'));
 
 const USAGE = `dssl v${VERSION} - the DSSL style language
 
@@ -69,7 +81,9 @@ const USAGE = `dssl v${VERSION} - the DSSL style language
   dssl dev [dir]         serve a folder with hot reload: edit a .dssl file and the page restyles with no reload
                          --port <n>     port (default 3000)
                          --inspect      also open the in-page inspector (hover an element to see its rules)
-  dssl --version         print the version`;
+  dssl --version         print the version
+
+  every command: --engine <dir> uses the engine in that folder (default: the one next to this file; or set DSSL_ENGINE)`;
 
 const readArg = (args, flag) => {
   const i = args.indexOf(flag);
@@ -147,6 +161,16 @@ function compileAll(files) {
     tokenBase = { ...(tokenBase || {}), ...doc.tokens };
     motionBase = { ...motionBase, ...(doc.motionFrames || {}) };
   }
+  // 0.15.0: a rule that can never win because a rule in a later file (or later in the same one) matches all it matches and sets the same thing.
+  // Per file this is invisible; across the page's files it is the commonest silent loss.
+  try {
+    const all = [];
+    out.forEach((x, i) => { for (const r of x.doc.rules || []) all.push({ ...r, file: r.file || x.name, order: i * 1e6 + (r.order || 0) }); });
+    for (const w of shadowWarnings(all)) {
+      const owner = out.find((x) => x.name === w.file) || out[0];
+      owner.warnings = [...owner.warnings, w];
+    }
+  } catch { /* a lint must never break a compile */ }
   return out;
 }
 

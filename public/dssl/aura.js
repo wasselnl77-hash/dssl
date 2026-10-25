@@ -49,6 +49,8 @@ export const GLOW_KEYS = {
   texture:   { kind: 'texture', words: 1, doc: 'texture(grain scale 2): break the light up with a texture' },
   essential: { kind: 'flag', words: 0, doc: 'keep animating even when the visitor prefers reduced motion' },
   unclipped: { kind: 'flag', words: 0, doc: 'let the light spill out of a parent that clips (overflow: hidden, auto, scroll). Without it the aura is cut at that edge, like the element itself' },
+  always:    { kind: 'flag', words: 0, doc: 'keep emitting even when the element cannot be seen (opacity 0, display: none, visibility: hidden, on it or an ancestor): for an invisible anchor that smoke or sparks come out of' },
+  z:         num(-1000000, 2147483000, { int: true, doc: 'the z-index of the layer this light is drawn on: `z 5` puts it under a hill with z-index 10. It meets elements in the page\'s root stacking context' }),
 };
 
 export const PARTICLE_KEYS = {
@@ -72,6 +74,8 @@ export const PARTICLE_KEYS = {
   texture:    { kind: 'texture', words: 1, doc: 'texture(grain): grainy particles' },
   essential:  { kind: 'flag', words: 0, doc: 'keep animating even when the visitor prefers reduced motion' },
   unclipped:  { kind: 'flag', words: 0, doc: 'let the particles leave a parent that clips (overflow: hidden, auto, scroll). Without it they are cut at that edge' },
+  always:     { kind: 'flag', words: 0, doc: 'keep emitting even when the element cannot be seen (opacity 0, display: none, visibility: hidden, on it or an ancestor): for an invisible anchor that smoke or sparks come out of' },
+  z:          num(-1000000, 2147483000, { int: true, doc: 'the z-index of the layer these particles are drawn on: `z 5` puts them under a hill with z-index 10. It meets elements in the page\'s root stacking context' }),
 };
 
 /* ------------------------------------------------------------------ *
@@ -382,6 +386,7 @@ export class AuraManager {
     // reduced motion draws a still picture, so it only needs a new frame when something could have moved
     this._onScroll = () => { if (this.reduced && !this.running && !this.paused && this.emitters.size) this.start(); };
     this._poll = null;
+    this.extra = new Map();        // z-index -> { canvas, ctx }: layers asked for with `z N`
     this._frame = (t) => this.frame(t);
   }
 
@@ -418,9 +423,60 @@ export class AuraManager {
     if (!this.canvas) return;
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.vw = window.innerWidth; this.vh = window.innerHeight;
-    this.canvas.width = Math.max(1, Math.round(this.vw * this.dpr));
-    this.canvas.height = Math.max(1, Math.round(this.vh * this.dpr));
+    for (const c of this.allCanvases()) {
+      c.width = Math.max(1, Math.round(this.vw * this.dpr));
+      c.height = Math.max(1, Math.round(this.vh * this.dpr));
+    }
     this.dirty = true;
+  }
+
+  allCanvases() { return [this.canvas, ...[...this.extra.values()].map((e) => e.canvas)]; }
+
+  /** the drawing context for a layer: the default canvas, or the one at the z-index the layer asked for (`z 5`) */
+  ctxFor(z) {
+    if (z === undefined || z === null) return this.ctx;
+    let e = this.extra.get(z);
+    if (!e) {
+      const c = document.createElement('canvas');
+      c.setAttribute('aria-hidden', 'true');
+      c.setAttribute('data-dssl-aura', String(z));
+      c.style.cssText = `position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:${z};`;
+      c.width = this.canvas.width; c.height = this.canvas.height;
+      (document.body || document.documentElement).appendChild(c);
+      e = { canvas: c, ctx: c.getContext('2d') };
+      this.extra.set(z, e);
+    }
+    return e.ctx;
+  }
+
+  /** how visible an element really is: its opacity times every ancestor's; 0 for display: none or visibility: hidden */
+  effectiveOpacity(el) {
+    try {
+      let o = 1;
+      if (getComputedStyle(el).visibility !== 'visible') return 0;
+      for (let a = el; a && a.nodeType === 1; a = a.parentElement) {
+        const cs = getComputedStyle(a);
+        if (cs.display === 'none') return 0;
+        o *= parseFloat(cs.opacity);
+        if (!(o > 0.004)) return 0;
+      }
+      return o;
+    } catch { return 1; }
+  }
+
+  /** what a frame would draw for this emitter, as a string: the same string twice means nothing needs redrawing */
+  stateKey(el, eo) {
+    const r = el.getBoundingClientRect();
+    return `${r.left.toFixed(1)},${r.top.toFixed(1)},${r.width.toFixed(1)},${r.height.toFixed(1)},${eo.toFixed(2)}`;
+  }
+
+  /** reduced motion: has anything moved, resized or faded since the last frame? (cheap: no drawing) */
+  peek() {
+    for (const [el, em] of this.emitters) {
+      if (!el.isConnected) return true;
+      if (this.stateKey(el, this.effectiveOpacity(el)) !== em.key) return true;
+    }
+    return false;
   }
 
   /* ---- the engine's interface ---- */
@@ -458,7 +514,7 @@ export class AuraManager {
     this.start();
   }
 
-  pause() { this.paused = true; this.running = false; if (this._poll) { clearTimeout(this._poll); this._poll = null; } if (this.ctx) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); }
+  pause() { this.paused = true; this.running = false; if (this._poll) { clearTimeout(this._poll); this._poll = null; } if (this.ctx) for (const c of this.allCanvases()) c.getContext('2d').clearRect(0, 0, c.width, c.height); }
   resume() { this.paused = false; this.start(); }
 
   destroy() {
@@ -467,6 +523,8 @@ export class AuraManager {
     window.removeEventListener('scroll', this._onScroll, { capture: true });
     if (this._poll) { clearTimeout(this._poll); this._poll = null; }
     if (this.io) this.io.disconnect();
+    for (const e of this.extra.values()) e.canvas.remove();
+    this.extra.clear();
     if (this.canvas) this.canvas.remove();
     this.canvas = null; this.ctx = null; this.emitters.clear();
   }
@@ -486,11 +544,15 @@ export class AuraManager {
     const dt = this.last ? Math.min(0.05, (now - this.last) / 1000) : 0.016;
     this.last = now;
     const reduced = this.reduced;
-    const ctx = this.ctx, dpr = this.dpr;
+    const dpr = this.dpr;
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const c of this.allCanvases()) {
+      const x = c.getContext('2d');
+      x.setTransform(1, 0, 0, 1, 0, 0);
+      x.clearRect(0, 0, c.width, c.height);
+      x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    let changed = false;
 
     // global budget: if everyone asks for more than the page can afford, everyone gets a share
     let want = 0;
@@ -498,6 +560,7 @@ export class AuraManager {
     const share = want > this.budget ? this.budget / want : 1;
 
     let alive = 0, anyActive = false;
+    this._n = (this._n || 0) + 1;
     for (const [el, em] of this.emitters) {
       if (!el.isConnected) { this.emitters.delete(el); if (this.io) this.io.unobserve(el); continue; }
       // read geometry once per frame for visible emitters
@@ -507,6 +570,12 @@ export class AuraManager {
         if (rect.width === 0 && rect.height === 0) rect = null;
       }
       em.rect = rect;
+      // 0.15.0: an emitter that cannot be seen (opacity 0 on it or any ancestor, display: none, visibility: hidden) does not emit, and
+      // what it already let go fades with it. Looked up every third frame, or every frame in reduced motion where frames are rare.
+      if (em.eo === undefined || reduced || this._n % 3 === 0) em.eo = this.effectiveOpacity(el);
+      if (em.layers.some((l) => l.cfg.always) || em.glow.some((g) => g.cfg.always)) em.eo = 1;   // an invisible anchor on purpose
+      const key = this.stateKey(el, em.eo);
+      if (key !== em.key) { em.key = key; changed = true; }
       // 0.14.0: a stage scaled with transform: scale() has a rect the size you SEE, so the light follows it, and so must its size
       // and speed. The scale is how much bigger (or smaller) the box is than the box CSS says it is.
       em.scale = 1;
@@ -518,11 +587,13 @@ export class AuraManager {
 
       // 0.14.0: cut the light at the edge of any parent that clips, so a stage with overflow: hidden keeps its fire inside
       const clipped = rect && em.clips && em.clips.length ? this.clipRect(em.clips) : null;
-      if (clipped) { ctx.save(); ctx.beginPath(); ctx.rect(clipped.x, clipped.y, clipped.w, clipped.h); ctx.clip(); }
+      const open = (ctx) => { if (clipped) { ctx.save(); ctx.beginPath(); ctx.rect(clipped.x, clipped.y, clipped.w, clipped.h); ctx.clip(); } };
+      const close = (ctx) => { if (clipped) ctx.restore(); };
+      const seen = em.eo > 0.004;
 
       // glow
-      if (rect && em.fade > 0 && (em.visible || em.dying)) {
-        for (const g of em.glow) { this.drawGlow(ctx, rect, em, g, now, reduced); }
+      if (rect && em.fade > 0 && (em.visible || em.dying) && seen) {
+        for (const g of em.glow) { const ctx = this.ctxFor(g.cfg.z); open(ctx); this.drawGlow(ctx, rect, em, g, now, reduced); close(ctx); }
         if (em.glow.length) anyActive = true;
       }
 
@@ -531,12 +602,12 @@ export class AuraManager {
         const cfg = L.cfg;
         const moving = !reduced || cfg.essential;
         L.scale = em.scale;
-        if (rect && em.visible && !em.dying && moving) this.emit(L, rect, em, dt, share, el);
-        if (L.parts.length) this.stepAndDraw(ctx, L, dt, moving, cfg.behind && rect ? { rect, radius: em.radius } : null);
+        L.eo = em.eo;
+        if (rect && em.visible && !em.dying && moving && seen) this.emit(L, rect, em, dt, share, el);
+        if (L.parts.length) { const ctx = this.ctxFor(cfg.z); open(ctx); this.stepAndDraw(ctx, L, dt, moving, cfg.behind && rect ? { rect, radius: em.radius } : null); close(ctx); }
         alive += L.parts.length;
-        if (L.parts.length || (rect && em.visible && !em.dying && moving)) anyActive = true;
+        if (L.parts.length || (rect && em.visible && !em.dying && moving && seen)) anyActive = true;
       }
-      if (clipped) ctx.restore();
       if (em.dying && em.fade <= 0 && em.layers.every((l) => !l.parts.length)) {
         this.emitters.delete(el);
         if (this.io) this.io.unobserve(el);
@@ -550,12 +621,14 @@ export class AuraManager {
     this._fpsN++;
     if (now - this._fpsT > 500) { this.stats.fps = Math.round((this._fpsN * 1000) / Math.max(1, now - this._fpsT)); this._fpsT = now; this._fpsN = 0; }
 
-    if (this.emitters.size === 0) { this.running = false; ctx.clearRect(0, 0, this.vw, this.vh); return; }
+    if (this.emitters.size === 0) { this.running = false; for (const c of this.allCanvases()) c.getContext('2d').clearRect(0, 0, c.width, c.height); return; }
     // Normally the loop runs every frame (the glow follows the element, particles move). With reduced
     // motion nothing moves, so one frame is a complete picture; it is redrawn on scroll, resize, a
-    // style change, and a slow poll for layout shifts. Essential layers and fading-out emitters still loop.
+    // style change, and a quick look (peek) for anything that moved. A frame that saw something move, resize or fade asks for the next one,
+    // so a glow on a thing that moves under reduced motion follows it every frame instead of lagging. Essential layers and fading-out emitters still loop.
     let needLoop = !reduced;
     if (reduced) {
+      if (changed) needLoop = true;
       for (const em of this.emitters.values()) {
         if (em.dying) needLoop = true;
         if (em.glow.some((g) => g.cfg.essential) || em.layers.some((l) => l.cfg.essential && (l.parts.length || (em.visible && !em.dying)))) needLoop = true;
@@ -563,7 +636,17 @@ export class AuraManager {
     }
     if (needLoop) { requestAnimationFrame(this._frame); return; }
     this.running = false;
-    if (!this._poll) this._poll = setTimeout(() => { this._poll = null; this.start(); }, 600);
+    this.watchStill();
+  }
+
+  /** reduced motion, nothing moving: look every 100ms (a few rect reads, no drawing) and draw again the moment something changed */
+  watchStill() {
+    if (this._poll || this.paused) return;
+    this._poll = setTimeout(() => {
+      this._poll = null;
+      if (this.running || !this.canvas) return;
+      if (this.peek()) this.start(); else this.watchStill();
+    }, 100);
   }
 
   /** the ancestors that clip their children (overflow other than visible), unless this emitter said `unclipped` */
@@ -604,7 +687,7 @@ export class AuraManager {
   drawGlow(ctx, rect, em, g, now, reduced) {
     const cfg = g.cfg;
     const moving = !reduced || cfg.essential;
-    let a = cfg.intensity * em.fade;
+    let a = cfg.intensity * em.fade * (em.eo === undefined ? 1 : em.eo);
     if (moving && cfg.pulse > 0) {
       const ph = ((now - g.t0) / cfg.pulse) * TAU;
       a *= 1 - cfg.depth * 0.5 * (1 + Math.sin(ph)) ;
@@ -819,7 +902,7 @@ export class AuraManager {
       }
       const t = p.age / p.life;
       const col = colorAt(c.stops, t);
-      const alpha = clamp01(col.a);
+      const alpha = clamp01(col.a) * (L.eo === undefined ? 1 : L.eo);
       if (alpha <= 0.003) continue;
       const size = p.size * lerp(1, c.grow, t);
       this.drawParticle(ctx, c, p, col, alpha, size);

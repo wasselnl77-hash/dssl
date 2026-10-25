@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.15.0
+
+- Bundled engine updated to 0.15.0 (the second game review). In the editor: `outline-shape`, `animate:` lists
+  (`animate: a 300, b 500`), `rotate: 5` (bare number = degrees), a state inside a pseudo-element block
+  (`::after { hover { } }`), the aura word `z N`, and a clear error for a CSS-style `font:` shorthand. Hovers document them.
+- The editor still checks one file at a time. `dssl check index.html` also finds rules that a later rule always beats.
+
 ## 0.14.0
 
 - Bundled engine updated to 0.14.0 (made for games). Editor: `@signal name in (a, b)`, `not in (...)` and `!=` are understood and

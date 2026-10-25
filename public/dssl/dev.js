@@ -9,6 +9,7 @@
  * ========================================================================= */
 
 import { parseColor, over, contrast, toHex } from './color.js';
+import { shadowWarnings } from './lint.js';
 
 const HOST_ID = 'dssl-dev-host';
 
@@ -221,6 +222,24 @@ export function lintDocument(root, { explain, engines }, opts = {}) {
   };
   const opacityOf = (el) => { let o = 1; for (let n = el; n && n.nodeType === 1; n = n.parentElement) o *= parseFloat(getComputedStyle(n).opacity) || 0; return o; };
 
+  // text-stroke and text-shadow are how game and poster text stays readable on any background. The letters count as readable when the
+  // outline (a stroke of 1px or more) or a tight shadow (blur up to 4px) is a colour the letters themselves stand out against.
+  const outlined = (cs, fg, need) => {
+    const sw = parseFloat(cs.webkitTextStrokeWidth) || 0;
+    if (sw >= 1) { const sc = parseColor(cs.webkitTextStrokeColor); if (sc && sc.a > 0.5 && contrast(over(fg, { ...sc, a: 1 }), { ...sc, a: 1 }) >= need) return true; }
+    const ts = cs.textShadow;
+    if (ts && ts !== 'none') {
+      for (const part of ts.split(/,(?![^(]*\))/)) {
+        const cm = /rgba?\([^)]*\)/.exec(part);
+        const sc = cm && parseColor(cm[0]);
+        const nums = part.replace(/rgba?\([^)]*\)/, '').trim().split(/\s+/).map((x) => parseFloat(x));
+        const blur = nums[2] || 0;
+        if (sc && sc.a > 0.5 && blur <= 4 && contrast(over(fg, { ...sc, a: 1 }), { ...sc, a: 1 }) >= need) return true;
+      }
+    }
+    return false;
+  };
+
   const seen = new Set();
   const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
   for (let t = walker.nextNode(); t; t = walker.nextNode()) {
@@ -237,11 +256,13 @@ export function lintDocument(root, { explain, engines }, opts = {}) {
     const bg = backdrop(el);
     if (!fg || !bg) continue;
     const op = opacityOf(el);
+    if (op < 0.05) continue;                 // invisible (a closed menu, a hidden toast): judging it against itself is noise
     const solidFg = over({ ...fg, a: fg.a * op }, bg);
     const ratio = contrast(solidFg, bg);
     const size = parseFloat(cs.fontSize) || 16, bold = (parseInt(cs.fontWeight, 10) || 400) >= 700;
     const large = size >= 24 || (size >= 18.66 && bold);
     const need = large ? Math.min(min, 3) : min;
+    if (ratio < need && outlined(cs, fg, need)) continue;   // an outline or hard shadow that sets the letters apart carries them
     if (ratio < need) {
       out.push({ kind: 'contrast', el, selector: describe(el), ratio: Math.round(ratio * 100) / 100, fg: toHex(solidFg), bg: toHex(bg), message: `text is ${ratio.toFixed(1)}:1 against what is behind it (${toHex(solidFg)} on ${toHex(bg)}), below ${need}:1${large ? ' for large text' : ''}` });
     }
@@ -256,6 +277,7 @@ export function lintDocument(root, { explain, engines }, opts = {}) {
         out.push({ kind: 'promoted', el, selector: describe(el), message: `the engine made this a ${disp.value} because a rule aligns its children without a display (it was ${natural}); dssl build will not` });
       }
     }
+    for (const w of shadowWarnings(eng.rules || [])) out.push({ kind: 'shadowed', el: null, selector: `${w.file || ''}:${w.line ?? ''}`, message: w.message });
     if (eng._reducedTold) out.push({ kind: 'motion', el: null, selector: '(page)', message: 'some animate: motions did not run because reduced motion is on; mark the ones that carry meaning `essential`, or DSSL.motion("full")' });
   }
   if (opts.log !== false && out.length) {

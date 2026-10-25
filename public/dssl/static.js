@@ -264,17 +264,25 @@ export function toCSS(docIn, opts = {}) {
     if (r0.signals && r0.signals.length) { report.skippedSignals++; continue; }
     // 0.14.0: motion on ::before and ::after becomes a real CSS animation (the keyframes are already in the file)
     let r = r0;
-    const an = (r0.decls || []).find((d) => d.prop === '@animate' && d.value);
-    if (an && animationShorthand(an.value)) {
-      r = { ...r0, decls: [...r0.decls.filter((d) => d.prop !== '@animate'), { prop: 'animation', value: animationShorthand(an.value), line: an.line }] };
-      if (!an.value.essential) r = { ...r, media: [...(r.media || []), '(prefers-reduced-motion: no-preference)'] };
+    let extraRule = null;
+    const ans = (r0.decls || []).filter((d) => d.prop === '@animate' && d.value && animationShorthand(d.value));
+    if (ans.length) {
+      // the essential motions always run; everything else waits for the reduced-motion check (a second rule when they are mixed)
+      const list = (xs) => xs.map((d) => animationShorthand(d.value)).join(', ');
+      const ess = ans.filter((d) => d.value.essential);
+      const rest = r0.decls.filter((d) => d.prop !== '@animate');
+      r = { ...r0, decls: ess.length ? [...rest, { prop: 'animation', value: list(ess), line: ess[0].line }] : rest };
+      if (ess.length < ans.length) extraRule = { ...r0, decls: [{ prop: 'animation', value: list(ans), line: ans[0].line }], media: [...(r0.media || []), '(prefers-reduced-motion: no-preference)'] };
       report.pseudoMotions = (report.pseudoMotions || 0) + 1;
     }
-    const { keep, engineProps } = splitDecls(r.decls || [], kinds);
-    report.engineDecls += engineProps;
-    if (!keep.length) { if (engineProps) report.skippedEngine++; continue; }
-    chunks.push({ layer: r.layer, ...emitRule({ ...r, decls: keep }, { pin: r.layer === 'pin', pseudo: r.pseudo, flat: !opts.nativeSpecificity }), order: r.order });
-    report.shadowRules++;
+    for (const rr of [r, extraRule]) {
+      if (!rr) continue;
+      const { keep, engineProps } = splitDecls(rr.decls || [], kinds);
+      if (rr === r) report.engineDecls += engineProps;
+      if (!keep.length) { if (engineProps && rr === r) report.skippedEngine++; continue; }
+      chunks.push({ layer: rr.layer, ...emitRule({ ...rr, decls: keep }, { pin: rr.layer === 'pin', pseudo: rr.pseudo, flat: !opts.nativeSpecificity }), order: rr.order });
+      if (rr === r) report.shadowRules++;
+    }
   }
 
   // ---- layers: emit the order statement once, then group ----

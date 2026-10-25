@@ -461,7 +461,7 @@ motion boing { 0%, 100% { translate: 0 0 } 40% { translate: 0 -18 } essential } 
 
 ```dssl
 tokens { shadow { pop: 0 4 0 #000 }  radius { pill: 99 } }
-.tomato { gradient: linear 180, #f55 -> #b11 + radial-gradient(circle, #fff6 18%, transparent 20%) tile 24 offset 4 4 }
+.tomato { gradient: radial-gradient(circle, #fff6 18%, transparent 20%) tile 24 offset 4 4 + linear 180, #f55 -> #b11 }   // the dots come FIRST, so they sit ON TOP of the red
 .title  { text-stroke: 6 color.ink; font-size: 48 }              // an outline OUTSIDE the letters
 .badge  { shadow: pop; radius: pill }                             // your own shadow and radius tokens, by bare name
 .ring   { background: conic-gradient(from 0deg, red, blue) }      // from, at, in... all accepted
@@ -508,6 +508,89 @@ tokens { shadow { pop: 0 4 0 #000 }  radius { pill: 99 } }
 - The "rule aligns without display" check moved from `dssl check` (it cannot see another rule giving the same element `display: flex`,
   so it cried wolf) to the build report and to `DSSL.lint`, which know.
 
+### The second game review (0.15.0)
+
+The same builder came back with a second list after a real game. All of it is in.
+
+**Aura**
+
+- Under reduced motion the aura used to redraw twice a second, so a glow on something that moves lagged behind it. Now it takes a quick
+  look (a few rectangle reads, no drawing) every 100ms while nothing moves, and draws every frame for as long as anything it lights
+  moves, resizes or fades.
+- An emitter that cannot be seen no longer emits: `opacity: 0` on it or on any ancestor, `display: none`, `visibility: hidden`. What it
+  already let go fades with it. A hidden menu with a smoking icon stops smoking. An invisible anchor you WANT smoke to come out of
+  (`opacity: 0` on purpose) says `always`: `aura-particle: #888 -> transparent 40 up always`.
+- `z N` puts a layer on its own canvas at that z-index: `aura-glow: #f80 40 z 5` goes under a hill with `z-index: 10`, while the
+  default layer stays above everything (or wherever `DSSL.auraZ()` put it). The canvas sits in the page's root stacking context, so it
+  interleaves with the page's top-level positioned elements; something inside a transformed parent is a stacking context of its own.
+
+**Rules that never win.** There is no specificity, so the LATER rule wins. That means `.prop.broc { z-index: 1 }` in one file loses to a
+plain `.prop { z-index: 2 }` in a file loaded after it, and the first line does nothing. `dssl check` (with all the files, or the page),
+the browser console and `DSSL.lint` now say so, with both places:
+
+```
+a.dssl:1 - warning - z-index in ".prop.broc" can never apply: ".prop" (b.dssl:1) comes later, matches every element this rule matches...
+```
+
+It reports a rule only when the later one matches everything the earlier one does, sets the same property to a different value, and is
+unconditional in the same way (same `@media`, state, signal) and in the same or a higher layer. The very same selector twice is left
+alone: that is an override, on purpose. Fix it by moving the specific rule below the general one.
+
+**Signals**
+
+- They keep their type: `DSSL.signal('toasting', false)` then `DSSL.getSignal('toasting')` is `false`, a number is a number. The
+  `data-dssl-signal-*` attribute is text. A bare `@signal name { }` is off for `false`, `0`, `"0"` and `"false"`.
+- `DSSL.signal('screen', 'shop', el)` sets a signal for `el` and what is inside it. The nearest value wins, the page-wide one is the
+  fallback, `DSSL.signal('screen', null, el)` clears it, and `DSSL.getSignal('screen', el)` is the value an element sees. `::before`
+  and `::after` rules behind a signal follow it too.
+- A signal restyles only the elements its rules select (inside the scope, if you gave one), not the whole page, and several in one
+  task are one pass. A signal that no rule mentions costs nothing.
+
+**Styling is asynchronous, so there is a way to wait for it.** The engine styles new elements in a microtask. `await DSSL.settled()`
+(or the synchronous `DSSL.flush()`) styles everything that is waiting, right now, so `offsetTop`, `getBoundingClientRect()` and computed
+styles are final on the next line. `DSSL.computed(el, 'translate')` does a flush and then reads the computed value.
+
+**Several motions on one element**
+
+```dssl
+motion blink  { 0%, 90%, 100% { opacity: 1 } 95% { opacity: .2 } }
+motion waddle { from { rotate: -4 } to { rotate: 4 } }
+motion glint  { from { opacity: .3 } to { opacity: 1 } }
+motion bob2   { from { translate: 0 0 } to { translate: 0 6 } }
+.duck { animate: blink 300 infinite, waddle 900 infinite alternate }
+.duck::after { content: ""; animate: glint 700 infinite, bob2 1200 infinite essential }   // also on pseudo-elements, and `dssl build` writes them
+```
+
+`await DSSL.play(el, 'pop', { pseudo: '::after' })` plays a motion on a pseudo-element.
+
+**An outline that follows the shape**
+
+```dssl
+.sprite { outline-shape: 3 color.ink }       // follows the picture's alpha, not its box; outline-shape: none clears it
+```
+
+It is four hard drop-shadows, one in each direction, which is what you wrote by hand. Corners come out square. It uses `filter`, so a
+`filter:` on the same rule replaces it.
+
+**Small syntax**
+
+- `rotate: 5` is 5deg (`5deg`, `0.1turn`, `x 30` still work).
+- A state inside a pseudo-element block is that pseudo-element in that state:
+  `.btn { ::after { content: ""; opacity: 0; hover { opacity: 1 } } }`. This is the same rule as `.btn:hover::after`.
+- `font:` is size, line height and colour (`font: 16/1.5 color.ink`), not the CSS shorthand. Writing `font: bold 16px Arial` used to make
+  a 700px font; it is now an error that says so. Weight and family are `font-weight:` and `font-family:`.
+- In `gradient:` the FIRST layer is the one on top. The example in the 0.14.0 chapter had the dots last, behind the colour; it is fixed.
+
+**Checking**
+
+- `DSSL.lint` no longer measures invisible text (a closed menu at `opacity: 0`) and counts a stroke of 1px or more, or a tight shadow
+  (blur up to 4px), that sets the letters apart from it as readable. A soft glow does not rescue unreadable text.
+- `dssl check`, `build` and the rest take `--engine ./dssl` (or `DSSL_ENGINE=./dssl`) to use the engine in that folder, so the CLI file
+  can live anywhere.
+
+**For tests of a game**: `DSSL.pauseMotion()` freezes every animation on the page (and the ones started afterwards),
+`DSSL.stepMotion(250)` moves them all forward by exactly 250ms, `DSSL.resumeMotion()` lets them run.
+
 ### Fonts
 
 ```dssl
@@ -532,7 +615,9 @@ A family line is `Family: weights [italic] [display swap|block|fallback|optional
 .sheen   { gradient: radial at top left, #fff/40 -> transparent + linear 135, #123 -> #456 }
 ```
 
-`repeating` turns any kind into its repeating form. `in oklch` (or `oklab`, `hsl`, `lab`, `srgb`, with `longer hue` and friends) picks the colour space the blend happens in. A lone position between two stops is a midpoint. Two positions make a hard band. Bare numbers in a stop position are px (degrees on `conic`). `mesh` takes a base colour and blobs: `color at x y [size n]` (default size 60%). `+` joins layers, first on top. A direction is optional: `linear #f00 -> #00f` works.
+`repeating` turns any kind into its repeating form. `in oklch` (or `oklab`, `hsl`, `lab`, `srgb`, with `longer hue` and friends) picks the colour space the blend happens in. A lone position between two stops is a midpoint. Two positions make a hard band. Bare numbers in a stop position are px (degrees on `conic`). `mesh` takes a base colour and blobs: `color at x y [size n]` (default size 60%). `+` joins layers, and the FIRST one you write is the one on top (so the dots or the shine go first, the base colour last). A direction is optional: `linear #f00 -> #00f` works.
+
+Two look-alikes: `#f00 -> 30% -> #00f` puts the halfway point of the blend at 30% (a midpoint, no colour is placed there), while `#f00 30%, #00f` puts the colour red AT 30% (a stop; with two positions on one colour, `#f00 0 30%`, it holds red from 0 to 30%).
 
 ### Inspector and hot reload
 
@@ -791,13 +876,17 @@ and listed, so the file you get always compiles.
 ```js
 import { DSSL } from '/dssl/index.js'     // or just use window.DSSL after boot
 
-DSSL.version                          // "0.14.0": a string, not a function
+DSSL.version                          // "0.15.0": a string, not a function
 DSSL.compile(source)                  // { ok, errors, warnings, stats, doc }: parse and resolve, no DOM
 DSSL.apply(source, { name, scope, replace })
 await DSSL.load(['a.dssl', 'b.dssl'])
 DSSL.toCSS(source | [sources], opts)  // the exit lane: { css, map, report } (see `dssl build`)
-DSSL.signal('theme', 'dark')          // drives @signal rules
-DSSL.getSignal('theme')               // the current value
+DSSL.signal('theme', 'dark')          // drives @signal rules (booleans and numbers keep their type)
+DSSL.signal('hp', 2, el)              // only for el and what is inside it; the nearest wins
+DSSL.getSignal('theme')               // the current value (DSSL.getSignal('hp', el) for a scope)
+DSSL.flush() / await DSSL.settled()   // style everything waiting NOW: offsetTop and computed styles are final after it
+DSSL.computed(el, 'translate')        // the final computed value, nothing left waiting
+DSSL.pauseMotion() / DSSL.stepMotion(250) / DSSL.resumeMotion()   // freeze, step and release every animation (for tests)
 DSSL.refresh() / DSSL.refresh(el)     // recompute the page, or one subtree (even a static one)
 DSSL.replay(selector)                 // run entrance motions again
 DSSL.errors()                         // a function: the errors of the last compile
@@ -822,7 +911,7 @@ Three ways to get it:
 
 1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
    https://open-vsx.org/extension/ehs-studio/dssl-vscode
-2. VS Code: download `dssl-vscode/dssl-vscode-0.14.0.vsix` from the repo files, then
+2. VS Code: download `dssl-vscode/dssl-vscode-0.15.0.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
 3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 
@@ -979,6 +1068,7 @@ node scripts/test-static-parity.mjs     # 0.13.0: every page of this site, built
 node scripts/test-v0130.mjs             # 0.13.0: build fidelity, source maps, strict CSP, server rendering
 node scripts/bench-compiled.mjs         # 0.13.0: compiled DSSL vs hand-written CSS, startup and churn (takes minutes)
 node scripts/test-v0140.mjs             # 0.14.0: the game-review fixes, and that the docs match the code
+node scripts/test-v0150.mjs             # 0.15.0: the second game review
 node scripts/test-v0100.mjs             # 0.10.0: glass, tilt, named-colour alpha, playground examples, HTML filter
 node scripts/test-designer.mjs          # the designer's state to DSSL and back, plus a random sweep
 node scripts/test-designer-browser.mjs  # the designer panel, driven like a person would

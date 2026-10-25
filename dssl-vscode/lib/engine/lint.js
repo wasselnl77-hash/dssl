@@ -163,3 +163,110 @@ export function lintRules({ rules, tokenMap, file }) {
   }
   return warnings;
 }
+
+/* ------------------------------------------------------------------ *
+ * rules that can never win (0.15.0)
+ * ------------------------------------------------------------------ */
+
+const LAYER_RANK = { tokens: 0, base: 1, components: 2, utilities: 3, pin: 4 };
+
+/** split a selector at top-level spaces and > + ~ (outside brackets and parentheses); null when it holds a top-level comma */
+function selectorParts(sel) {
+  const parts = []; let depth = 0, cur = '', q = null;
+  for (const ch of String(sel).trim()) {
+    if (q) { cur += ch; if (ch === q) q = null; continue; }
+    if (ch === '"' || ch === "'") { q = ch; cur += ch; continue; }
+    if (ch === '(' || ch === '[') depth++;
+    if (ch === ')' || ch === ']') depth--;
+    if (depth === 0 && ch === ',') return null;
+    if (depth === 0 && (ch === ' ' || ch === '>' || ch === '+' || ch === '~')) { if (cur) { parts.push(cur); cur = ''; } parts.push(ch === ' ' ? ' ' : ch); continue; }
+    cur += ch;
+  }
+  if (cur) parts.push(cur);
+  return parts;
+}
+
+/** the simple selectors of one compound: `div.a#b[x]:not(.c)` is div, .a, #b, [x], :not(.c) */
+function simpleSelectors(compound) {
+  const out = []; let i = 0; const n = compound.length;
+  const take = (start) => {
+    let j = start + 1, depth = 0;
+    while (j < n) {
+      const c = compound[j];
+      if (c === '(' || c === '[') depth++;
+      else if (c === ')' || c === ']') depth--;
+      else if (depth === 0 && /[.#:\[]/.test(c)) break;
+      j++;
+    }
+    return j;
+  };
+  if (/^[a-zA-Z*]/.test(compound)) { let j = 0; while (j < n && /[\w*-]/.test(compound[j])) j++; out.push(compound.slice(0, j).toLowerCase()); i = j; }
+  while (i < n) {
+    const j = compound[i] === ':' && compound[i + 1] === ':' ? take(i + 1) : take(i);
+    out.push(compound.slice(i, j)); i = j;
+  }
+  return out;
+}
+
+/**
+ * A rule whose every declaration of a property is beaten by a LATER rule that matches everything it matches. There is no specificity
+ * in DSSL, so `.prop.broc { z-index: 1 }` in one file loses to a plain `.prop { z-index: 2 }` in a file that comes after it, and the
+ * line does nothing at all. (The very same selector again is left alone: that is how a later file overrides an earlier one.) Both rules must be unconditional alike (same @media, @signal, container, state) and the later one must be
+ * in the same layer or a higher one. Pure; rules from several files must already carry one global `order`.
+ * @returns {Array<{a:{sel,file,line,props:string[]}, b:{sel,file,line}}>}
+ */
+export function shadowedRules(rules) {
+  const info = [];
+  for (const r of rules) {
+    if (!r || r.pseudo || !r.sel || !r.decls || !r.decls.length) continue;
+    const parts = selectorParts(r.sel);
+    if (!parts || !parts.length) continue;
+    const comp = parts[parts.length - 1];
+    if (/^[ >+~]$/.test(comp)) continue;
+    if (/^:root$|::/.test(r.sel)) continue;
+    const toks = simpleSelectors(comp);
+    if (!toks.length) continue;
+    const cond = JSON.stringify([r.media || [], (r.signals || []).map((s) => [s.name, s.op, s.value, s.values]), r.containers || [], [...(r.states || [])].sort()]);
+    info.push({ idx: info.length, r, toks, set: new Set(toks), single: parts.length === 1, cond, rank: LAYER_RANK[r.layer] ?? 2, order: r.order ?? 0 });
+  }
+  // the later rules, found by the first simple selector they need
+  const byTok = new Map();
+  for (const b of info) if (b.single) { const k = b.toks[0]; if (!byTok.has(k)) byTok.set(k, []); byTok.get(k).push(b); }
+  const pairs = new Map();
+  for (const a of info) {
+    const seenProps = new Set();
+    const cands = [];
+    for (const t of a.toks) for (const b of byTok.get(t) || []) cands.push(b);
+    if (byTok.has('*')) for (const b of byTok.get('*')) cands.push(b);
+    cands.sort((x, y) => x.order - y.order);
+    for (const b of cands) {
+      if (b === a || b.cond !== a.cond) continue;
+      if (b.r.sel.replace(/\s+/g, ' ').trim() === a.r.sel.replace(/\s+/g, ' ').trim()) continue;   // the same selector again is an override on purpose (a theme file, a later tweak)
+      if (b.rank < a.rank || (b.rank === a.rank && b.order <= a.order)) continue;
+      if (b.toks.some((t) => t !== '*' && !a.set.has(t))) continue;
+      const bProps = new Map();
+      for (const d of b.r.decls) if (d.prop && !String(d.prop).startsWith('@')) bProps.set(d.prop, d.value);
+      const hit = [];
+      for (const d of a.r.decls) {
+        const p = d.prop;
+        if (!p || String(p).startsWith('@') || seenProps.has(p) || !bProps.has(p)) continue;
+        if (String(bProps.get(p)) === String(d.value)) continue;
+        seenProps.add(p); hit.push(p);
+      }
+      if (hit.length) {
+        const key = a.idx + '>' + b.idx;
+        pairs.set(key, { a: { sel: a.r.sel, file: a.r.file, line: (a.r.decls.find((d) => d.prop === hit[0]) || a.r).line ?? a.r.line, props: hit }, b: { sel: b.r.sel, file: b.r.file, line: b.r.line } });
+      }
+    }
+  }
+  return [...pairs.values()];
+}
+
+/** the same, as compiler warnings */
+export function shadowWarnings(rules) {
+  return shadowedRules(rules).map((p) => ({
+    file: p.a.file, line: p.a.line,
+    message: `${p.a.props.join(', ')} in "${p.a.sel}" can never apply: "${p.b.sel}" (${p.b.file || ''}${p.b.file ? ':' : ''}${p.b.line}) comes later, matches every element this rule matches, and sets ${p.a.props.length > 1 ? 'the same properties' : 'the same property'}`,
+    hint: 'there is no specificity in DSSL, so the later rule always wins. Move the more specific rule below the general one, or remove the line from the general one',
+  }));
+}

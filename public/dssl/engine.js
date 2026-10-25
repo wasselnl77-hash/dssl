@@ -25,7 +25,8 @@ import { buildTexture, composeTextureInto, splitBgList as splitList } from './te
 import { AuraManager, resolveLayer } from './aura.js';
 import { parseColor } from './color.js';
 import { tiltTransform } from './effects.js';
-import { keyframesCss, animationShorthand } from './static.js';
+import { keyframesCss, animationShorthand } from './static.js'
+import { shadowWarnings } from './lint.js';
 
 const LAYER_RANK = { tokens: 0, base: 1, components: 2, utilities: 3, pin: 4 };
 
@@ -180,6 +181,10 @@ export class DsslEngine {
     this.rules = [];
     this.shadowRules = [];
     this.signalStore = new Map();
+    this.scopedSignals = new WeakMap();    // 0.15.0: element -> Map(name -> value) for DSSL.signal(name, value, el)
+    this.scopedCount = 0;
+    this.sigShadowIdx = [];                // 0.15.0: indexes of the pseudo-element rules that sit behind a @signal
+    this.motionHeld = false;               // 0.15.0: DSSL.pauseMotion()
     this.mqlCache = new Map();
     this.containerEls = new Set();
     this.ownMap = new WeakMap();           // element -> [props DSSL owns]
@@ -437,6 +442,19 @@ export class DsslEngine {
     this.init();
     this.renderShadow();
     this.computeAll();
+    this.reportShadowed(rules);
+  }
+
+  /** 0.15.0: say, once each, which rules can never apply because a later rule beats them everywhere (no specificity: the later one wins) */
+  reportShadowed(rules) {
+    try {
+      if (!this._shadowTold) this._shadowTold = new Set();
+      const fresh = shadowWarnings(rules).filter((w) => { const k = w.file + ':' + w.line + '|' + w.message; if (this._shadowTold.has(k)) return false; this._shadowTold.add(k); return true; });
+      if (!fresh.length) return;
+      console.groupCollapsed(`%c[DSSL] ${fresh.length} rule(s) can never apply`, 'color:#8a6d1a;font-weight:bold');
+      for (const w of fresh) console.warn(`${w.file || ''}:${w.line ?? ''} - ${w.message}\n    ${w.hint}`);
+      console.groupEnd();
+    } catch { /* a lint must never break the page */ }
   }
 
   /** 0.12.0: fonts { } becomes <link> tags in <head>, one per URL, removed again when no sheet asks for it */
@@ -532,55 +550,7 @@ export class DsslEngine {
     }
 
     // --- DOM mutations ---
-    const mo = new MutationObserver((muts) => {
-      if (this.frozen) return; // v0.7.0 - a frozen engine sees a snapshot, not a live page
-      if (this._applying) return; // our own style writes - ignore
-      const batch = new Set();
-      let fullSweep = false;
-      for (const m of muts) {
-        if (m.type === 'attributes') {
-          if (m.attributeName === 'style') continue;
-          if (m.target === document.documentElement && m.attributeName.startsWith('data-dssl')) continue;
-          batch.add(m.target);
-          // class/attr changes can affect descendant rules - include small subtrees.
-          // v0.3.3: when the changed element owns a HUGE subtree (view root flips
-          // like data-view on the site shell), don't skip the descendants - a full
-          // debounced sweep keeps every descendant rule honest. Skipping is what
-          // left the nav highlight stuck on the boot-time view after SPA routing.
-          if (m.target.querySelectorAll) {
-            const kids = m.target.querySelectorAll('*');
-            if (kids.length <= 300) kids.forEach(k => batch.add(k));
-            else fullSweep = true;
-          }
-        } else {
-          if (m.addedNodes) m.addedNodes.forEach(n => {
-            if (n.nodeType !== 1) return;
-            batch.add(n);
-            if (n.querySelectorAll) n.querySelectorAll('*').forEach(k => batch.add(k));
-          });
-          if (m.removedNodes) m.removedNodes.forEach(n => {
-            if (n.nodeType !== 1) return;
-            this.touched.delete(n);
-            this.overlapEls.delete(n);   // v0.5.0 - dropped policies must not pin the pass
-            this.nudgedEls.delete(n);
-            if (n.querySelectorAll) n.querySelectorAll('*').forEach(k => {
-              this.touched.delete(k);
-              this.overlapEls.delete(k);
-              this.nudgedEls.delete(k);
-            });
-          });
-        }
-      }
-      if (fullSweep) {
-        // one full recompute per microtask burst, same drain the scheduler uses
-        if (!this._sweepQueued) {
-          this._sweepQueued = true;
-          queueMicrotask(() => { this._sweepQueued = false; this.computeAll(); });
-        }
-        return;
-      }
-      if (batch.size) this.schedule(batch);
-    });
+    const mo = new MutationObserver((muts) => this.onMutations(muts));
     mo.observe(doc, { childList: true, subtree: true, attributes: true, attributeFilter: undefined });
     this._mo = mo;
     this.startOverlapTimer();
@@ -735,17 +705,80 @@ export class DsslEngine {
     els.forEach(el => this.pending.add(el));
     if (this.scheduled) return;
     this.scheduled = true;
-    queueMicrotask(() => {
-      this.scheduled = false;
-      const batch = [...this.pending];
-      this.pending.clear();
-      this._applying = true;
-      for (const el of batch) this.computeElement(el);
-      this._applying = false;
-      this.applyStagger();
-      this.applyArc();          // v0.6.0 - bend-around arcs after every drain
-      this.scheduleOverlap();   // v0.5.0 - nudges read fresh boxes after the writes settle
-    });
+    queueMicrotask(() => { this.scheduled = false; this.drainPending(); });
+  }
+
+  drainPending() {
+    if (!this.pending.size) return;
+    const batch = [...this.pending];
+    this.pending.clear();
+    this._applying = true;
+    for (const el of batch) this.computeElement(el);
+    this._applying = false;
+    this.applyStagger();
+    this.applyArc();          // v0.6.0 - bend-around arcs after every drain
+    this.scheduleOverlap();   // v0.5.0 - nudges read fresh boxes after the writes settle
+  }
+
+  /** 0.15.0: do now what the engine has queued for the next microtask: DOM changes the observer has not delivered, restyles, signals.
+   *  After this, computed styles and layout are final. DSSL.settled() is the awaitable version. */
+  flush() {
+    if (this.frozen) return;
+    if (this._mo) { const recs = this._mo.takeRecords(); if (recs.length) this.onMutations(recs); }
+    if (this._sweepQueued || this._allQueued) { this._sweepQueued = false; this._allQueued = false; this._sigNames = null; this._sigScopes = null; this._sigGlobal = false; this.computeAll(); }
+    else this.flushSignals();
+    this.drainPending();
+  }
+
+  /** what the page changed (the MutationObserver's work, also run by flush()) */
+  onMutations(muts) {
+    if (this.frozen) return; // v0.7.0 - a frozen engine sees a snapshot, not a live page
+    if (this._applying) return; // our own style writes - ignore
+    const batch = new Set();
+    let fullSweep = false;
+    for (const m of muts) {
+      if (m.type === 'attributes') {
+        if (m.attributeName === 'style' || m.attributeName === 'data-dssl-s') continue;
+        if (m.target === document.documentElement && m.attributeName.startsWith('data-dssl')) continue;
+        batch.add(m.target);
+        // class/attr changes can affect descendant rules - include small subtrees.
+        // v0.3.3: when the changed element owns a HUGE subtree (view root flips
+        // like data-view on the site shell), don't skip the descendants - a full
+        // debounced sweep keeps every descendant rule honest. Skipping is what
+        // left the nav highlight stuck on the boot-time view after SPA routing.
+        if (m.target.querySelectorAll) {
+          const kids = m.target.querySelectorAll('*');
+          if (kids.length <= 300) kids.forEach(k => batch.add(k));
+          else fullSweep = true;
+        }
+      } else {
+        if (m.addedNodes) m.addedNodes.forEach(n => {
+          if (n.nodeType !== 1) return;
+          batch.add(n);
+          if (n.querySelectorAll) n.querySelectorAll('*').forEach(k => batch.add(k));
+        });
+        if (m.removedNodes) m.removedNodes.forEach(n => {
+          if (n.nodeType !== 1) return;
+          this.touched.delete(n);
+          this.overlapEls.delete(n);   // v0.5.0 - dropped policies must not pin the pass
+          this.nudgedEls.delete(n);
+          if (n.querySelectorAll) n.querySelectorAll('*').forEach(k => {
+            this.touched.delete(k);
+            this.overlapEls.delete(k);
+            this.nudgedEls.delete(k);
+          });
+        });
+      }
+    }
+    if (fullSweep) {
+      // one full recompute per microtask burst, same drain the scheduler uses
+      if (!this._sweepQueued) {
+        this._sweepQueued = true;
+        queueMicrotask(() => { if (!this._sweepQueued) return; this._sweepQueued = false; this.computeAll(); });
+      }
+      return;
+    }
+    if (batch.size) this.schedule(batch);
   }
 
   /* v0.4.1 - coalesced full recompute for ambient triggers (ResizeObserver,
@@ -756,7 +789,7 @@ export class DsslEngine {
     if (this.frozen) return;         // v0.7.0 - frozen: no ambient recompute
     if (this._allQueued) return;
     this._allQueued = true;
-    queueMicrotask(() => { this._allQueued = false; this.computeAll(); });
+    queueMicrotask(() => { if (!this._allQueued) return; this._allQueued = false; this.computeAll(); });
   }
 
   matches(el, sel) {
@@ -768,11 +801,43 @@ export class DsslEngine {
     return this.scope === el || this.scope.contains(el);
   }
 
-  signalsPass(rule) {
+  /** the elements a signal-gated pseudo-element rule is about: its selector without the states (hover...) it also needs */
+  sigShadowBase(r) {
+    if (r._base === undefined) r._base = (r.sel || '*').replace(STATE_PSEUDO_RE, '').trim() || '*';
+    return r._base;
+  }
+
+  /** keep data-dssl-s on an element: the numbers of the signal-gated pseudo-element rules that are on for it right now */
+  markSignalShadow(el) {
+    let on = '';
+    for (const idx of this.sigShadowIdx) {
+      const r = this.shadowRules[idx];
+      if (!r || !this.matches(el, this.sigShadowBase(r))) continue;
+      if (!this.signalsPass(r, el)) continue;
+      on += (on ? ' ' : '') + idx;
+    }
+    const cur = el.getAttribute('data-dssl-s');
+    try {
+      if (on) { if (cur !== on) el.setAttribute('data-dssl-s', on); }
+      else if (cur !== null) el.removeAttribute('data-dssl-s');
+    } catch { /* detached */ }
+  }
+
+  /** a signal's value for an element: the nearest ancestor (or itself) that was given its own (DSSL.signal(name, value, el)), else the global one */
+  sigLookup(el, name) {
+    if (this.scopedCount && el) {
+      for (let a = el; a; a = a.parentElement) {
+        const m = this.scopedSignals.get(a);
+        if (m && m.has(name)) return { has: true, val: m.get(name) };
+      }
+    }
+    return this.signalStore.has(name) ? { has: true, val: this.signalStore.get(name) } : { has: false, val: undefined };
+  }
+
+  signalsPass(rule, el) {
     for (const s of rule.signals) {
-      const has = this.signalStore.has(s.name);
-      const val = this.signalStore.get(s.name);
-      if (s.op === 'truthy') { if (!has || val === false || val === null || val === 'false') return false; }
+      const { has, val } = this.sigLookup(el, s.name);
+      if (s.op === 'truthy') { if (!has || val === false || val === null || val === 'false' || val === 0 || val === '0') return false; }
       else if (s.op === '==') { if (!has || String(val) !== String(s.value)) return false; }
       else if (s.op === '!=') { if (has && String(val) === String(s.value)) return false; }
       else if (s.op === 'in') { if (!has || !(s.values || []).includes(String(val))) return false; }          // 0.14.0
@@ -817,6 +882,7 @@ export class DsslEngine {
       try { found = root.querySelectorAll(sel); } catch { continue; }
       found.forEach(el => els.add(el));
     }
+    for (const idx of this.sigShadowIdx) { try { root.querySelectorAll(this.sigShadowBase(this.shadowRules[idx])).forEach((el) => els.add(el)); } catch { /* bad selector */ } }
     for (const el of els) this.computeElement(el);
     this._forceCompute = false;
     this._applying = false;
@@ -841,6 +907,7 @@ export class DsslEngine {
     // a signal no longer walk it. DSSL.freeze(el) marks one and DSSL.refresh(el) restyles it on demand.
     if (this.staticSeen && !this._forceCompute && this.ownMap.has(el) && el.closest('[data-dssl-static]')) return;
     this.touched.add(el);
+    if (this.sigShadowIdx.length) this.markSignalShadow(el);
 
     const matched = [];
     const rootEl = this.scope || document.documentElement;
@@ -867,7 +934,7 @@ export class DsslEngine {
         if (!this.matches(el, sel)) continue;
       }
       if (!rule.media.every(q => this.mql(q).matches)) continue;
-      if (!this.signalsPass(rule)) continue;
+      if (!this.signalsPass(rule, el)) continue;
       if (!this.containerPass(el, rule)) continue;
       matched.push(rule);
     }
@@ -968,10 +1035,11 @@ export class DsslEngine {
     {
       let i = 0;
       for (const rule of matched) {
+        let nth = 0;   // 0.15.0: several motions in one rule (animate: a 300, b 500) each need their own key
         for (const d of rule.decls) {
           if (d.prop !== '@animate' || d.value === null) continue;
           const spec = animSpecs[i++];
-          if (spec) spec.key = rule.id + '|' + rule.media.join('&') + '|' + rule.signals.map(s => s.name + s.op + s.value).join('&');
+          if (spec) spec.key = rule.id + '|' + rule.media.join('&') + '|' + rule.signals.map(s => s.name + s.op + s.value).join('&') + '#' + (nth++);
         }
       }
     }
@@ -1202,6 +1270,7 @@ export class DsslEngine {
           direction: spec.direction || 'normal',   // v0.5.0 - `alternate`
         });
         if (spec.iterations === Infinity) this._hasInfiniteAnims = true;
+        if (this.motionHeld) { try { anim.pause(); } catch { /* ignore */ } }   // DSSL.pauseMotion(): new motions start held too
         anims.set(spec.key, anim);
       } catch { /* WAAPI unsupported property - skip */ }
       this._overlapDirty = true;   // moving boxes can create (or clear) overlaps
@@ -1512,22 +1581,71 @@ export class DsslEngine {
    * Signals (JS → styles bridge)
    * ------------------------------------------------------------ */
 
-  signal(name, value) {
-    if (value === null || value === undefined) this.signalStore.delete(name);
-    else this.signalStore.set(name, String(value));
+  /** DSSL.signal(name, value) sets it for the whole page; DSSL.signal(name, value, el) only for el and what is inside it (the
+   *  nearest one wins). Booleans and numbers stay booleans and numbers for getSignal(); the data-dssl-signal-* mirror is text. */
+  signal(name, value, scope) {
+    const off = value === null || value === undefined;
+    const target = scope && scope.nodeType === 1 ? scope : null;
+    if (target) {
+      let m = this.scopedSignals.get(target);
+      if (off) { if (m && m.delete(name)) { this.scopedCount--; if (!m.size) this.scopedSignals.delete(target); } }
+      else {
+        if (!m) { m = new Map(); this.scopedSignals.set(target, m); }
+        if (!m.has(name)) this.scopedCount++;
+        m.set(name, value);
+      }
+    } else if (off) this.signalStore.delete(name);
+    else this.signalStore.set(name, value);
     // DevTools-visible mirror
     try {
-      if (value === null || value === undefined) document.documentElement.removeAttribute('data-dssl-signal-' + name);
-      else document.documentElement.setAttribute('data-dssl-signal-' + name, String(value));
+      const host = target || document.documentElement;
+      if (off) host.removeAttribute('data-dssl-signal-' + name);
+      else host.setAttribute('data-dssl-signal-' + name, String(value));
     } catch { }
+    // 0.15.0: only the rules that mention this signal are looked at, and only the elements they select (inside the scope, if given),
+    // not the whole page. A burst of signals in one task is one pass.
+    if (!this._sigNames) this._sigNames = new Set();
+    this._sigNames.add(name);
+    if (target) { if (!this._sigScopes) this._sigScopes = new Set(); this._sigScopes.add(target); } else this._sigGlobal = true;
     // v0.7.0 - a frozen engine has no ambient drain, but an explicit signal()
     // is a developer action: drain synchronously so signals keep working
     // while the observers sleep.
-    if (this.frozen) { this.freezeNotice(); this.computeAll(); return; }
-    this.scheduleComputeAll();
+    if (this.frozen) { this.freezeNotice(); this.flushSignals(); return; }
+    if (this._sigQueued) return;
+    this._sigQueued = true;
+    queueMicrotask(() => { this._sigQueued = false; this.flushSignals(); });
   }
 
-  getSignal(name) { return this.signalStore.get(name); }
+  flushSignals() {
+    const names = this._sigNames;
+    if (!names || !names.size) return;
+    const scopes = this._sigScopes, global = this._sigGlobal;
+    this._sigNames = null; this._sigScopes = null; this._sigGlobal = false;
+    const rules = this.rules.filter((r) => r.signals.some((x) => names.has(x.name)));
+    const shadows = this.sigShadowIdx.map((i) => this.shadowRules[i]).filter((r) => r.signals.some((x) => names.has(x.name)));
+    if (!rules.length && !shadows.length) return;       // nothing is styled by this signal
+    const rootEl = this.scope || document.documentElement;
+    const root = this.scope || document;
+    const els = new Set();
+    for (const rule of rules) {
+      if (rule.sel === ':root') { els.add(rootEl); continue; }
+      let sel = rule.sel;
+      if (rule.states.has('seen')) sel = sel.replace(/:seen\b/g, '') || '*';
+      let found;
+      try { found = root.querySelectorAll(sel); } catch { continue; }
+      found.forEach((el) => els.add(el));
+    }
+    for (const r of shadows) { try { root.querySelectorAll(this.sigShadowBase(r)).forEach((el) => els.add(el)); } catch { /* bad selector */ } }
+    const inside = (el) => { if (global) return true; for (const sc of scopes) if (sc === el || sc.contains(el)) return true; return false; };
+    this._applying = true;
+    try { for (const el of els) if (inside(el)) this.computeElement(el); }
+    finally { this._applying = false; }
+    this.applyStagger();
+    this.applyArc();
+    this.scheduleOverlap();
+  }
+
+  getSignal(name, el) { return this.sigLookup(el, name).val; }
 
   /* ------------------------------------------------------------ *
    * v0.7.0 - freeze / unfreeze: the speed escape hatch.
@@ -1625,7 +1743,7 @@ export class DsslEngine {
         if (!this.matches(el, sel)) continue;
       }
       if (!rule.media.every(q => this.mql(q).matches)) continue;
-      if (!this.signalsPass(rule)) continue;
+      if (!this.signalsPass(rule, el)) continue;
       if (!this.containerPass(el, rule)) continue;
       matched.push(rule);
     }
@@ -1653,7 +1771,7 @@ export class DsslEngine {
       const sel = r.sel || '*';
       if (!this.matches(el, sel)) continue;
       if (!r.media.every(q => this.mql(q).matches)) continue;
-      if (!this.signalsPass(r)) continue;
+      if (!this.signalsPass(r, el)) continue;
       if (!this.containerPass(el, r)) continue;
       pseudo.push({ sel: r.sel, pseudo: r.pseudo, layer: r.layer, file: r.file, line: r.line, decls: r.decls });
     }
@@ -1683,28 +1801,22 @@ export class DsslEngine {
 
     const prefix = this.scope ? `[${idAttr}="${this.name}"] ` : '';
 
-    const cssFor = (r) => {
-      let sel = prefix + r.sel + '::' + r.pseudo;
-      for (const s of r.signals) {
-        const attr = 'data-dssl-signal-' + s.name;
-        const eq = (v) => `[${attr}="${v}"]`;
-        const cond = s.op === 'truthy' ? `html[${attr}]`
-          : s.op === '!=' ? `html:not(${eq(s.value)})`
-          : s.op === 'in' ? `html:is(${(s.values || []).map(eq).join(', ')})`
-          : s.op === 'notin' ? `html:not(:is(${(s.values || []).map(eq).join(', ')}))`
-          : `html${eq(s.value)}`;
-        sel = cond + ' ' + sel;
-      }
+    const cssFor = (r, idx) => {
+      // 0.15.0: a pseudo-element rule behind a @signal is switched by a marker the engine keeps on the element (data-dssl-s lists the rule
+      // numbers that are on for it). The engine already knows which signal value an element sees (the nearest scope wins), which CSS cannot say.
+      let sel = prefix + r.sel + (r.signals.length ? `[data-dssl-s~="${idx}"]` : '') + '::' + r.pseudo;
       let body = r.decls.filter((d) => !d.prop.startsWith('@')).map(d => `  ${d.prop}: ${d.value};`).join('\n');
       // 0.14.0: animate: on ::before / ::after is a CSS animation (WAAPI cannot reach a pseudo-element). Unless the motion is
       // essential it sits behind the reduced-motion check, with data-dssl-motion able to force it on or off.
-      const an = r.decls.find((d) => d.prop === '@animate' && d.value);
-      const anim = an && animationShorthand(an.value);
+      const ans = r.decls.filter((d) => d.prop === '@animate' && d.value && animationShorthand(d.value));
+      const list = (xs) => xs.map((d) => animationShorthand(d.value)).join(', ');
       let extra = '';
-      if (anim) {
-        if (an.value.essential || r.signals.length) body += `${body ? '\n' : ''}  animation: ${anim};`;
-        else {
-          const mk = (s) => `${s} {\n  animation: ${anim};\n}`;
+      if (ans.length) {
+        // the essential ones always run (so does everything behind a signal); the rest wait for the reduced-motion check
+        const always = r.signals.length ? ans : ans.filter((d) => d.value.essential);
+        if (always.length) body += `${body ? '\n' : ''}  animation: ${list(always)};`;
+        if (always.length < ans.length) {
+          const mk = (s) => `${s} {\n  animation: ${list(ans)};\n}`;
           extra = `\n\n@media (prefers-reduced-motion: no-preference) {\n${mk('html:not([data-dssl-motion="reduced"]) ' + sel)}\n}\n\n${mk('html[data-dssl-motion="full"] ' + sel)}`;
         }
       }
@@ -1714,6 +1826,8 @@ export class DsslEngine {
       return out;
     };
 
+    this.sigShadowIdx = [];
+    this.shadowRules.forEach((r, i) => { if (r.signals.length) this.sigShadowIdx.push(i); });
     let css = this.shadowRules.map(cssFor).join('\n\n');
     // 0.14.0: every motion is also a real @keyframes, so `animation: name 400ms` and its longhands (animation-delay...) work in
     // plain DSSL too, not only through animate:

@@ -1,6 +1,6 @@
 {
   "name": "dssl",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "private": true,
   "description": "The DSSL style language and the website that is written in it.",
   "scripts": {

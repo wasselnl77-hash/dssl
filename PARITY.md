@@ -62,6 +62,28 @@ so the boundary is explicit, not folklore.
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
 
+## v0.15.0: the second game review
+
+| Review item | Status |
+|---|---|
+| Aura redraws 1.5 times a second under reduced motion | done: follows what moves, rests when nothing does |
+| Aura emitters linger when hidden | done: invisible emitters (opacity 0, display none, visibility hidden, on it or an ancestor) stop |
+| One canvas on `<body>`, never behind a hill | done as `z N` per layer; interleaves with the root stacking context only |
+| Silent file-order losses | done: `dssl check`, console and `DSSL.lint` name rules a later rule always beats |
+| Styling is asynchronous | done: `DSSL.flush()`, `await DSSL.settled()`, `DSSL.computed()` |
+| Signals typed | done |
+| `DSSL.lint` noisy | done: invisible text skipped, outline and tight shadow count |
+| `DSSL.signal` costs 50 ms | done: only the elements its rules select are restyled |
+| Several `animate:` per element | done |
+| Scoped signals | done (`DSSL.signal(name, value, el)`) |
+| `outline-shape` | done (square corners, uses `filter`) |
+| `DSSL.play` on pseudo-elements | done |
+| CLI `--engine` | done |
+| Test helpers (final value, pause, step) | done |
+| `rotate: 5`, nested state in `::after`, `font:` trap, gradient docs | done |
+
+Not verified: Firefox and Safari. Scoped signals on `::before`/`::after` use a marker attribute the engine keeps on the element.
+
 ## v0.14.0: made for games
 
 From a review by an agent that built a game on DSSL. Twelve problems and ten wishes; each has an assertion in `scripts/test-v0140.mjs`.

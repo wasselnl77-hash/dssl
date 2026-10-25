@@ -21,7 +21,8 @@ export const SEMANTIC = {
   fold: 'swings up over its top edge like a closing page. `fold: 14`.',
   stretch: 'cartoon squash-and-stretch that keeps volume: `stretch: 0.94` squeezes to 0.94 wide and honestly grows to 1/0.94 tall.',
   'bend-around': 'curves a container\u2019s CHILDREN along a circular arc instead of deforming one element: `bend-around: -22` opens into a smile. Caps at \u00b1170\u00b0. Children keep their own hover bends.',
-  animate: 'run a motion: `animate: name duration [easing] [delay N] [jitter N] [iterations N] [infinite] [alternate] [essential]`. Example: `animate: pulse 1600 infinite alternate`. `jitter` gives each element its own random delay, `essential` runs it even when the visitor prefers reduced motion. Works on ::before and ::after too. Run one from JS with `DSSL.play(el, name, opts)`.',
+  animate: 'run a motion (or several: `animate: blink 300 infinite, waddle 900 infinite alternate`): `animate: name duration [easing] [delay N] [jitter N] [iterations N] [infinite] [alternate] [essential]`. Example: `animate: pulse 1600 infinite alternate`. `jitter` gives each element its own random delay, `essential` runs it even when the visitor prefers reduced motion. Works on ::before and ::after too. Run one from JS with `DSSL.play(el, name, opts)`.',
+  'outline-shape': 'an outline that follows the SHAPE (a sprite\u2019s alpha), not its box: `outline-shape: 3 color.ink`. Four hard drop-shadows, square corners. Uses `filter`, so it replaces another filter on the same rule. `none` clears it.',
   'text-stroke': 'an outline round text, outside the letters: `text-stroke: 6 color.ink` (writes -webkit-text-stroke and paint-order: stroke fill). Add `inside` for a centred stroke, `none` to clear.',
   stagger: 'choreographed children: `stagger: 70` fires each child\u2019s animation 70ms after its older sibling.',
   transition: 'per-property transition: `transition: 200`, or `transition: 200 snap transform`. Honors reduced-motion.',
@@ -34,8 +35,8 @@ export const SEMANTIC = {
   tilt: 'follows the pointer in 3D: `tilt: 10`, `tilt: 12 lift 1.04 perspective 700 speed 0.2 invert glare`. Runtime only. `glare` keeps --dssl-gx and --dssl-gy pointing at the pointer so you can draw a shine. Ignores touch, flat under reduced motion.',
   texture: 'a generated texture layered ON TOP of the element\u2019s own background: `texture: grain`, `texture: wood scale 6 intensity 0.8`, `texture: grain, scanlines`. 30 presets (grain, paper, marble, wood, carbon, halftone, ...) or build your own from a generator (noise, bump, lines, dots, grid, checker, weave, carbon, waves, hex) plus settings (scale, intensity, contrast, octaves, color, color2, blend, stretch, contour, ...). Wood: `texture: oak figure 0.8 knots 2 planks 120` (rings generator, ten species). `symmetrical` mirrors the tile so it never shows a seam. Open the designer to see them all.',
   aura: 'light and particles around an element, with NO presets: you describe it. `aura: glow #ff7a00 30 flicker 0.3, particles #fd0 -> #f60 count 60 shape flame glowing behind`. Replaces both slots. `aura: none` clears them.',
-  'aura-glow': 'just the glow slot: `aura-glow: color.accent 24 pulse 1600`. Positional colour and radius, then settings (intensity, pulse, depth, flicker, texture(...), seed, essential). `aura-glow: none` clears only the glow.',
-  'aura-particle': 'just the particles slot: `aura-particle: #7cf -> transparent 40 up size 6 life 800 speed 30 from bottom`. Settings: count, size, life, speed, dir, spread, gravity, drag, turbulence, from, shape, grow, glowing, behind, blend, texture(...), seed, essential.',
+  'aura-glow': 'just the glow slot: `aura-glow: color.accent 24 pulse 1600`. Positional colour and radius, then settings (z N, always, intensity, pulse, depth, flicker, texture(...), seed, essential). `aura-glow: none` clears only the glow.',
+  'aura-particle': 'just the particles slot: `aura-particle: #7cf -> transparent 40 up size 6 life 800 speed 30 from bottom`. Settings: z N (own canvas layer), count, size, life, speed, dir, spread, gravity, drag, turbulence, from, shape, grow, glowing, behind, blend, texture(...), seed, essential.',
   'aura-particles': 'the same as `aura-particle`.',
   'glow-particle': 'the particles slot with every particle glowing (additive light): `glow-particle: #fff 30 out`.',
   'glow-particles': 'the same as `glow-particle`.',
@@ -66,7 +67,7 @@ export const CSS = {
   opacity: 'passthrough CSS. Below 100% the overlap policy wakes up (see `overlap`).',
   transform: 'passthrough CSS \u2014 deform (bend/stretch/fold) composes into this channel.',
   translate: 'the transform channel the engine itself uses for overlap escapes; animating translate never fights the engine.',
-  rotate: 'passthrough CSS.',
+  rotate: 'rotation. A bare number is degrees: `rotate: 5` is 5deg. `5deg`, `0.1turn` and `x 30` pass through.',
   scale: 'passthrough CSS.',
   filter: 'passthrough CSS: blur(10), brightness(1.1).',
   'backdrop-filter': 'passthrough CSS: blur(10).',
@@ -116,7 +117,7 @@ export const STATES = {
 export const AT_RULES = {
   '@media': 'conditions: `@media (max-width: 860)`, sugar forms `@media dark`, `@media light`, `@media reduced-motion`, bare widths, `<=` ranges.',
   '@container': 'evaluates against the nearest ancestor (or self) with a container-type: `@container (min-width: 480)`.',
-  '@signal': 'the JS bridge: `@signal menuOpen { ... }` re-evaluates when DSSL.signal(\u0027menuOpen\u0027, true) fires. Mirrors onto data-dssl-signal-* attributes. Also `@signal screen in (menu, shop)`, `not in (a, b)` and `!=`.',
+  '@signal': 'the JS bridge: `@signal menuOpen { ... }` re-evaluates when DSSL.signal(\u0027menuOpen\u0027, true) fires. Mirrors onto data-dssl-signal-* attributes. Also `@signal screen in (menu, shop)`, `not in (a, b)` and `!=`. `DSSL.signal(name, value, el)` sets it for one subtree.',
   '@layer': 'cascade layers: `@layer base { }`, `@layer components { }`, `@layer utilities { }`. Cascade is (layer, source order) \u2014 no specificity, no !important.',
 };
 
