@@ -25,6 +25,7 @@ import { buildTexture, composeTextureInto, splitBgList as splitList } from './te
 import { AuraManager, resolveLayer } from './aura.js';
 import { parseColor } from './color.js';
 import { tiltTransform } from './effects.js';
+import { keyframesCss, animationShorthand } from './static.js';
 
 const LAYER_RANK = { tokens: 0, base: 1, components: 2, utilities: 3, pin: 4 };
 
@@ -77,6 +78,9 @@ function pageNonce() {
     return m ? m.getAttribute('content') : '';
   } catch { return ''; }
 }
+
+// properties the engine also writes by other routes (the overlap nudge, bend-around, stack), so a mismatch there is not the author's doing
+const ENGINE_ALSO_WRITES = new Set(['translate', 'transform', 'transform-origin', 'grid-area']);
 
 const ALIGN_PROPS = new Set([
   'place-items', 'place-content', 'align-items', 'justify-items',
@@ -217,6 +221,9 @@ export class DsslEngine {
     this.texAnims = new WeakMap();         // element -> running texture-shimmer Animation
     this.texEls = new Set();               // elements that have one, so freeze() can stop them all
     this.tiltEls = new Map();              // 0.10.0: element -> { spec, stop } for tilt:
+    this.authored = new WeakMap();         // 0.14.0: element -> Map(prop -> { value, imp }) of inline styles that belong to the page, not to us
+    this.staticSeen = false;               // 0.14.0: is there any data-dssl-static subtree
+    this._forceCompute = false;
   }
 
   /* ------------------------------------------------------------ *
@@ -405,6 +412,7 @@ export class DsslEngine {
     const rules = [];
     const shadowRules = [];
     const raws = [];
+    const motionFrames = {};
     const bundles = [...this.bundles.values()].sort((a, b) => a.seq - b.seq);
     assignGlobalOrder(bundles);
     for (const b of bundles) {
@@ -414,7 +422,9 @@ export class DsslEngine {
       shadowRules.push(...b.shadowRules);
       // v0.8.0 - raw { } verbatim CSS rides the same document stylesheet
       if (b.raws) raws.push(...b.raws);
+      Object.assign(motionFrames, b.motionFrames || {});   // 0.14.0: one registry of motions across every sheet
     }
+    this.motionFrames = motionFrames;
     this.rules = rules;
     this.shadowRules = shadowRules;
     this.raws = raws;
@@ -451,6 +461,18 @@ export class DsslEngine {
       el.rel = 'stylesheet'; el.href = url; el.setAttribute('data-dssl-font', '');
       document.head.appendChild(el);
     }
+  }
+
+  /** a stable pseudo-random 0..max for this element, so a row of identical pickups does not bob in lockstep (and the same page always looks the same) */
+  jitterFor(el, max) {
+    if (!this._jit) this._jit = new WeakMap();
+    let r = this._jit.get(el);
+    if (r === undefined) {
+      this._jitSeed = ((this._jitSeed || 1) * 16807) % 2147483647;
+      r = this._jitSeed / 2147483647;
+      this._jit.set(el, r);
+    }
+    return Math.round(r * max);
   }
 
   mql(query) {
@@ -581,7 +603,9 @@ export class DsslEngine {
     try {
       const rm = window.matchMedia('(prefers-reduced-motion: reduce)');
       rm.addEventListener('change', () => { if (!this.frozen) this.scheduleComputeAll(); });
-      this.reducedMotion = rm;
+      // 0.14.0: <html data-dssl-motion="full"> runs every motion whatever the system asks for (a game's motion is its content),
+      // "reduced" holds them all still, and anything else follows the system. DSSL.motion('full') sets it.
+      this.reducedMotion = { get matches() { const m = document.documentElement.getAttribute('data-dssl-motion'); return m === 'full' ? false : m === 'reduced' ? true : rm.matches; }, get system() { return rm.matches; } };
     } catch { this.reducedMotion = { matches: false }; }
 
     // --- `seen` state (v0.4.0): fires once when the element scrolls into view ---
@@ -751,6 +775,8 @@ export class DsslEngine {
       if (s.op === 'truthy') { if (!has || val === false || val === null || val === 'false') return false; }
       else if (s.op === '==') { if (!has || String(val) !== String(s.value)) return false; }
       else if (s.op === '!=') { if (has && String(val) === String(s.value)) return false; }
+      else if (s.op === 'in') { if (!has || !(s.values || []).includes(String(val))) return false; }          // 0.14.0
+      else if (s.op === 'notin') { if (has && (s.values || []).includes(String(val))) return false; }
     }
     return true;
   }
@@ -775,6 +801,8 @@ export class DsslEngine {
 
   computeAll() {
     this._colorCache.clear();   // 0.9.0: tokens or the theme may have changed, so colours are looked up again
+    this.staticSeen = !!document.querySelector('[data-dssl-static]');
+    this._forceCompute = true;  // a full recompute (the sheets changed, a media query flipped) reaches static subtrees too
     this._applying = true;
     const rootEl = this.scope || document.documentElement;
     const els = new Set([rootEl, ...this.touched]);   // include previously-styled elements - their rules may have STOPPED matching
@@ -790,15 +818,28 @@ export class DsslEngine {
       found.forEach(el => els.add(el));
     }
     for (const el of els) this.computeElement(el);
+    this._forceCompute = false;
     this._applying = false;
     this.applyStagger();
     this.applyArc();            // v0.6.0 - bend-around arcs after every drain
     this.scheduleOverlap();     // v0.5.0
   }
 
+  /** restyle one subtree now, static or not (DSSL.refresh(el)) */
+  refreshSubtree(root) {
+    if (!root || root.nodeType !== 1 || !this.inScope(root)) return;
+    this._forceCompute = true; this._applying = true;
+    try { for (const el of [root, ...root.querySelectorAll('*')]) this.computeElement(el); }
+    finally { this._forceCompute = false; this._applying = false; }
+    this.applyStagger(); this.applyArc(); this.scheduleOverlap();
+  }
+
   computeElement(el) {
     if (!el || !el.style || el.nodeType !== 1) return;
     if (!this.inScope(el)) return;
+    // 0.14.0: a subtree marked data-dssl-static is styled once and then left alone: a class toggled on its parent, a media query,
+    // a signal no longer walk it. DSSL.freeze(el) marks one and DSSL.refresh(el) restyles it on demand.
+    if (this.staticSeen && !this._forceCompute && this.ownMap.has(el) && el.closest('[data-dssl-static]')) return;
     this.touched.add(el);
 
     const matched = [];
@@ -847,6 +888,26 @@ export class DsslEngine {
      * against what we own, and write ONLY the difference. */
 
     const owned = this.ownMap.get(el) || new Map();  // prop -> {value, imp}
+    // 0.14.0: inline styles that are NOT ours. What the page wrote before the engine first looked (a style="" attribute, a script
+    // that placed the element) belongs to the author and wins over a rule, like in CSS; the same goes for a property a script
+    // changes after we wrote it. Before this the engine overwrote them, so a rule with `left: 0` undid a game's own positions.
+    let authored = this.authored.get(el);
+    if (!this.ownMap.has(el) && !authored) {
+      for (let i = 0; i < el.style.length; i++) {
+        const p = el.style[i];
+        if (p.startsWith('--dssl-') || p === 'grid-area') continue;
+        if (!authored) { authored = new Map(); this.authored.set(el, authored); }
+        authored.set(p, { value: el.style.getPropertyValue(p), imp: el.style.getPropertyPriority(p) });
+      }
+    }
+    if (authored) {
+      for (const [p, a] of authored) {
+        const cur = el.style.getPropertyValue(p);
+        if (cur === '') authored.delete(p);                       // the author took it away: the rule may have it now
+        else { a.value = cur; a.imp = el.style.getPropertyPriority(p); }
+      }
+      if (!authored.size) { this.authored.delete(el); authored = null; }
+    }
     const newOwned = new Map();                      // prop -> {value, imp}
     const animSpecs = [];
     let cancelAnims = false;
@@ -928,9 +989,7 @@ export class DsslEngine {
         const single = wordsTop(lh.value).length === 1;
         if ((lh.seq || 0) > (sh.seq || 0) && single) newOwned.set(fam, { value: foldIntoBorder(sh.value, lh.value, lhName.slice(7)), imp: sh.imp, seq: lh.seq });
         newOwned.delete(lhName);
-        if (!this._warned) this._warned = new Set();
-        const wmsg = `[DSSL] folded ${lhName} into ${fam} on <${el.tagName.toLowerCase()}${el.className ? ' .' + String(el.className).split(' ')[0] : ''}> - inline style cannot hold a var() shorthand and its longhand together`;
-        if (!this._warned.has(wmsg)) { this._warned.add(wmsg); console.info(wmsg); }
+        // (0.14.0: no console line here. Folding is the normal, correct way a border longhand meets its shorthand, not news.)
       }
     }
     for (const [fam, longhands] of Object.entries(POSITIONAL_FAMILIES)) {
@@ -1033,9 +1092,19 @@ export class DsslEngine {
     }
 
     // SET pass - only what is new or actually changed.
+    let wrote = false;
     for (const [prop, next] of newOwned) {
       const prev = owned.get(prop);
-      if (prev && prev.value === next.value && prev.imp === next.imp) continue;
+      // a script changed a property we wrote: it is the author's now (the few the engine also writes by other routes are exempt)
+      if (prev && prev.rb !== undefined && !ENGINE_ALSO_WRITES.has(prop) && el.style.getPropertyValue(prop) !== prev.rb) {
+        if (!authored) { authored = new Map(); this.authored.set(el, authored); }
+        authored.set(prop, { value: el.style.getPropertyValue(prop), imp: el.style.getPropertyPriority(prop) });
+        newOwned.delete(prop); owned.delete(prop);
+        continue;
+      }
+      if (authored && authored.has(prop)) { newOwned.delete(prop); continue; }
+      if (prev && prev.value === next.value && prev.imp === next.imp) { next.rb = prev.rb; continue; }
+      wrote = true;
       try {
         el.style.setProperty(prop, next.value, next.imp);
       } catch (why) {
@@ -1048,6 +1117,15 @@ export class DsslEngine {
       }
     }
 
+    // a shorthand we just wrote (margin: 0) can have wiped a longhand the author set (margin-top: 14): put theirs back
+    if (authored) {
+      for (const [p, a] of authored) {
+        try { if (el.style.getPropertyValue(p) !== a.value) el.style.setProperty(p, a.value, a.imp); } catch { /* ignore */ }
+      }
+    }
+    // what the browser holds for each property now, read once after every write: a longhand written after its shorthand changes how
+    // the shorthand reads back, so a per-property reading taken at write time would look like someone else's edit
+    if (wrote || authored) for (const [p, v] of newOwned) v.rb = el.style.getPropertyValue(p);
     this.ownMap.set(el, newOwned);
     this.lastApply = Date.now();
 
@@ -1102,7 +1180,14 @@ export class DsslEngine {
     const reduced = this.reducedMotion && this.reducedMotion.matches;
     for (const spec of animSpecs) {
       if (spec.broken || !spec.frames || !spec.frames.length) continue;
-      if (reduced && !spec.essential) continue;
+      if (reduced && !spec.essential) {
+        // never silent: a game or a tutorial can lose all its motion to a system setting and look broken
+        if (!this._reducedTold) {
+          this._reducedTold = true;
+          console.info(`[DSSL] "${spec.motion}" and any other animate: that is not marked essential did not run, because this browser asks for reduced motion (prefers-reduced-motion: reduce). Motion that IS the content should say \`essential\` inside its motion block, or set <html data-dssl-motion="full"> (DSSL.motion('full')) to run everything.`);
+        }
+        continue;
+      }
       if (anims.has(spec.key)) continue;
       let frames = spec.frames.map(f => ({ ...f.props, offset: f.offset / 100 }));
       if (frames.length === 1) {
@@ -1112,7 +1197,7 @@ export class DsslEngine {
       try {
         const anim = el.animate(frames, {
           duration: spec.duration, easing: spec.easing,
-          delay: spec.delay || 0, fill: spec.fill,
+          delay: (spec.delay || 0) + (spec.jitter ? this.jitterFor(el, spec.jitter) : 0), fill: spec.fill,
           iterations: spec.iterations || 1,        // v0.5.0 - `infinite`
           direction: spec.direction || 'normal',   // v0.5.0 - `alternate`
         });
@@ -1602,17 +1687,38 @@ export class DsslEngine {
       let sel = prefix + r.sel + '::' + r.pseudo;
       for (const s of r.signals) {
         const attr = 'data-dssl-signal-' + s.name;
-        const cond = s.op === 'truthy' ? `html[${attr}]` : `html[${attr}="${s.value}"]`;
+        const eq = (v) => `[${attr}="${v}"]`;
+        const cond = s.op === 'truthy' ? `html[${attr}]`
+          : s.op === '!=' ? `html:not(${eq(s.value)})`
+          : s.op === 'in' ? `html:is(${(s.values || []).map(eq).join(', ')})`
+          : s.op === 'notin' ? `html:not(:is(${(s.values || []).map(eq).join(', ')}))`
+          : `html${eq(s.value)}`;
         sel = cond + ' ' + sel;
       }
-      let body = r.decls.map(d => `  ${d.prop}: ${d.value};`).join('\n');
-      let out = `${sel} {\n${body}\n}`;
+      let body = r.decls.filter((d) => !d.prop.startsWith('@')).map(d => `  ${d.prop}: ${d.value};`).join('\n');
+      // 0.14.0: animate: on ::before / ::after is a CSS animation (WAAPI cannot reach a pseudo-element). Unless the motion is
+      // essential it sits behind the reduced-motion check, with data-dssl-motion able to force it on or off.
+      const an = r.decls.find((d) => d.prop === '@animate' && d.value);
+      const anim = an && animationShorthand(an.value);
+      let extra = '';
+      if (anim) {
+        if (an.value.essential || r.signals.length) body += `${body ? '\n' : ''}  animation: ${anim};`;
+        else {
+          const mk = (s) => `${s} {\n  animation: ${anim};\n}`;
+          extra = `\n\n@media (prefers-reduced-motion: no-preference) {\n${mk('html:not([data-dssl-motion="reduced"]) ' + sel)}\n}\n\n${mk('html[data-dssl-motion="full"] ' + sel)}`;
+        }
+      }
+      let out = `${sel} {\n${body}\n}${extra}`;
       for (const q of [...r.media].reverse()) out = `@media ${q} {\n${out}\n}`;
       for (const c of [...r.containers].reverse()) out = `@container ${c} {\n${out}\n}`;
       return out;
     };
 
     let css = this.shadowRules.map(cssFor).join('\n\n');
+    // 0.14.0: every motion is also a real @keyframes, so `animation: name 400ms` and its longhands (animation-delay...) work in
+    // plain DSSL too, not only through animate:
+    const kf = keyframesCss(this.motionFrames);
+    if (kf.length) css += '\n\n' + kf.join('\n\n');
 
     // v0.8.0 - raw { } blocks: verbatim CSS (@font-face, @keyframes,
     // @supports, @import…), appended after the pseudo-element rules

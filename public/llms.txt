@@ -5,7 +5,7 @@
 - Site (docs, playground, changelog, bench): https://dssl-sable.vercel.app
 - Repo + full docs in the README: https://huggingface.co/EHS-Studio/dssl
 - Install: `curl -fsSL https://dssl-sable.vercel.app/install.sh | sh` (or the zip: https://dssl-sable.vercel.app/dssl-engine.zip)
-- Version: 0.9.0 (engine), MIT license
+- Version: 0.14.0 (engine), MIT license
 - Feature matrix vs CSS: see PARITY.md in the repo
 - For agents working ON the codebase: see AGENTS.md in the repo
 
@@ -46,7 +46,7 @@ DSSL.toCSS(src)                    // v0.8.0: the exit lane -> { css, report }
 DSSL.signal('menuOpen', true)      // the JS -> styles bridge
 DSSL.freeze() / DSSL.unfreeze()    // the speed handbrake
 DSSL.explain(el, { quiet: true })  // matched rules, file/line, winning decls per property
-DSSL.replay(sel) / DSSL.refresh() / DSSL.errors() / DSSL.version
+DSSL.replay(sel) / DSSL.refresh([el]) / DSSL.errors() (a function) / DSSL.version (a string) / DSSL.getSignal(name) / DSSL.freeze([el]) / DSSL.unfreeze([el]) / await DSSL.inspect() / await DSSL.watch() / await DSSL.lint(root) / DSSL.play(el, motion, opts) / DSSL.motion('full'|'reduced'|'auto') / DSSL.auraZ(n)
 ```
 
 ## 0.9.0: texture, aura, sliders, lint, import
@@ -62,6 +62,19 @@ DSSL.replay(sel) / DSSL.refresh() / DSSL.errors() / DSSL.version
 - `tilt: 10 lift 1.04 perspective 900 speed 0.18 invert glare` turns toward the pointer in 3D. Runtime only. `glare` keeps `--dssl-gx` and `--dssl-gy` pointing at the pointer. Ignores touch, flat under reduced motion, stops on freeze. Do not combine with `bend` or `fold`.
 - Alpha on a named colour works: `white/12`, `currentColor/20`. It used to compile to `white/12px`.
 - The playground has a canvas.html tab, `?example=` links, lint warnings and an "as CSS" tab. The canvas keeps a short allow-list of tags and drops scripts, handlers, styles and ids.
+
+## 0.14.0: made for games (from a review by an agent that built one)
+- Reduced motion is never silent. A plain `animate:` does not run when the system asks for reduced motion; the console now says so once, and says how to get out: put `essential` in the motion block or on the animate line, or `DSSL.motion('full')` / `<html data-dssl-motion="full">` to run everything (`'reduced'` holds all still, `'auto'` follows the system).
+- `animate: name 300 delay 100 jitter 200 iterations 3 essential`. `jitter` gives every element its own random delay, the same on every load. `animation-delay` and friends beside `animate:` now warn, because they do nothing there.
+- Motions are shared across files like tokens (`dssl check`/`build` too). Keyframes accept `0%`, `40%`, `0%, 100%`, `from`, `to`. Every motion also exists as a real `@keyframes`, so `animation: bob 300ms` works. `animate:` works on `::before` and `::after`.
+- `await DSSL.play(el, 'boing', { duration, hold })` returns a promise that settles when the motion ends (also when cancelled); `hold: true` keeps the last frame; an unknown name rejects with did-you-mean.
+- `gradient:` layers with `+`, takes CSS gradient functions as layers, and `tile 24`, `offset 4 4`, `no-repeat` after a layer. `gradient:` plus `background-image:` in one rule is a warning.
+- `text-stroke: 6 color.ink` (outside the letters, paint-order stroke fill), `inside` for centred, `none`. `paint-order: stroke fill` and `conic-gradient(from 0deg, ...)` are accepted. `shadow: pop` and `radius: pill` work for your own tokens.
+- Your own inline styles win: a `style=""` attribute or a script's `el.style.left` beats a rule, including through `DSSL.refresh()`. `data-dssl-static` / `DSSL.freeze(el)` styles a subtree once and leaves it alone; `DSSL.refresh(el)` restyles it on demand.
+- Aura: clipped to an `overflow: hidden` stage (add `unclipped` to spill), scales with an ancestor `transform: scale`, `DSSL.auraZ(20)` puts the canvas under a menu.
+- `@signal screen in (menu, shop)`, `not in (...)`, `!=`.
+- `DSSL.lint(root)` finds what only a live page shows: text colour against the composited background (cream on cream from two rules), and elements the engine had to turn into grids. `dssl check index.html` and `dssl build index.html` read the stylesheets a page links, in page order.
+- The folded-border console message is gone. Docs now list every function on DSSL (a test keeps it that way).
 
 ## 0.13.0: shipping without the engine
 - `dssl build a.dssl b.dssl -o out.css [--reset] [--sourcemap] [--inline-tokens] [--native-specificity]`: several files in load order. Selectors are wrapped in :where() so source order wins like in the engine (no CSS specificity). --reset adds the small reset as the FIRST layer. --sourcemap writes out.css.map (rule and declaration level, sources embedded) so devtools show the .dssl file and line. --inline-tokens writes token values in place of var() where a token is defined once and never redefined (fastest; tokens changed at run time will not reach built rules).
@@ -98,4 +111,4 @@ Wait for the `dssl-ready` event on `window` before measuring layout: the engine 
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.13.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.14.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.

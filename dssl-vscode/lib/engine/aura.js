@@ -48,6 +48,7 @@ export const GLOW_KEYS = {
   seed:      num(0, 99999, { int: true, doc: 'a different random flicker with the same look' }),
   texture:   { kind: 'texture', words: 1, doc: 'texture(grain scale 2): break the light up with a texture' },
   essential: { kind: 'flag', words: 0, doc: 'keep animating even when the visitor prefers reduced motion' },
+  unclipped: { kind: 'flag', words: 0, doc: 'let the light spill out of a parent that clips (overflow: hidden, auto, scroll). Without it the aura is cut at that edge, like the element itself' },
 };
 
 export const PARTICLE_KEYS = {
@@ -70,6 +71,7 @@ export const PARTICLE_KEYS = {
   seed:       num(0, 99999, { int: true, doc: 'a different random pattern with the same look' }),
   texture:    { kind: 'texture', words: 1, doc: 'texture(grain): grainy particles' },
   essential:  { kind: 'flag', words: 0, doc: 'keep animating even when the visitor prefers reduced motion' },
+  unclipped:  { kind: 'flag', words: 0, doc: 'let the particles leave a parent that clips (overflow: hidden, auto, scroll). Without it they are cut at that edge' },
 };
 
 /* ------------------------------------------------------------------ *
@@ -392,7 +394,10 @@ export class AuraManager {
     const c = document.createElement('canvas');
     c.setAttribute('aria-hidden', 'true');
     c.setAttribute('data-dssl-aura', '');
-    c.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:2147483000;';
+    // 0.14.0: the layer sits above the page by default. <html data-dssl-aura-z="20"> (or DSSL.auraZ(20)) lowers it, so a menu or a
+    // glass overlay with a higher z-index covers the light the way it covers everything else.
+    const z = parseInt(document.documentElement.getAttribute('data-dssl-aura-z'), 10);
+    c.style.cssText = `position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:${Number.isFinite(z) ? z : 2147483000};`;
     (document.body || document.documentElement).appendChild(c);
     this.canvas = c;
     this.ctx = c.getContext('2d');
@@ -502,10 +507,18 @@ export class AuraManager {
         if (rect.width === 0 && rect.height === 0) rect = null;
       }
       em.rect = rect;
-      if (em.radiusAt < 0 || (em.age++ % 45) === 0) { em.radius = this.cornerRadius(el, rect); em.radiusAt = 0; }
+      // 0.14.0: a stage scaled with transform: scale() has a rect the size you SEE, so the light follows it, and so must its size
+      // and speed. The scale is how much bigger (or smaller) the box is than the box CSS says it is.
+      em.scale = 1;
+      if (rect && el.offsetWidth > 0) em.scale = Math.max(0.05, Math.min(20, rect.width / el.offsetWidth));
+      if (em.radiusAt < 0 || (em.age++ % 45) === 0) { em.radius = this.cornerRadius(el, rect); em.radiusAt = 0; em.clips = this.clipAncestors(el, em); }
 
       if (em.dying) em.fade = Math.max(0, em.fade - dt * 3);
       else em.fade = Math.min(1, em.fade + dt * 4);
+
+      // 0.14.0: cut the light at the edge of any parent that clips, so a stage with overflow: hidden keeps its fire inside
+      const clipped = rect && em.clips && em.clips.length ? this.clipRect(em.clips) : null;
+      if (clipped) { ctx.save(); ctx.beginPath(); ctx.rect(clipped.x, clipped.y, clipped.w, clipped.h); ctx.clip(); }
 
       // glow
       if (rect && em.fade > 0 && (em.visible || em.dying)) {
@@ -517,11 +530,13 @@ export class AuraManager {
       for (const L of em.layers) {
         const cfg = L.cfg;
         const moving = !reduced || cfg.essential;
+        L.scale = em.scale;
         if (rect && em.visible && !em.dying && moving) this.emit(L, rect, em, dt, share, el);
         if (L.parts.length) this.stepAndDraw(ctx, L, dt, moving, cfg.behind && rect ? { rect, radius: em.radius } : null);
         alive += L.parts.length;
         if (L.parts.length || (rect && em.visible && !em.dying && moving)) anyActive = true;
       }
+      if (clipped) ctx.restore();
       if (em.dying && em.fade <= 0 && em.layers.every((l) => !l.parts.length)) {
         this.emitters.delete(el);
         if (this.io) this.io.unobserve(el);
@@ -551,6 +566,31 @@ export class AuraManager {
     if (!this._poll) this._poll = setTimeout(() => { this._poll = null; this.start(); }, 600);
   }
 
+  /** the ancestors that clip their children (overflow other than visible), unless this emitter said `unclipped` */
+  clipAncestors(el, em) {
+    if (em.layers.some((l) => l.cfg.unclipped) || em.glow.some((g) => g.cfg.unclipped)) return [];
+    const out = [];
+    try {
+      for (let a = el.parentElement; a && a !== document.body && a !== document.documentElement; a = a.parentElement) {
+        const cs = getComputedStyle(a);
+        if (/(hidden|clip|auto|scroll)/.test(cs.overflowX + ' ' + cs.overflowY)) out.push(a);
+      }
+    } catch { /* detached */ }
+    return out;
+  }
+
+  /** the visible box: the padding boxes of every clipping ancestor, intersected. Null when nothing clips. */
+  clipRect(list) {
+    let x0 = -1e9, y0 = -1e9, x1 = 1e9, y1 = 1e9;
+    for (const a of list) {
+      const r = a.getBoundingClientRect();
+      const sx = a.offsetWidth ? r.width / a.offsetWidth : 1, sy = a.offsetHeight ? r.height / a.offsetHeight : 1;
+      x0 = Math.max(x0, r.left + a.clientLeft * sx); y0 = Math.max(y0, r.top + a.clientTop * sy);
+      x1 = Math.min(x1, r.left + (a.clientLeft + a.clientWidth) * sx); y1 = Math.min(y1, r.top + (a.clientTop + a.clientHeight) * sy);
+    }
+    return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+  }
+
   cornerRadius(el, rect) {
     try {
       const v = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
@@ -577,7 +617,7 @@ export class AuraManager {
     }
     if (a <= 0.004) return;
     const c = cfg.rgba;
-    const R = cfg.radius;
+    const R = cfg.radius * (em.scale || 1);
     const dpr = this.dpr;
     const x = rect.left, y = rect.top, w = rect.width, h = rect.height;
     const pad = Math.ceil(R * 1.6);
@@ -706,11 +746,11 @@ export class AuraManager {
     while (L.acc >= 1) {
       L.acc -= 1;
       if (L.parts.length >= cap) { L.acc = Math.min(L.acc, 1); break; }
-      L.parts.push(this.spawn(L, rect, el));
+      L.parts.push(this.spawn(L, rect, el, em.scale || 1));
     }
   }
 
-  spawn(L, rect, el) {
+  spawn(L, rect, el, scale = 1) {
     const c = L.cfg, r = L.rnd;
     const between = (a, b) => a + (b - a) * r();
     let x, y;
@@ -744,11 +784,11 @@ export class AuraManager {
       if (c.dir === 'in') ang += Math.PI;
     } else ang = (c.dir * Math.PI) / 180;
     ang += ((r() - 0.5) * c.spread * Math.PI) / 180;
-    const sp = between(c.speed[0], c.speed[1]);
+    const sp = between(c.speed[0], c.speed[1]) * scale;
     return {
       x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
       age: 0, life: between(c.life[0], c.life[1]) / 1000,
-      size: between(c.size[0], c.size[1]), rot: r() * TAU, spin: (r() - 0.5) * 4, variant: (r() * 4) | 0, ph: r() * TAU,
+      size: between(c.size[0], c.size[1]) * scale, rot: r() * TAU, spin: (r() - 0.5) * 4, variant: (r() * 4) | 0, ph: r() * TAU,
     };
   }
 
@@ -770,8 +810,9 @@ export class AuraManager {
       if (moving) {
         p.age += dt;
         if (p.age >= p.life) { parts[i] = parts[parts.length - 1]; parts.pop(); continue; }
-        p.vy += c.gravity * dt;
-        if (c.turbulence) { p.vx += Math.sin(p.ph + p.age * 7) * c.turbulence * dt; p.vy += Math.cos(p.ph * 1.3 + p.age * 5) * c.turbulence * 0.3 * dt; }
+        const sc = L.scale || 1;
+        p.vy += c.gravity * sc * dt;
+        if (c.turbulence) { p.vx += Math.sin(p.ph + p.age * 7) * c.turbulence * sc * dt; p.vy += Math.cos(p.ph * 1.3 + p.age * 5) * c.turbulence * sc * 0.3 * dt; }
         if (c.drag) { p.vx *= drag; p.vy *= drag; }
         p.x += p.vx * dt; p.y += p.vy * dt;
         p.rot += p.spin * dt;

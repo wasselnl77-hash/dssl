@@ -97,10 +97,11 @@ section('--inline-tokens');
 
 section('alignment without a box: the one thing a build cannot do for you');
 {
-  const w = compile('.a { place-items: center }\n.b { display: grid; place-items: center }\n.c { row: center }\n.d:hover { justify-content: center }\n@media (width < 600) { .e { align-items: center } }', 't.dssl').warnings.map((x) => x.message);
-  ok('a rule that aligns without saying display gets a warning', w.length === 1 && /"place-items" on "\.a"/.test(w[0]), JSON.stringify(w));
-  ok('a rule with display, a flex helper, a state or a media query does not', !w.some((m) => /"\.(b|c|d|e)"/.test(m)));
-  ok('the warning explains what differs', /dssl build does not/.test(compile('.a { place-items: center }', 't').warnings[0].hint));
+  const src = '.a { place-items: center }\n.b { display: grid; place-items: center }\n.c { row: center }\n.d:hover { justify-content: center }\n@media (width < 600) { .e { align-items: center } }';
+  const nb = toCSS(src, { banner: false }).report.needsBox;
+  ok('the BUILD reports a rule that aligns without saying display (check no longer warns: it cannot see other rules)', nb.length === 1 && nb[0].sel === '.a' && nb[0].prop === 'place-items', JSON.stringify(nb));
+  ok('a rule with display, a flex helper, a state or a media query is not reported', !nb.some((x) => /^\.(b|c|d|e)$/.test(x.sel)));
+  ok('check stays quiet about it', compile(src, 't.dssl').warnings.length === 0);
 }
 
 section('source maps: devtools show the .dssl file and line');

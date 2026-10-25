@@ -52,6 +52,25 @@ const INTERACTIVE = /^(a|button|input|select|textarea|summary)\b|\[tabindex|\[ro
  * @param {object} p { rules, tokenMap, file }
  * @returns {Array} warnings in the compiler's {file, line, message, hint} shape
  */
+/**
+ * Rules that align their children and never say what kind of box they are. The engine quietly makes the box a grid when it
+ * runs; a `dssl build` cannot, because a stylesheet does not know what each element is. So this is reported by the build (and
+ * by DSSL.lint on a live page, which knows exactly which elements were promoted), not by `check`: per rule it cannot see that
+ * a different rule gave the same element display: flex, and it was wrong about that often enough to be noise.
+ */
+export function alignWithoutBox(rules) {
+  const out = [];
+  for (const r of rules) {
+    if (r.pseudo) continue;
+    const conditional = (r.media && r.media.length) || (r.signals && r.signals.length) || (r.containers && r.containers.length);
+    const states = r.states || new Set();
+    if (conditional || states.size) continue;
+    const aligns = r.decls.find((d) => ALIGN_PROPS.has(d.prop));
+    if (aligns && !r.decls.some((d) => d.prop === 'display' || d.prop === '@display')) out.push({ sel: r.sel, prop: aligns.prop, line: aligns.line, file: r.file });
+  }
+  return out;
+}
+
 export function lintRules({ rules, tokenMap, file }) {
   const warnings = [];
   const cssToColor = makeColorResolver(tokenMap);
@@ -103,21 +122,6 @@ export function lintRules({ rules, tokenMap, file }) {
             }
           }
         }
-      }
-    }
-
-    // ---- alignment with no box to align in
-    // The engine quietly turns a plain box into a grid when a rule aligns its children (place-items, justify-content...),
-    // so the page looks right in the browser. `dssl build` cannot know what each element is, so a compiled page would not.
-    if (!conditional && states.size === 0) {
-      const aligns = r.decls.find((d) => ALIGN_PROPS.has(d.prop));
-      const hasDisplay = r.decls.some((d) => d.prop === 'display' || d.prop === '@display');
-      if (aligns && !hasDisplay) {
-        warnings.push({
-          file, line: aligns.line,
-          message: `"${aligns.prop}" on "${r.sel}" only works on a flex or grid box, and this rule never says which`,
-          hint: 'add display: grid (or flex), or use row / column / grid, so a build matches the engine: the engine adds it for you at run time, dssl build does not',
-        });
       }
     }
 

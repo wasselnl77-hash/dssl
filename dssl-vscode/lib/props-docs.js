@@ -12,7 +12,7 @@ export const SEMANTIC = {
   size: 'width and height in one line: `size: 40 20` = 40 wide, 20 tall. `size: 40` = both.',
   shadow: 'box shadow from the shadow token scale: `shadow: sm | md | lg | xl`. Custom: `shadow: 0 2 4 ink/10, 0 4 12 ink/8`.',
   radius: 'border-radius, bare number or token: `radius: md`, `radius: full`, `radius: 14`.',
-  gradient: 'gradient as a sentence: `gradient: linear 135, color.accent -> color.ok`. Also `repeating linear 45, #fff 0 10, #000 10 20` (stripes), `linear 90 in oklch, a -> b` (blend colour space), `a -> 30% -> b` (midpoint), `a 0 30%, b 30% 100%` (hard bands), `mesh #fff4e6, #ff7a1a at 15% 20%, #3949ab at 80% 70%` (soft blobs on a base), and layers joined with ` + ` (first on top). A stop that is not a color is a compile error.',
+  gradient: 'gradient as a sentence: `gradient: linear 135, color.accent -> color.ok`. Also `repeating linear 45, #fff 0 10, #000 10 20` (stripes), `linear 90 in oklch, a -> b` (blend colour space), `a -> 30% -> b` (midpoint), `a 0 30%, b 30% 100%` (hard bands), `mesh #fff4e6, #ff7a1a at 15% 20%, #3949ab at 80% 70%` (soft blobs on a base), and layers joined with ` + ` (first on top; each can end with `tile 24`, `offset 4 4`, `no-repeat`, and can be a CSS `radial-gradient(...)`). A stop that is not a color is a compile error.',
   'gradient-text': 'clips the gradient grammar into the glyphs: `gradient-text: linear to right, color.accent, color.ink`.',
   'gradient-flow': 'the gradient drifts forever through WAAPI: `gradient-flow: 6s alternate`. Holds still under reduced-motion.',
   bend: 'bows the element in 3D. Positive tips the top away, negative leans toward you. Bare numbers are degrees. Composes into the one transform channel.',
@@ -21,7 +21,8 @@ export const SEMANTIC = {
   fold: 'swings up over its top edge like a closing page. `fold: 14`.',
   stretch: 'cartoon squash-and-stretch that keeps volume: `stretch: 0.94` squeezes to 0.94 wide and honestly grows to 1/0.94 tall.',
   'bend-around': 'curves a container\u2019s CHILDREN along a circular arc instead of deforming one element: `bend-around: -22` opens into a smile. Caps at \u00b1170\u00b0. Children keep their own hover bends.',
-  animate: 'run a motion: `animate: name duration [easing] [delay] [fill] [infinite] [alternate]`. Example: `animate: pulse 1600 infinite alternate`.',
+  animate: 'run a motion: `animate: name duration [easing] [delay N] [jitter N] [iterations N] [infinite] [alternate] [essential]`. Example: `animate: pulse 1600 infinite alternate`. `jitter` gives each element its own random delay, `essential` runs it even when the visitor prefers reduced motion. Works on ::before and ::after too. Run one from JS with `DSSL.play(el, name, opts)`.',
+  'text-stroke': 'an outline round text, outside the letters: `text-stroke: 6 color.ink` (writes -webkit-text-stroke and paint-order: stroke fill). Add `inside` for a centred stroke, `none` to clear.',
   stagger: 'choreographed children: `stagger: 70` fires each child\u2019s animation 70ms after its older sibling.',
   transition: 'per-property transition: `transition: 200`, or `transition: 200 snap transform`. Honors reduced-motion.',
   overlap: 'the anti-overlap policy: `auto` (engine shoves translucent elements apart), `deny` (this one never sits on anything), `allow` (exempt). Nothing below 100% opacity overlaps anything unless you say so.',
@@ -115,7 +116,7 @@ export const STATES = {
 export const AT_RULES = {
   '@media': 'conditions: `@media (max-width: 860)`, sugar forms `@media dark`, `@media light`, `@media reduced-motion`, bare widths, `<=` ranges.',
   '@container': 'evaluates against the nearest ancestor (or self) with a container-type: `@container (min-width: 480)`.',
-  '@signal': 'the JS bridge: `@signal menuOpen { ... }` re-evaluates when DSSL.signal(\u0027menuOpen\u0027, true) fires. Mirrors onto data-dssl-signal-* attributes.',
+  '@signal': 'the JS bridge: `@signal menuOpen { ... }` re-evaluates when DSSL.signal(\u0027menuOpen\u0027, true) fires. Mirrors onto data-dssl-signal-* attributes. Also `@signal screen in (menu, shop)`, `not in (a, b)` and `!=`.',
   '@layer': 'cascade layers: `@layer base { }`, `@layer components { }`, `@layer utilities { }`. Cascade is (layer, source order) \u2014 no specificity, no !important.',
 };
 

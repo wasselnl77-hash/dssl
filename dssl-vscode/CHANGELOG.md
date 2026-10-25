@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0
+
+- Bundled engine updated to 0.14.0 (made for games). Editor: `@signal name in (a, b)`, `not in (...)` and `!=` are understood and
+  documented on hover; `animate:` now documents `delay`, `jitter`, `iterations` and `essential`; `text-stroke` and layered
+  `gradient:` (`+`, `tile`, `offset`, `no-repeat`) have hover docs; `animate:` inside `::before`/`::after` is no longer an error.
+  (The editor still checks one file at a time, so a motion defined in another file shows as unknown there; `dssl check index.html` checks them together.)
+
 ## 0.13.0
 
 - Bundled engine updated to 0.13.0. In the editor: a new warning for a rule that aligns its children (`place-items`, `justify-content`...)

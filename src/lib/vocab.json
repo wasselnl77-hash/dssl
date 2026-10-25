@@ -342,6 +342,10 @@
     {
       "key": "essential",
       "doc": "keep animating even when the visitor prefers reduced motion"
+    },
+    {
+      "key": "unclipped",
+      "doc": "let the light spill out of a parent that clips (overflow: hidden, auto, scroll). Without it the aura is cut at that edge, like the element itself"
     }
   ],
   "particleKeys": [
@@ -420,6 +424,10 @@
     {
       "key": "essential",
       "doc": "keep animating even when the visitor prefers reduced motion"
+    },
+    {
+      "key": "unclipped",
+      "doc": "let the particles leave a parent that clips (overflow: hidden, auto, scroll). Without it they are cut at that edge"
     }
   ],
   "sliderClauses": [

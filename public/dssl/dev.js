@@ -8,6 +8,8 @@
  * (or when the script tag carries data-inspect or data-watch).
  * ========================================================================= */
 
+import { parseColor, over, contrast, toHex } from './color.js';
+
 const HOST_ID = 'dssl-dev-host';
 
 function describe(el) {
@@ -179,4 +181,89 @@ export function createWatcher({ apply, sources }) {
   };
   const stop = () => { if (timer) clearInterval(timer); timer = null; opts = null; if (toast) { toast.remove(); toast = null; } };
   return { start, stop, get active() { return !!timer || !!opts; }, check };
+}
+
+/* ------------------------------------------------------------------ runtime lint */
+
+/**
+ * DSSL.lint(root): the checks a stylesheet linter cannot make, because they need the page. It reads what the browser actually
+ * computed, so it sees the cream text that inherited onto a cream card (two rules, two files, no warning from `dssl check`).
+ *
+ *   contrast   a piece of text against the colour it really sits on: its own background, or the nearest ancestor's, composited
+ *              through any transparency. Text over an image or a gradient is not guessed at (pass { images: true } to include it).
+ *   promoted   an element the engine turned into a grid because its rule aligns children without saying display. It looks right
+ *              here, and a `dssl build` would not do it.
+ *   motion     animate: motions that did not run because of reduced motion
+ *
+ * Returns [{ kind, el, selector, message, ... }]. { log: false } stays quiet. { min: 3 } changes the 4.5 limit.
+ */
+export function lintDocument(root, { explain, engines }, opts = {}) {
+  const out = [];
+  const scope = root || document.body;
+  const min = opts.min || 4.5;
+  const page = parseColor(getComputedStyle(document.documentElement).backgroundColor) || { r: 255, g: 255, b: 255, a: 1 };
+  const solidPage = page.a < 0.99 ? over(page, { r: 255, g: 255, b: 255, a: 1 }) : page;
+
+  // the colour behind an element, or null when an image or gradient is in the way and we would only be guessing
+  const backdrop = (el) => {
+    const layers = [];
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      const c = parseColor(cs.backgroundColor);
+      const hasImage = cs.backgroundImage && cs.backgroundImage !== 'none';
+      if (hasImage && !opts.images) return null;
+      if (c && c.a > 0) layers.push(c);
+      if (c && c.a >= 0.99 && !hasImage) break;
+    }
+    let base = solidPage;
+    for (let i = layers.length - 1; i >= 0; i--) base = over(layers[i], { ...base, a: 1 });
+    return base;
+  };
+  const opacityOf = (el) => { let o = 1; for (let n = el; n && n.nodeType === 1; n = n.parentElement) o *= parseFloat(getComputedStyle(n).opacity) || 0; return o; };
+
+  const seen = new Set();
+  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+    if (!t.nodeValue.trim()) continue;
+    const el = t.parentElement;
+    if (!el || seen.has(el) || el.closest('#' + HOST_ID + ', script, style, noscript')) continue;
+    seen.add(el);
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden' || cs.display === 'none') continue;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) continue;
+    if (cs.webkitTextFillColor === 'rgba(0, 0, 0, 0)' || /transparent/.test(cs.webkitTextFillColor) ) continue;   // gradient text: the colour is a picture
+    const fg = parseColor(cs.color);
+    const bg = backdrop(el);
+    if (!fg || !bg) continue;
+    const op = opacityOf(el);
+    const solidFg = over({ ...fg, a: fg.a * op }, bg);
+    const ratio = contrast(solidFg, bg);
+    const size = parseFloat(cs.fontSize) || 16, bold = (parseInt(cs.fontWeight, 10) || 400) >= 700;
+    const large = size >= 24 || (size >= 18.66 && bold);
+    const need = large ? Math.min(min, 3) : min;
+    if (ratio < need) {
+      out.push({ kind: 'contrast', el, selector: describe(el), ratio: Math.round(ratio * 100) / 100, fg: toHex(solidFg), bg: toHex(bg), message: `text is ${ratio.toFixed(1)}:1 against what is behind it (${toHex(solidFg)} on ${toHex(bg)}), below ${need}:1${large ? ' for large text' : ''}` });
+    }
+  }
+
+  for (const eng of engines) {
+    for (const el of scope.querySelectorAll('*')) {
+      const owned = eng.ownMap.get(el);
+      const disp = owned && owned.get('display');
+      const natural = eng.naturalDisplay.get(el);
+      if (disp && /^(inline-)?grid$/.test(disp.value) && natural && !/^(flex|inline-flex|grid|inline-grid)$/.test(natural) && !(eng.rules || []).some((r) => r.decls.some((d) => d.prop === 'display' && /grid|flex/.test(String(d.value))) && eng.matches(el, r.sel.replace(/:seen\b/g, '') || '*'))) {
+        out.push({ kind: 'promoted', el, selector: describe(el), message: `the engine made this a ${disp.value} because a rule aligns its children without a display (it was ${natural}); dssl build will not` });
+      }
+    }
+    if (eng._reducedTold) out.push({ kind: 'motion', el: null, selector: '(page)', message: 'some animate: motions did not run because reduced motion is on; mark the ones that carry meaning `essential`, or DSSL.motion("full")' });
+  }
+  if (opts.log !== false && out.length) {
+    try {
+      console.groupCollapsed(`%c[DSSL] lint: ${out.length} thing${out.length === 1 ? '' : 's'} worth a look`, 'color:#8a6d1a;font-weight:bold');
+      for (const f of out) console.warn(`${f.kind}  ${f.selector}  ${f.message}`, f.el || '');
+      console.groupEnd();
+    } catch { /* old console */ }
+  }
+  return out;
 }

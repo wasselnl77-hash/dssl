@@ -71,8 +71,13 @@ Bare numbers are pixels. States like `hover` are nested blocks. The engine keeps
 - `DSSL.signal(name, value)` drive styles from JS with `@signal` conditions in your `.dssl`
 - `DSSL.refresh()` force a full recompute
 - `DSSL.replay(selector)` replay entrance motions on matching elements
-- `DSSL.errors` the last reported errors (also grouped in the console, with did-you-mean hints)
-- `DSSL.version` engine version
+- `DSSL.errors()` a function: the last reported errors (also grouped in the console, with did-you-mean hints)
+- `DSSL.version` the engine version, a string (not a function)
+- `DSSL.toCSS(source | [sources], opts)` compile to plain CSS (the `dssl build` lane): `{ css, map, report }`
+- `DSSL.getSignal(name)` read a signal back
+- `DSSL.refresh(el)` / `DSSL.freeze(el)` / `DSSL.unfreeze(el)` one subtree: restyle it, or style it once and leave it alone
+- `DSSL.explain(el)`, `await DSSL.inspect()`, `await DSSL.watch()`, `await DSSL.lint(root)` find out why a style is what it is, hot reload, check the live page
+- `DSSL.play(el, 'motion', opts)` run a motion once from JS (a promise), `DSSL.motion('full')` ignore reduced motion, `DSSL.auraZ(n)` aura canvas z-index
 
 ## Scoped engines
 

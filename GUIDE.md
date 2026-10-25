@@ -18,7 +18,7 @@ hand-rolled CSS for creative pages, docs, playgrounds and internal tools.
 
 | Path | What it is |
 |---|---|
-| `public/dssl/` | The engine. Six zero-dependency ESM files: `parser.js`, `resolver.js`, `engine.js`, `index.js` (public API), `utils.js`, `boot.js`. This is the whole language. |
+| `public/dssl/` | The engine: plain ESM files with no dependencies, loaded by one script tag. `parser.js` (text to tree), `resolver.js` (tree to rules), `engine.js` (applies them in the browser), `index.js` (the public API), `boot.js` (auto-boot), `utils.js`, `static.js` (`dssl build`), `server.js` (the same compiler with no DOM), `texture.js`, `aura.js`, `slider.js`, `effects.js` (glass, tilt), `color.js`, `lint.js`, `import.js` (CSS to DSSL), `fonts.js`, `dev.js` (inspector, hot reload, runtime lint; loaded only when asked for). This is the whole language. |
 | `public/styles/*.dssl` | The stylesheets that drive the docs site itself. The site is styled entirely by its own engine, which makes it the de-facto test suite. |
 | `public/examples/hello.dssl` | The starter stylesheet. Small, commented, every interaction real. |
 | `package/` + `public/install.sh`, `install.ps1` | The downloadable engine package: `curl -fsSL https://dssl-sable.vercel.app/install.sh \| sh`. |
@@ -425,6 +425,89 @@ engine is ready: the engine adds the class `dssl-ready` to `<html>` when it has 
 <script>setTimeout(() => document.documentElement.classList.add('dssl-ready'), 2500)</script> <!-- failsafe -->
 ```
 
+### Using it for a game (0.14.0)
+
+A review by someone building a game on DSSL turned up twelve problems and a list of wishes. This is the language now, in the
+order they hit.
+
+**Motion**
+
+```dssl
+motion bob   { from { translate: 0 0 } to { translate: 0 8 } }
+motion pulse { from { opacity: 1 } to { opacity: .4 } }
+motion boing { 0%, 100% { translate: 0 0 } 40% { translate: 0 -18 } essential }   // 0% and 40% work, a list works
+.coin   { animate: bob 1200 infinite alternate delay 100 jitter 600 }             // jitter: a different delay per element
+.hero   { animate: boing 300 iterations 3 essential }                              // essential for this use only
+.spark::before { content: ""; animate: pulse 900 infinite }                        // motion on a pseudo-element
+```
+
+- **Reduced motion is never silent.** A system that asks for reduced motion stops every `animate:` that is not `essential`, which
+  for a game is all of it. The engine now says so, once, in the console, and there are three ways out: `essential` inside the
+  motion, `essential` on one `animate:` line, or for the whole page `<html data-dssl-motion="full">` (`DSSL.motion('full')`;
+  `'reduced'` holds everything still, `'auto'` goes back to following the system).
+- **Motions are shared like tokens.** `motion waddle { }` in one file is usable by `animate: waddle` in any file loaded after it
+  (`dssl check` and `dssl build` fold them forward the same way). No more pasting a motion into three files.
+- **`animation-delay` and friends** (`-duration`, `-iteration-count`...) only tune a CSS animation. A rule using `animate:` has none,
+  so they used to compile and do nothing. Now there is a warning that names the replacement: `delay N`, `jitter N`, `iterations N`,
+  `infinite`, `alternate`, an easing, `essential`. And every motion is also written as a real `@keyframes` into the engine's own
+  stylesheet, so the plain CSS form `animation: boing 300ms 2` works too.
+- **`DSSL.play(el, 'boing', { duration, delay, easing, iterations, hold, jitter, essential })`** runs a motion once and returns a
+  promise that settles when it ends (or is cancelled). `hold: true` keeps the last frame. It follows reduced motion like `animate:`.
+  This replaces add a class, set a timer, remove the class.
+- **Keyframes in CSS habits:** `0% { }`, `40% { }`, and `0%, 100% { }` are accepted next to `from`, `to` and `at 40%`.
+- **Motion on `::before` and `::after`** becomes a CSS animation, behind the reduced-motion check (and `dssl build` writes it).
+
+**Looks**
+
+```dssl
+tokens { shadow { pop: 0 4 0 #000 }  radius { pill: 99 } }
+.tomato { gradient: linear 180, #f55 -> #b11 + radial-gradient(circle, #fff6 18%, transparent 20%) tile 24 offset 4 4 }
+.title  { text-stroke: 6 color.ink; font-size: 48 }              // an outline OUTSIDE the letters
+.badge  { shadow: pop; radius: pill }                             // your own shadow and radius tokens, by bare name
+.ring   { background: conic-gradient(from 0deg, red, blue) }      // from, at, in... all accepted
+.label  { paint-order: stroke fill }                              // stroke and fill are accepted words
+```
+
+- **`gradient:` and `background-image:` in one rule** replace each other, and the first used to vanish without a word. Now it is a
+  warning that tells you to layer them in the sentence: layers are joined with `+`, and a layer can be a plain CSS
+  `radial-gradient(...)` or `url(...)`. Each layer takes `tile 24` (or `tile 24 12`), `offset 4 4`, `no-repeat`, `repeat-x`, `repeat-y`.
+- **`shadow: pop` and `radius: pill`** work for tokens you define (`tokens { shadow { pop: 0 4 0 #000 } radius { pill: 99 } }`), like
+  the built-in `sm`, `md`, `lg`.
+- **`text-stroke: 6 color.ink`** is the stroke-plus-`paint-order` trick written once (`inside` keeps a centred stroke).
+
+**The engine and your scripts**
+
+- **Your inline styles win.** What the page wrote before the engine looked (a `style=""` attribute, a script placing an element) and what a
+  script changes afterwards belongs to you: a rule with `left: 0` no longer undoes the positions your game code sets, exactly like
+  in CSS. (The few properties the engine also moves itself, `transform`, `translate`, `transform-origin` and `grid-area`, are exempt
+  from the after-the-fact part.)
+- **Static subtrees.** `<div data-dssl-static>` or `DSSL.freeze(el)` styles a subtree once and leaves it alone: a class toggled on a
+  parent, a signal, a mutation no longer walk it. A full recompute (new stylesheet, a media query flipping) still reaches it, and
+  `DSSL.refresh(el)` restyles it on demand. `DSSL.unfreeze(el)` takes the mark off. `DSSL.freeze()` with no argument still parks the whole page.
+- **Aura follows its stage.** It is cut at the edge of any parent that clips (`overflow: hidden`, `auto`, `scroll`; say `unclipped` to
+  let it spill), its size and speed follow an ancestor `transform: scale()`, and `DSSL.auraZ(20)` (or `<html data-dssl-aura-z="20">`)
+  lowers the canvas under a menu that has a higher z-index.
+- **No more `folded border-color into border` in the console.** It was the normal, correct merge, logged on every recompute.
+
+**Signals**
+
+```dssl
+@signal screen in (menu, shop, settings) { .overlay { opacity: 1 } }
+@signal screen not in (playing) { .hud { display: none } }
+@signal screen != menu { .back { display: block } }
+```
+
+**Checking**
+
+- `dssl check index.html` (and `dssl build index.html`) read the stylesheets from the page in the order it loads them: every
+  `<link rel="stylesheet/dssl">` and inline `<style type="text/dssl">`. No script of your own to keep the order.
+- `await DSSL.lint(root?)` checks what a stylesheet linter cannot, because it needs the page: **text against the colour it really sits
+  on** (its own background or the nearest ancestor's, through transparency; the cream text that inherited onto a cream card), boxes the
+  engine had to turn into grids, and motion held back by reduced motion. `{ min: 3 }` changes the limit, `{ images: true }` also judges
+  text over images and gradients, `{ log: false }` stays quiet.
+- The "rule aligns without display" check moved from `dssl check` (it cannot see another rule giving the same element `display: flex`,
+  so it cried wolf) to the build report and to `DSSL.lint`, which know.
+
 ### Fonts
 
 ```dssl
@@ -706,17 +789,27 @@ and listed, so the file you get always compiles.
 ## 4. The engine API
 
 ```js
-import { DSSL } from '/dssl/index.js'
+import { DSSL } from '/dssl/index.js'     // or just use window.DSSL after boot
 
-DSSL.version()                    // "0.7.2"
-DSSL.compile(source)              // { ok, errors, warnings, stats, doc }
+DSSL.version                          // "0.14.0": a string, not a function
+DSSL.compile(source)                  // { ok, errors, warnings, stats, doc }: parse and resolve, no DOM
 DSSL.apply(source, { name, scope, replace })
 await DSSL.load(['a.dssl', 'b.dssl'])
-DSSL.signal('theme', 'dark')      // drives @signal rules
-DSSL.refresh()                    // full recompute
-DSSL.freeze() / DSSL.unfreeze()   // static snapshot: ambient restyling off
-DSSL.explain(el)                  // which rules matched, what won, why
-DSSL.errors()                     // last compile errors
+DSSL.toCSS(source | [sources], opts)  // the exit lane: { css, map, report } (see `dssl build`)
+DSSL.signal('theme', 'dark')          // drives @signal rules
+DSSL.getSignal('theme')               // the current value
+DSSL.refresh() / DSSL.refresh(el)     // recompute the page, or one subtree (even a static one)
+DSSL.replay(selector)                 // run entrance motions again
+DSSL.errors()                         // a function: the errors of the last compile
+DSSL.freeze() / DSSL.unfreeze()       // the whole page: ambient restyling off
+DSSL.freeze(el) / DSSL.unfreeze(el)   // one subtree: styled once, then left alone
+DSSL.explain(el)                      // which rules matched, what won, why (console)
+await DSSL.inspect()                  // the same, as a panel you hover with
+await DSSL.watch()                    // hot reload of loaded .dssl and linked .css
+await DSSL.lint(root)                 // problems only a live page shows (contrast on the real background, ...)
+DSSL.play(el, 'boing', opts)          // run a motion once from JS; resolves when it ends
+DSSL.motion('full' | 'reduced' | 'auto')   // reduced-motion override
+DSSL.auraZ(20)                        // z-index of the aura canvas
 ```
 
 `freeze()` is the big performance lever for static pages: the engine drops its
@@ -729,7 +822,7 @@ Three ways to get it:
 
 1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
    https://open-vsx.org/extension/ehs-studio/dssl-vscode
-2. VS Code: download `dssl-vscode/dssl-vscode-0.13.0.vsix` from the repo files, then
+2. VS Code: download `dssl-vscode/dssl-vscode-0.14.0.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
 3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 
@@ -885,6 +978,7 @@ node scripts/test-browser-v090.mjs      # 0.9.0 in Chrome: pixels, lifecycle, re
 node scripts/test-static-parity.mjs     # 0.13.0: every page of this site, built CSS with JavaScript off vs the engine, element by element (needs npm run build)
 node scripts/test-v0130.mjs             # 0.13.0: build fidelity, source maps, strict CSP, server rendering
 node scripts/bench-compiled.mjs         # 0.13.0: compiled DSSL vs hand-written CSS, startup and churn (takes minutes)
+node scripts/test-v0140.mjs             # 0.14.0: the game-review fixes, and that the docs match the code
 node scripts/test-v0100.mjs             # 0.10.0: glass, tilt, named-colour alpha, playground examples, HTML filter
 node scripts/test-designer.mjs          # the designer's state to DSSL and back, plus a random sweep
 node scripts/test-designer-browser.mjs  # the designer panel, driven like a person would

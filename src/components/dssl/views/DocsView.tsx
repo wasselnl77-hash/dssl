@@ -73,7 +73,7 @@ export default function DocsView() {
           <section className="doc-block" id="start">
             <h2 className="section-title">Quickstart: three steps</h2>
             <p className="doc-lead">
-              No bundler, no build step, no dependencies. The engine is two static files;
+              No bundler, no build step, no dependencies. The engine is a folder of plain JavaScript files, loaded by one script tag;
               your styles are plain <code>.dssl</code> text the browser fetches and applies
               itself.
             </p>

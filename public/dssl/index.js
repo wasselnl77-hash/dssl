@@ -15,11 +15,11 @@
  * ========================================================================= */
 
 import { parse } from './parser.js';
-import { resolve, DEFAULT_TOKENS } from './resolver.js';
+import { resolve, DEFAULT_TOKENS, EASINGS } from './resolver.js';
 import { toCSS as docToCSS } from './static.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.13.0';
+export const VERSION = '0.14.0';
 
 let counter = 0;
 const loadedUrls = new Set();   // every .dssl file fetched by load(), so DSSL.watch() knows what to follow
@@ -29,6 +29,8 @@ let lastErrors = [];
 // Token registry shared across bundles: tokens.dssl defines the palette,
 // every later stylesheet resolves against it.
 const tokenRegistry = new Map(Object.entries(DEFAULT_TOKENS));
+// ...and so do motions (0.14.0): `motion waddle { }` in one file can be used by `animate: waddle` in another
+const motionRegistry = new Map();
 
 function getEngine(opts = {}) {
   if (!opts.scope) {
@@ -72,7 +74,7 @@ function reportWarnings(warnings, file) {
 /** Parse + resolve without touching the DOM. */
 export function compile(source, file = 'inline.dssl') {
   const { ast, errors: parseErrors } = parse(source, file);
-  const doc = resolve(ast, file, Object.fromEntries(tokenRegistry));
+  const doc = resolve(ast, file, Object.fromEntries(tokenRegistry), Object.fromEntries(motionRegistry));
   const errors = [...parseErrors, ...doc.errors];
   return {
     ok: errors.length === 0,
@@ -96,6 +98,7 @@ export function apply(source, opts = {}) {
   const name = opts.name || 'inline-' + (++counter);
   const file = name.endsWith('.dssl') ? name : name + '.dssl';
   const result = compile(source, file);
+  for (const [k, v] of Object.entries(result.doc.motionFrames || {})) motionRegistry.set(k, v);
   // fold this bundle's tokens into the shared registry for later bundles
   let registryDirty = false;
   for (const [k, v] of Object.entries(result.doc.tokens || {})) {
@@ -155,14 +158,15 @@ export function toCSS(input, opts = {}) {
   // one source string, or several (strings or already-compiled documents) in load order: tokens fold forward like <link> order
   const list = Array.isArray(input) ? input : [input];
   const docs = [], errors = [], warnings = [];
-  let base = {};
+  let base = {}, motionBase = {};
   for (const [i, item] of list.entries()) {
     if (typeof item === 'string') {
       const file = (list.length === 1 ? opts.file : (opts.files && opts.files[i])) || `inline-${i + 1}.dssl`;
       const { ast, errors: pe } = parse(item, file);
-      const doc = resolve(ast, file, Object.keys(base).length ? base : Object.fromEntries(tokenRegistry));
+      const doc = resolve(ast, file, Object.keys(base).length ? base : Object.fromEntries(tokenRegistry), motionBase);
       docs.push(doc); errors.push(...pe, ...doc.errors); warnings.push(...(doc.warnings || []));
       base = { ...base, ...doc.tokens };
+      motionBase = { ...motionBase, ...(doc.motionFrames || {}) };
     } else { docs.push(item); errors.push(...(item.errors || [])); warnings.push(...(item.warnings || [])); }
   }
   const built = docToCSS(docs.length === 1 ? docs[0] : docs, { file: opts.file || 'inline.dssl', ...opts, version: VERSION });
@@ -171,7 +175,69 @@ export function toCSS(input, opts = {}) {
 
 export function signal(name, value) { for (const e of engines.values()) e.signal(name, value); }
 export function getSignal(name) { return engines.get('global')?.getSignal(name); }
-export function refresh() { for (const e of engines.values()) e.computeAll(); }
+/**
+ * DSSL.play(el, 'boing', { duration, delay, easing, iterations, hold, essential, jitter }) runs a motion once from JavaScript and
+ * returns a promise for the animation, which settles when it ends. `hold: true` keeps the final frame instead of snapping back
+ * (what you want for a pop-in). It follows reduced motion like animate: does, unless the motion or the call says essential.
+ * Before this you added a class, set a timer, and removed the class, once per replay.
+ */
+export function play(el, name, opts = {}) {
+  const m = motionRegistry.get(name);
+  if (!m) {
+    const known = [...motionRegistry.keys()];
+    const hint = didYouMeanLocal(name, known);
+    return Promise.reject(new Error(`[DSSL] play: unknown motion "${name}"${hint ? ` (did you mean "${hint}"?)` : known.length ? ` (known: ${known.join(', ')})` : ' (no motion is defined yet)'}`));
+  }
+  if (!el || typeof el.animate !== 'function') return Promise.reject(new Error('[DSSL] play: the first argument must be an element'));
+  const eng = engines.get('global');
+  const reduced = eng ? eng.reducedMotion.matches : false;
+  if (reduced && !m.essential && !opts.essential) return Promise.resolve(null);
+  let frames = m.frames.map((f) => ({ ...f.props, offset: f.offset / 100 }));
+  if (frames.length === 1) frames = frames[0].offset === 0 ? [frames[0], { offset: 1 }] : [{ offset: 0 }, frames[0]];
+  const ms = (v, d) => (typeof v === 'string' ? (/ms$/.test(v) ? parseFloat(v) : /s$/.test(v) ? parseFloat(v) * 1000 : parseFloat(v)) : (v === undefined ? d : v));
+  const easing = opts.easing ? (EASINGS[opts.easing] || opts.easing) : EASINGS.smooth;
+  const jit = opts.jitter ? Math.round(Math.random() * ms(opts.jitter, 0)) : 0;
+  let anim;
+  try {
+    anim = el.animate(frames, { duration: ms(opts.duration, 400), delay: ms(opts.delay, 0) + jit, easing, iterations: opts.iterations === 'infinite' ? Infinity : (opts.iterations || 1), direction: opts.direction || 'normal', fill: opts.hold ? 'forwards' : (opts.fill || 'none') });
+  } catch (e) { return Promise.reject(e); }
+  return anim.finished.then(() => anim, () => anim);   // a cancelled animation settles too, so awaiting it never hangs
+}
+
+/** DSSL.auraZ(20): the z-index of the one canvas aura draws on (default: above everything). Menus and overlays with a higher z-index then cover it. */
+export function auraZ(z) {
+  const root = document.documentElement;
+  if (z === null || z === undefined) root.removeAttribute('data-dssl-aura-z'); else root.setAttribute('data-dssl-aura-z', String(z));
+  for (const e of engines.values()) if (e.aura && e.aura.canvas) e.aura.canvas.style.zIndex = z === null || z === undefined ? '2147483000' : String(z);
+  return z;
+}
+
+/** DSSL.motion('full') runs every animate: whatever the system asks for, 'reduced' holds them all still, 'auto' follows the system */
+export function motion(mode = 'auto') {
+  const root = document.documentElement;
+  if (mode === 'auto') root.removeAttribute('data-dssl-motion'); else root.setAttribute('data-dssl-motion', mode === 'full' ? 'full' : 'reduced');
+  for (const e of engines.values()) {
+    // stop what is running, then let the recompute start only what the new mode allows
+    for (const el of e.touched) { const m = e.animMap.get(el); if (m) { m.forEach((a) => { try { a.cancel(); } catch { } }); m.clear(); } }
+    e.computeAll();
+  }
+  return mode;
+}
+
+// a tiny did-you-mean for play(), so index.js does not need utils for it
+function didYouMeanLocal(w, list) {
+  let best = null, bd = 3;
+  for (const c of list) {
+    const a = w, b = c; const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    if (d[a.length][b.length] < bd) { bd = d[a.length][b.length]; best = c; }
+  }
+  return best;
+}
+
+/** DSSL.refresh() restyles the whole page; DSSL.refresh(el) restyles that subtree, even if it is static */
+export function refresh(root) { for (const e of engines.values()) { if (root && root.nodeType === 1) e.refreshSubtree(root); else e.computeAll(); } }
 export function replay(selector) { for (const e of engines.values()) e.replay(selector); }
 export function errors() { return lastErrors; }
 export function version() { return VERSION; }
@@ -179,12 +245,15 @@ export function version() { return VERSION; }
 // v0.7.0 - freeze()/unfreeze() every engine: the whole page stops reacting
 // (observers, media, state events, overlap heartbeat) and keeps its resolved
 // look for free. Explicit API calls still drain. Returns combined stats.
-export function freeze() {
+export function freeze(root) {
+  // 0.14.0: freeze(el) marks ONE subtree static (styled once, then left alone); freeze() with no argument still parks the whole page
+  if (root && root.nodeType === 1) { root.setAttribute('data-dssl-static', ''); for (const e of engines.values()) e.staticSeen = true; return root; }
   const stats = [];
   for (const e of engines.values()) stats.push(e.freeze());
   return stats.length === 1 ? stats[0] : stats;
 }
-export function unfreeze() {
+export function unfreeze(root) {
+  if (root && root.nodeType === 1) { root.removeAttribute('data-dssl-static'); for (const e of engines.values()) e.refreshSubtree(root); return root; }
   const stats = [];
   for (const e of engines.values()) stats.push(e.unfreeze());
   return stats.length === 1 ? stats[0] : stats;
@@ -233,6 +302,12 @@ export async function inspect(on = true) {
   d.inspector.start();
   return true;
 }
+/** DSSL.lint(root?, { min, images, log }) resolves to what is wrong on the page as it is drawn: low contrast text, engine-made boxes, motion held back */
+export async function lint(root, opts) {
+  const d = await dev();
+  return devMod.lintDocument(root || null, { explain, engines: [...engines.values()] }, opts || {});
+}
+
 /** DSSL.watch({ interval, css, toast }) re-applies a .dssl file when it changes on disk; DSSL.watch(false) stops */
 export async function watch(o = {}) {
   const d = await dev();
@@ -243,7 +318,7 @@ export async function watch(o = {}) {
 
 export const DSSL = {
   version: VERSION, compile, apply, load, toCSS, signal, getSignal, refresh, replay, errors,
-  freeze, unfreeze, explain, inspect, watch,
+  freeze, unfreeze, explain, inspect, watch, play, motion, auraZ, lint,
   __debug: { engines },
 };
 

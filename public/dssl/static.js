@@ -21,7 +21,7 @@
  * ========================================================================= */
 
 import { buildTexture, composeTextureInto } from './texture.js';
-import { makeColorResolver } from './lint.js';
+import { makeColorResolver, alignWithoutBox } from './lint.js';
 
 const LAYER_RANK = { tokens: 0, base: 1, components: 2, utilities: 3, pin: 4 };
 const LAYER_NAMES = ['tokens', 'base', 'components', 'utilities', 'pin'];
@@ -50,6 +50,29 @@ function emitRule(r, { pin = false, pseudo = null, flat = true } = {}) {
   for (const q of [...(r.containers || [])].reverse()) { out = `@container ${q} {\n${out}\n}`; wrap++; }
   for (const q of [...(r.media || [])].reverse()) { out = `@media ${q} {\n${out}\n}`; wrap++; }
   return { css: out, maps: maps.map((m) => ({ ...m, dl: m.dl + wrap })) };
+}
+
+/** @keyframes for every motion, so `animation: name` in plain CSS works (the engine writes the same into its own stylesheet) */
+export function keyframesCss(motionFrames) {
+  const out = [];
+  for (const [name, m] of Object.entries(motionFrames || {})) {
+    const frames = (m.frames || []).map((f) => {
+      const off = f.offset === 0 ? '0%' : f.offset === 100 ? '100%' : `${f.offset}%`;
+      const body = Object.entries(f.props).map(([p, v]) => `  ${kebab(p)}: ${v};`).join('\n');
+      return `${off} {\n${body}\n}`;
+    });
+    if (frames.length) out.push(`@keyframes ${name} {\n${frames.join('\n')}\n}`);
+  }
+  return out;
+}
+
+/** an `animate:` spec as a CSS animation shorthand, for motions on ::before and ::after (WAAPI cannot reach a pseudo-element) */
+export function animationShorthand(spec) {
+  if (!spec || !spec.motion || spec.broken) return null;
+  const parts = [spec.motion, `${spec.duration}ms`, spec.easing || 'ease', `${spec.delay || 0}ms`, spec.iterations === Infinity ? 'infinite' : String(spec.iterations || 1)];
+  if (spec.direction && spec.direction !== 'normal') parts.push(spec.direction);
+  parts.push(spec.fill || 'both');
+  return parts.join(' ');
 }
 
 /** a source map needs base64 VLQ numbers */
@@ -213,17 +236,7 @@ export function toCSS(docIn, opts = {}) {
 
   // ---- keyframes from motions (name kept, so `animation: name` works) ----
   const motionFrames = doc.motionFrames || {};
-  for (const [name, m] of Object.entries(motionFrames)) {
-    const frames = m.frames.map(f => {
-      const off = f.offset === 0 ? '0%' : f.offset === 100 ? '100%' : `${f.offset}%`;
-      const body = Object.entries(f.props).map(([p, v]) => `  ${kebab(p)}: ${v};`).join('\n');
-      return `${off} {\n${body}\n}`;
-    });
-    if (frames.length) {
-      chunks.push({ layer: null, css: `@keyframes ${name} {\n${frames.join('\n')}\n}` });
-      report.keyframes++;
-    }
-  }
+  for (const css of keyframesCss(motionFrames)) { chunks.push({ layer: null, css }); report.keyframes++; }
 
   // ---- regular rules ----
   const toColor = makeColorResolver(new Map(Object.entries(doc.tokens || {})));
@@ -247,8 +260,16 @@ export function toCSS(docIn, opts = {}) {
   }
 
   // ---- pseudo-element rules (the shadow-CSS lane, native in a build) ----
-  for (const r of doc.shadowRules || []) {
-    if (r.signals && r.signals.length) { report.skippedSignals++; continue; }
+  for (const r0 of doc.shadowRules || []) {
+    if (r0.signals && r0.signals.length) { report.skippedSignals++; continue; }
+    // 0.14.0: motion on ::before and ::after becomes a real CSS animation (the keyframes are already in the file)
+    let r = r0;
+    const an = (r0.decls || []).find((d) => d.prop === '@animate' && d.value);
+    if (an && animationShorthand(an.value)) {
+      r = { ...r0, decls: [...r0.decls.filter((d) => d.prop !== '@animate'), { prop: 'animation', value: animationShorthand(an.value), line: an.line }] };
+      if (!an.value.essential) r = { ...r, media: [...(r.media || []), '(prefers-reduced-motion: no-preference)'] };
+      report.pseudoMotions = (report.pseudoMotions || 0) + 1;
+    }
     const { keep, engineProps } = splitDecls(r.decls || [], kinds);
     report.engineDecls += engineProps;
     if (!keep.length) { if (engineProps) report.skippedEngine++; continue; }
@@ -282,6 +303,7 @@ export function toCSS(docIn, opts = {}) {
     report.raws++;
   }
 
+  report.needsBox = alignWithoutBox(allRules);   // rules the engine would have given a display, and a build cannot
   report.engineKinds = [...kinds].sort();
   let css = out.trimEnd() + '\n';
   let map = null;

@@ -12,6 +12,19 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.14.0",
+    date: "growth phase \u00b7 made for games",
+    title: "A review from an agent that built a game, and all twelve problems fixed.",
+    why: "someone built a real game on DSSL and wrote down what bit them. Most of it was fair: motion that vanished without a word, two rules fighting over one background, settings that compiled and did nothing, docs that did not match the code.",
+    kind: "add",
+    body:
+      "Reduced motion no longer kills animate: in silence. The console says so once and how to get out: write essential in the motion, or call DSSL.motion('full'). animate: reads delay, jitter (a different random delay per element, the same on every load), iterations and essential. Motions are shared across files like tokens, keyframes take 0% and 40%, every motion is also a real @keyframes, and animate: works on ::before and ::after. DSSL.play(el, 'boing', { hold: true }) returns a promise. Your own inline styles now win over rules, a data-dssl-static subtree is styled once and left alone, and an aura is clipped to its stage, follows its scale, and can sit under a menu with DSSL.auraZ(). Gradients layer with + and take tile, offset and no-repeat, text-stroke is a real word, shadow: pop and radius: pill work for your own tokens, @signal takes in (a, b), not in and !=. DSSL.lint(root) checks the text colour against the real composited background, which found cream-on-cream that no single rule showed. dssl check and dssl build take an index.html and read the stylesheets it links. The docs were out of date in six places; a test now compares them with the real API. Not verified: Firefox and Safari.",
+    code: `motion boing { 0% { scale: 1 } 40% { scale: 1.3 } 100% { scale: 1 } }
+.coin { animate: boing 600 infinite jitter 400 essential }
+await DSSL.play(hero, 'boing', { hold: true })
+@signal screen in (menu, shop) { .hud { opacity: 0 } }`,
+  },
+  {
     version: "v0.13.0",
     date: "growth phase \u00b7 the compiled page is the page",
     title: "A built page matches the engine, with JavaScript off. And here are the numbers.",

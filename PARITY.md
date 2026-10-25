@@ -62,6 +62,27 @@ so the boundary is explicit, not folklore.
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
 
+## v0.14.0: made for games
+
+From a review by an agent that built a game on DSSL. Twelve problems and ten wishes; each has an assertion in `scripts/test-v0140.mjs`.
+
+| Review item | Status |
+|---|---|
+| Reduced motion silently kills every `animate:` | done: console says so once; `essential`, `DSSL.motion('full')`, `data-dssl-motion` |
+| `gradient:` and `background-image:` overwrite each other | done: warning; layers with `+` |
+| `animation-delay` etc. compile and do nothing | done: warning that names the replacement; `delay`/`jitter`/`iterations` words |
+| Motions scoped to one file | done: shared registry, same as tokens |
+| `paint-order: stroke fill`, `conic-gradient(from 0deg ...)` rejected | done |
+| `shadow: pop`, `radius: pill` for custom tokens | done |
+| Console noise "folded border-color" | done: removed |
+| Lint misses cross-rule contrast, false align warning | done: `DSSL.lint(root)` computes it on the live page; the align warning moved to `dssl build`'s report where it applies |
+| Docs drift | done: docs checked by a test against the real API and file list |
+| `0% { }` keyframes | done |
+| Engine overwrites inline styles | done: author styles win |
+| Static subtree, play(), scoped aura, `check index.html`, richer `@signal`, gradient sugar, motions on pseudo-elements, `text-stroke`, per-element variation, runtime lint | done |
+
+Not verified: Firefox and Safari (all checks ran in Chrome). The engine is still not at CSS parity for startup (see v0.13.0 below).
+
 ## v0.13.0: the compiled page is the page
 
 | Promise | Status | Evidence |

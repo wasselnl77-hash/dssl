@@ -38,6 +38,7 @@ import { PSEUDO_ELEMENTS, VENDOR_PSEUDO, STATE_WORDS } from './parser.js';
 // exported for the editor extension: completions ride the same list the
 // compiler validates against, so the two can never drift apart
 export const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,none,auto,currentcolor,transparent,' +
+  'from,stroke,markers,normal,' +   // 0.14.0: conic-gradient(from 0deg...), paint-order: stroke fill
   'black,silver,gray,white,maroon,red,purple,fuchsia,green,lime,olive,yellow,navy,blue,teal,aqua,' +
   'orange,gold,pink,brown,violet,cyan,magenta,indigo,crimson,coral,tomato,goldenrod,khaki,' +
   'slategray,slategrey,dimgray,dimgrey,lightgray,lightgrey,darkgray,darkgrey,gainsboro,whitesmoke,' +
@@ -454,13 +455,38 @@ const INTERP_RE = /\s*\bin\s+(srgb-linear|srgb|display-p3|lab|oklab|xyz-d50|xyz-
  *   radial at top left, #fff/40 -> transparent + linear 135, #123 -> #456   layers, first on top
  */
 function buildGradient(v, ctx) {
+  const parts = buildGradientParts(v, ctx);
+  return parts ? parts.image : null;
+}
+
+/**
+ * The same, with each layer's own size, position and repeat. After a layer, in any order:
+ *   tile 24          background-size 24px (tile 24 12 for width and height)
+ *   offset 4 4       background-position
+ *   no-repeat, repeat-x, repeat-y
+ * and a layer can be a plain CSS function (radial-gradient(...), url(...)) when the sentence has no word for it.
+ * Returns { image, size, position, repeat } where size, position and repeat are null unless some layer set one.
+ */
+function buildGradientParts(v, ctx) {
   const layers = splitLayers(String(v).trim());
-  if (layers.length > 1) {
-    const out = [];
-    for (const l of layers) { const g = buildGradientLayer(l, ctx); if (g === null) return null; out.push(g); }
-    return out.join(', ');
+  const out = { images: [], sizes: [], positions: [], repeats: [] };
+  const px = (x) => (/^-?\d+(\.\d+)?$/.test(x) ? x + 'px' : x);
+  for (let layer of layers) {
+    let size = null, pos = null, rep = null;
+    for (;;) {
+      let m;
+      if ((m = layer.match(/\s+tile\s+(\S+)(?:\s+(\S+))?$/i)) && !/^(tile|offset)$/i.test(m[1])) { size = px(m[1]) + ' ' + px(m[2] || m[1]); layer = layer.slice(0, m.index); continue; }
+      if ((m = layer.match(/\s+offset\s+(\S+)\s+(\S+)$/i))) { pos = px(m[1]) + ' ' + px(m[2]); layer = layer.slice(0, m.index); continue; }
+      if ((m = layer.match(/\s+(no-repeat|repeat-x|repeat-y)$/i))) { rep = m[1].toLowerCase(); layer = layer.slice(0, m.index); continue; }
+      break;
+    }
+    const isCssFn = /^(?:repeating-)?(?:linear|radial|conic)-gradient\(|^url\(|^image-set\(|^-webkit-/i.test(layer.trim());
+    const img = isCssFn ? resolveValue(layer.trim(), { ...ctx, unitless: false, bareIdents: false }) : buildGradientLayer(layer, ctx);
+    if (img === null) return null;
+    out.images.push(img); out.sizes.push(size); out.positions.push(pos); out.repeats.push(rep);
   }
-  return buildGradientLayer(String(v).trim(), ctx);
+  const listOf = (arr, dflt) => (arr.some((x) => x !== null) ? arr.map((x) => x || dflt).join(', ') : null);
+  return { image: out.images.join(', '), size: listOf(out.sizes, 'auto'), position: listOf(out.positions, '0 0'), repeat: listOf(out.repeats, 'repeat') };
 }
 
 function buildMesh(rest, ctx) {
@@ -787,12 +813,15 @@ const SEMANTIC = {
     if (['sm', 'md', 'lg', 'xl', 'none'].includes(t)) {
       return [{ prop: 'box-shadow', value: t === 'none' ? 'none' : `var(--dssl-shadow-${t})` }];
     }
+    // 0.14.0: your own shadow token works by its bare name, like the built-in ones: tokens { shadow { pop: ... } }  then  shadow: pop
+    if (/^[A-Za-z][\w-]*$/.test(t) && ctx.tokens && ctx.tokens.has('shadow.' + t)) return [{ prop: 'box-shadow', value: `var(--dssl-shadow-${t})` }];
     return [{ prop: 'box-shadow', value: resolveValue(v, ctx) }];
   },
   radius(v, ctx) {
     const atoms = v.trim().split(/\s+/).filter(Boolean);
     const out = atoms.map(a => {
       if (['sm', 'md', 'lg', 'full', 'xl'].includes(a)) return `var(--dssl-radius-${a})`;
+      if (/^[A-Za-z][\w-]*$/.test(a) && ctx.tokens && ctx.tokens.has('radius.' + a)) return `var(--dssl-radius-${a})`;   // 0.14.0: radius { pill: 99 }  then  radius: pill
       return resolveValue(a, ctx);
     });
     return [{ prop: 'border-radius', value: out.join(' ') }];
@@ -901,10 +930,20 @@ const SEMANTIC = {
     if (t === 'none') return [{ prop: '@animate', value: null }];
     const atoms = t.split(/\s+/);
     const spec = { motion: atoms[0], duration: 400, easing: EASINGS.smooth, fill: 'both', delay: 0 };
+    const toMs = (a) => (a.endsWith('s') && !a.endsWith('ms') ? parseFloat(a) * 1000 : parseFloat(a));
     for (let k = 1; k < atoms.length; k++) {
       const a = atoms[k];
+      // 0.14.0: the words that used to be CSS longhands which did nothing here
+      if (a === 'delay' || a === 'jitter' || a === 'iterations') {
+        const v = atoms[k + 1];
+        if (v === undefined || !/^\d+(\.\d+)?(ms|s)?$/.test(v)) { ctx.errors.push({ file: ctx.file, line: ctx.line, message: `${a} needs a number`, hint: a === 'iterations' ? 'animate: boing 300 iterations 3' : `animate: bob 1200 infinite ${a} 600` }); continue; }
+        if (a === 'iterations') spec.iterations = parseFloat(v); else spec[a] = toMs(v);
+        k++;
+        continue;
+      }
+      if (a === 'essential') { spec.essentialHere = true; continue; }
       if (/^\d+(ms|s)?$/.test(a)) {
-        const ms = a.endsWith('s') && !a.endsWith('ms') ? parseFloat(a) * 1000 : parseFloat(a);
+        const ms = toMs(a);
         if (k === 1) spec.duration = ms; else spec.delay = ms;
         continue;
       }
@@ -914,7 +953,7 @@ const SEMANTIC = {
       // animate: pulse 1600 infinite alternate  - was impossible before.
       if (a === 'infinite') { spec.iterations = Infinity; continue; }
       if (['alternate', 'alternate-reverse', 'reverse', 'normal'].includes(a)) { spec.direction = a; continue; }
-      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown animate part "${a}"`, hint: didYouMean(a, Object.keys(EASINGS).concat(['both', 'forwards', 'backwards', 'infinite', 'alternate'])) });
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: `unknown animate part "${a}"`, hint: didYouMean(a, Object.keys(EASINGS).concat(['both', 'forwards', 'backwards', 'infinite', 'alternate', 'delay', 'jitter', 'iterations', 'essential'])) });
     }
     return [{ prop: '@animate', value: spec }];
   },
@@ -1006,8 +1045,31 @@ const SEMANTIC = {
    * gradient into the glyphs. gradient-flow loops background-position so a
    * gradient drifts forever - one line instead of keyframe folklore. */
   gradient(v, ctx) {
-    const img = buildGradient(v, ctx);
-    return img ? [{ prop: 'background-image', value: img }] : [];
+    const g = buildGradientParts(v, ctx);
+    if (!g) return [];
+    const out = [{ prop: 'background-image', value: g.image, fromGradient: true }];
+    if (g.size) out.push({ prop: 'background-size', value: g.size });
+    if (g.position) out.push({ prop: 'background-position', value: g.position });
+    if (g.repeat) out.push({ prop: 'background-repeat', value: g.repeat });
+    return out;
+  },
+  // 0.14.0: an outline round text, in one line. The stroke is drawn first and the fill over it, so the outline sits OUTSIDE
+  // the letters and does not eat them (the stroke-plus-paint-order trick, written once). `inside` keeps the default centred stroke.
+  //   text-stroke: 6 color.ink      text-stroke: 2 #fff inside
+  'text-stroke'(v, ctx) {
+    const atoms = (v || '').trim().split(/\s+/).filter(Boolean);
+    if (atoms.length === 1 && atoms[0] === 'none') return [{ prop: '-webkit-text-stroke', value: '0' }, { prop: 'paint-order', value: 'normal' }];
+    const inside = atoms.includes('inside');
+    const rest = atoms.filter((a) => a !== 'inside');
+    if (!rest.length || !/^\d+(\.\d+)?(px|em|rem)?$/.test(rest[0])) {
+      ctx.errors.push({ file: ctx.file, line: ctx.line, message: 'text-stroke needs a width first', hint: 'text-stroke: 6 color.ink' });
+      return [];
+    }
+    const width = /^\d+(\.\d+)?$/.test(rest[0]) ? rest[0] + 'px' : rest[0];
+    const color = rest[1] ? resolveValue(rest.slice(1).join(' '), { ...ctx, unitless: false, bareIdents: false }) : 'currentcolor';
+    const out = [{ prop: '-webkit-text-stroke', value: `${width} ${color}` }];
+    if (!inside) out.push({ prop: 'paint-order', value: 'stroke fill' });
+    return out;
   },
   'gradient-text'(v, ctx) {
     const img = buildGradient(v, ctx);
@@ -1260,6 +1322,13 @@ function normalizeMedia(query, ctx, line) {
 }
 
 function parseSignal(expr, ctx, line) {
+  // 0.14.0: a set of values:  @signal screen in (menu, shop, settings)   and   @signal screen not in (playing)
+  const list = expr.match(/^([A-Za-z_][\w-]*)\s+(not\s+in|in)\s*\(([^)]*)\)\s*$/);
+  if (list) {
+    const values = list[3].split(',').map((x) => x.trim().replace(/^(["'])(.*)\1$/, '$2')).filter((x) => x !== '');
+    if (!values.length) { ctx.errors.push({ file: ctx.file, line, message: `@signal ${list[1]} ${list[2]} ( ) has no values`, hint: '@signal screen in (menu, shop)' }); }
+    return { name: list[1], op: /^not/.test(list[2]) ? 'notin' : 'in', value: values.join(','), values };
+  }
   const m = expr.match(/^([A-Za-z_][\w-]*)\s*(==|!=)\s*(.+)$/);
   if (m) {
     let v = m[3].trim();
@@ -1275,7 +1344,7 @@ function parseSignal(expr, ctx, line) {
  * The flattener
  * ------------------------------------------------------------------ */
 
-export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
+export function resolve(ast, file = 'inline.dssl', baseTokens = null, baseMotions = null) {
   const errors = [];
   const rules = [];
   const shadowRules = [];
@@ -1333,14 +1402,23 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
 
   const parseMotion = (name) => {
     const node = motions[name];
-    if (!node) return null;
+    // 0.14.0: a motion defined in another stylesheet counts, like a token does. `baseMotions` holds the ones the files loaded
+    // before this one defined, already turned into keyframes.
+    if (!node) return (baseMotions && baseMotions[name]) || null;
     if (node._parsed) return node._parsed;
     node._parsed = { essential: false, frames: [] };
+    // from, to, at 40%, and since 0.14.0 plain CSS habits too: 0%, 40%, and a list like  0%, 100%
     const frameOf = (label) => {
-      if (label === 'from') return 0;
-      if (label === 'to') return 100;
-      const m = label.match(/^at\s+([0-9.]+)\s*%?$/);
+      const t = label.trim();
+      if (t === 'from') return 0;
+      if (t === 'to') return 100;
+      const m = t.match(/^(?:at\s+)?([0-9.]+)\s*%?$/);
       return m ? parseFloat(m[1]) : null;
+    };
+    const framesOf = (label) => {
+      const parts = label.split(',').map((x) => x.trim()).filter(Boolean);
+      const offs = parts.map(frameOf);
+      return offs.some((o) => o === null || o < 0 || o > 100) ? null : offs;
     };
     const ctxBase = { file, line: node.line, errors, warnings, tokens: tokenMap, tokenNames: [...tokenMap.keys()], prop: 'motion', unitless: false };
     for (const child of node.children) {
@@ -1353,9 +1431,9 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
         continue;
       }
       if (child.kind === 'selector') {
-        const offset = frameOf(child.sel);
-        if (offset === null) {
-          errors.push({ file, line: child.line, message: `bad keyframe selector "${child.sel}"`, hint: 'use from, to, or at 40%' });
+        const offsets = framesOf(child.sel);
+        if (offsets === null) {
+          errors.push({ file, line: child.line, message: `bad keyframe selector "${child.sel}"`, hint: 'use from, to, at 40%, or just 40% (a list works too: 0%, 100%). A keyframe sits between 0 and 100' });
           continue;
         }
         const props = {};
@@ -1386,7 +1464,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           props.transform = c.transform;
           if (c.origin) props.transformOrigin = c.origin;
         }
-        node._parsed.frames.push({ offset, props });
+        for (const offset of offsets) node._parsed.frames.push({ offset, props: { ...props } });
       }
     }
     node._parsed.frames.sort((a, b) => a.offset - b.offset);
@@ -1553,7 +1631,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
             // used to leak into the shadow sheet as junk CSS the browser
             // silently dropped - exactly the silence this language refuses.
             for (const r of resolved) {
-              if (r.prop.startsWith('@')) {
+              if (r.prop.startsWith('@') && r.prop !== '@animate') {   // 0.14.0: animate: becomes a CSS animation on a pseudo-element
                 errors.push({ file, line: d.line, message: `"${d.prop}" is engine-native and has no meaning on ::${node.name} - a pseudo-element has no DOM handle`, hint: 'put it on the element itself, not inside the pseudo block' });
                 continue;
               }
@@ -1637,7 +1715,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       // nested pseudo path): no DOM handle means no nudge, animate or stack.
       const decls = [];
       for (const d of sub.decls) {
-        if (d.prop && d.prop.startsWith('@')) {
+        if (d.prop && d.prop.startsWith('@') && d.prop !== '@animate') {
           errors.push({ file, line, message: `"${d.prop}" is engine-native and has no meaning on ::${ps.parts[0].pseudo.split(/[\s:(]/)[0]} - a pseudo-element has no DOM handle`, hint: 'put it on the element itself, not inside the pseudo rule' });
           continue;
         }
@@ -1743,6 +1821,36 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
 
   // parse all motions that were referenced
   for (const r of [...rules, ...shadowRules]) {
+    // 0.14.0: gradient: writes background-image, so a second background-image (or a background: with an image in it) in the same
+    // rule replaces it and the gradient is gone, with no sign of it. Say so, and say how to layer.
+    {
+      const g = r.decls.find((x) => x.fromGradient);
+      if (g) {
+        const other = r.decls.find((x) => x !== g && !x.fromGradient && (x.prop === 'background-image' || (x.prop === 'background' && /url\(|gradient\(/.test(String(x.value)))));
+        if (other) warnings.push({
+          file, line: Math.max(g.line || 0, other.line || 0) || g.line,
+          message: `"${r.sel}" sets the background image twice (gradient: and ${other.prop}): the later one replaces the earlier, so one of them never shows`,
+          hint: 'layer them in one gradient: sentence, joined with +, first on top:  gradient: radial circle, #fff4 -> transparent tile 24 + linear 180, #e33 -> #a11  (a CSS radial-gradient(...) or url(...) works as a layer too)',
+        });
+      }
+    }
+    // 0.14.0: animation-delay, -duration, -iteration-count... only tune a CSS animation, and a rule that runs its motion through
+    // animate: (the Web Animations API) has none, so they compiled, were written inline, and did nothing, with no word about it.
+    {
+      const hasCssAnim = r.decls.some((x) => x.prop === 'animation' || x.prop === 'animation-name');
+      const usesAnimate = r.decls.some((x) => x.prop === '@animate' && x.value);
+      for (const x of r.decls) {
+        const m = /^animation-(delay|duration|iteration-count|direction|fill-mode|timing-function|play-state)$/.exec(x.prop);
+        if (m && !hasCssAnim) {
+          const word = { delay: 'delay', duration: 'a number after the name', 'iteration-count': 'infinite, or iterations 3', direction: 'alternate', 'fill-mode': 'both, forwards', 'timing-function': 'an easing name', 'play-state': '' }[m[1]];
+          warnings.push({
+            file, line: x.line,
+            message: `${x.prop} does nothing here: this rule has no CSS animation to tune${usesAnimate ? ', it runs its motion through animate:' : ''}`,
+            hint: usesAnimate || !hasCssAnim ? `put it in the animate: line, e.g.  animate: ${(r.decls.find((y) => y.prop === '@animate' && y.value) || { value: { motion: 'name' } }).value.motion} 400 ${m[1] === 'delay' ? 'delay 200' : word || ''}  (words: delay N, jitter N, iterations N, infinite, alternate, an easing, essential). Or write the whole  animation: name 400ms ...  shorthand` : '',
+          });
+        }
+      }
+    }
     for (const d of r.decls) {
       if (d.prop === '@animate' && d.value && d.value.motion) {
         const m = parseMotion(d.value.motion);
@@ -1755,7 +1863,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
           d.value.broken = true;
         } else {
           d.value.frames = m.frames;
-          d.value.essential = m.essential;
+          d.value.essential = m.essential || !!d.value.essentialHere;
         }
       }
       // v0.8.0 - the animation shorthand is CSS passthrough, so a motion
@@ -1764,7 +1872,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null) {
       // from raw { } or another stylesheet, the warning says it can be ignored.
       if ((d.prop === 'animation' || d.prop === 'animation-name') && typeof d.value === 'string') {
         const words = d.value.split(/[\s,]+/).filter(w => /^[A-Za-z][\w-]*$/.test(w));
-        const named = words.find(w => motions[w]);
+        const named = words.find(w => motions[w] || (baseMotions && baseMotions[w]));
         if (words.length && !named) {
           warnings.push({
             file, line: d.line,

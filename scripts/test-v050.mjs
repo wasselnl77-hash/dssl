@@ -257,9 +257,10 @@ console.log(`${pass} passed, ${fail} failed`);
 
 // 14. engine-native props inside pseudo blocks fail loud (no junk shadow CSS)
 {
-  const a = compile('.card::before { animate: pop 400 }');
-  check('14 nested animate-in-pseudo is LOUD', a.errors.length === 1 && /engine-native/.test(a.errors[0].message), JSON.stringify(a.errors));
-  check('14 nothing leaked to shadow CSS', a.doc.shadowRules.length === 0 && a.doc.rules.length === 0);
+  // 0.14.0: animate: on a pseudo-element is allowed now (it becomes a CSS animation); what is still engine-only fails loud
+  const a = compile('motion pop { from { opacity: 0 } to { opacity: 1 } }\n.card::before { content: "x"; animate: pop 400 }');
+  check('14 animate on a pseudo-element is allowed since 0.14 and becomes a CSS animation', a.errors.length === 0 && a.doc.shadowRules.length === 1 && a.doc.shadowRules[0].decls.some((d) => d.prop === '@animate'), JSON.stringify(a.errors));
+  check('14 an unknown motion there is still LOUD', compile('.card::before { content: "x"; animate: pop 400 }').errors.length === 1);
 
   const b = compile('.card::before { overlap: deny }');
   check('14 top-level overlap-in-pseudo is LOUD', b.errors.length === 1 && /engine-native/.test(b.errors[0].message), JSON.stringify(b.errors));

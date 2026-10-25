@@ -45,11 +45,12 @@ const { importCss } = await import('file://' + join(engineDir, 'import.js'));
 
 const USAGE = `dssl v${VERSION} - the DSSL style language
 
-  dssl check <files…>    compile with the real engine, print diagnostics
+  dssl check <files…>    compile with the real engine, print diagnostics. A page (index.html) works too:
+                         it takes the stylesheets in the order the page loads them
                          --json    machine-readable output
                          --strict  warnings are errors too (exit 1)
                          --quiet   only print diagnostics, no summary
-  dssl build <files…>    compile the static subset to a real .css file (several files: in load order, tokens first)
+  dssl build <files…>    (or a page, index.html) compile the static subset to a real .css file (several files: in load order, tokens first)
                          -o <out.css>   output path (default: <first file>.css)
                          --sourcemap    write <out.css>.map so devtools show the .dssl file and line of each rule
                          --map-name <f> file name for the map when your host will not serve *.map (default <out.css>.map)
@@ -87,24 +88,64 @@ const readSource = (file) => {
   }
 };
 
+/**
+ * 0.14.0: `dssl check index.html` and `dssl build index.html` read the page and take its stylesheets in the order the browser
+ * loads them: every <link rel="stylesheet/dssl"> and every inline <style type="text/dssl"> (or <script type="text/dssl">),
+ * top to bottom. Relative links are resolved against the page's folder; a leading / is tried against that folder first.
+ * Nobody keeps a second list of files in a script any more, and the order cannot drift from what the runtime does.
+ */
+function expandInputs(args) {
+  const out = [];
+  for (const a of args) {
+    if (!/\.html?$/i.test(a)) { out.push(a); continue; }
+    const html = readSource(a);
+    const dir = dirname(pathResolve(a));
+    const found = [];
+    const re = /<link\b[^>]*>|<(style|script)\b[^>]*type\s*=\s*["']text\/dssl["'][^>]*>([\s\S]*?)<\/\1>/gi;
+    let n = 0, m;
+    while ((m = re.exec(html))) {
+      if (m[0].toLowerCase().startsWith('<link')) {
+        if (!/rel\s*=\s*["']stylesheet\/dssl["']/i.test(m[0])) continue;
+        const href = (m[0].match(/href\s*=\s*["']([^"']+)["']/i) || [])[1];
+        if (!href || /^(https?:)?\/\//i.test(href)) continue;
+        const clean = href.split(/[?#]/)[0];
+        const cands = [join(dir, clean), join(dir, clean.replace(/^\//, '')), pathResolve(clean)];
+        const hit = cands.find((c) => existsSync(c));
+        if (!hit) { console.error(`dssl: ${a} links ${href}, which is not on disk (looked in ${dir})`); process.exit(2); }
+        found.push(hit);
+      } else {
+        n++;
+        const nm = (m[0].match(/data-dssl-name\s*=\s*["']([^"']+)["']/i) || [])[1] || `${basename(a)}#inline-${n}`;
+        found.push({ name: nm, text: m[2], file: pathResolve(a) });
+      }
+    }
+    if (!found.length) { console.error(`dssl: ${a} has no <link rel="stylesheet/dssl"> or <style type="text/dssl"> in it`); process.exit(2); }
+    out.push(...found);
+  }
+  return out;
+}
+
 /** compile files in order, folding tokens forward like the browser does */
 function compileAll(files) {
   const out = [];
-  let tokenBase = null;
-  for (const file of files) {
-    const src = readSource(file);
-    const name = basename(file);
+  let tokenBase = null, motionBase = {};
+  for (const item of expandInputs(files)) {
+    const inline = typeof item === 'object';
+    const file = inline ? item.file : item;
+    const src = inline ? item.text : readSource(file);
+    const name = inline ? item.name : basename(file);
     const { ast, errors: parseErrors } = parse(src, name);
     let doc;
     try {
-      doc = resolve(ast, name, tokenBase);
+      doc = resolve(ast, name, tokenBase, motionBase);
     } catch (e) {
       // the compiler must never throw - this is a bug report if it happens
       doc = { rules: [], shadowRules: [], raws: [], errors: [{ file: name, line: 0, message: `internal compiler error: ${e.message}`, hint: 'please report this - a snippet that crashes the compiler is a bug in DSSL, not in your code' }], warnings: [], tokens: {} };
     }
     const all = [...parseErrors.map(e => ({ ...e, file: name })), ...doc.errors.map(e => ({ ...e, file: e.file || name }))];
-    out.push({ file, name, doc, errors: all, warnings: doc.warnings || [] });
+    out.push({ file, name, doc, errors: all, warnings: doc.warnings || [], text: src });
     tokenBase = { ...(tokenBase || {}), ...doc.tokens };
+    motionBase = { ...motionBase, ...(doc.motionFrames || {}) };
   }
   return out;
 }
@@ -148,7 +189,7 @@ if (cmd === 'check') {
   const strict = args.includes('--strict');
   const quiet = args.includes('--quiet');
   for (const f of ['--json', '--strict', '--quiet']) { const i = args.indexOf(f); if (i !== -1) args.splice(i, 1); }
-  if (!args.length) { console.error('dssl check: give me at least one .dssl file'); process.exit(2); }
+  if (!args.length) { console.error('dssl check: give me at least one .dssl file, or a page (index.html) to read the stylesheet order from'); process.exit(2); }
   const results = compileAll(args);
   if (json) {
     console.log(JSON.stringify({
@@ -209,11 +250,12 @@ if (cmd === 'dev') {
   if (!args.length) { console.error('dssl build: give me a .dssl file to build (or several, in load order: tokens first)'); process.exit(2); }
   const inputs = [...args];
   const results = compileAll(inputs);
+  inputs.length = 0; inputs.push(...results.map((x) => x.file));
   const errors = results.flatMap((x) => x.errors), warnings = results.flatMap((x) => x.warnings);
   const outputPath = outPath || (inputs[0].replace(/\.dssl$/i, '') + '.css');
   const outDir = dirname(pathResolve(outputPath));
   const sources = {};
-  for (const x of results) sources[x.name] = { path: pathRelative(outDir, pathResolve(x.file)).split('\\').join('/'), content: readFileSync(x.file, 'utf8') };
+  for (const x of results) sources[x.name] = { path: pathRelative(outDir, pathResolve(x.file)).split('\\').join('/'), content: x.text };
   const built = toCSS(results.map((x) => x.doc), {
     file: inputs.map((f) => basename(f)).join(' + '), banner, version: VERSION, reset, nativeSpecificity, inlineTokens,
     sourceMap: sourcemap, sources, mapFile: basename(outputPath), sourceMapUrl: sourcemap ? (mapName || basename(outputPath) + '.map') : undefined,
@@ -240,6 +282,11 @@ if (cmd === 'dev') {
     if (rep.seenStripped) console.log(`  ${rep.seenStripped} seen rule(s) applied unconditionally (the no-JS state)`);
     if (rep.bakedTextures) console.log(`  ${rep.bakedTextures} texture(s) baked into the CSS as background images`);
     for (const n of rep.notBaked || []) console.log(`  texture on "${n.sel}" stays in the runtime: ${n.why}`);
+    if (rep.needsBox && rep.needsBox.length) {
+      console.log(`  ${rep.needsBox.length} rule(s) align their children without saying display, so the engine would make them grids and this CSS will not:`);
+      for (const n of rep.needsBox.slice(0, 8)) console.log(`    ${n.file || ''}:${n.line} ${n.sel} { ${n.prop} }  ->  add display: grid (or flex)`);
+      if (rep.needsBox.length > 8) console.log(`    ...and ${rep.needsBox.length - 8} more`);
+    }
     if (rep.skippedSignals || rep.engineDecls) {
       const kinds = rep.engineKinds.length ? ` (${rep.engineKinds.join(', ')})` : '';
       console.log(`  stays in the runtime: ${rep.skippedSignals} @signal rule(s), ${rep.engineDecls} engine-native declaration(s)${kinds}`);
