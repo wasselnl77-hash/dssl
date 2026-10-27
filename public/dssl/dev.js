@@ -237,7 +237,11 @@ function cssThatLoses(eng, scope) {
     try {
       const owner = sheet.ownerNode;
       if (owner && owner.getAttributeNames && owner.getAttributeNames().some((n) => n.startsWith('data-dssl'))) continue;   // the engine's own sheets
-      visit([...sheet.cssRules], sheet.href ? sheet.href.split('/').pop() : '<style>');
+      // the output of `dssl build` declares the DSSL layer order first (tokens, base, components, utilities, pin). It is DSSL's own CSS, built
+      // to sit UNDER the engine (its reset in particular), so it is not "your CSS" and is not judged here.
+      const rules = [...sheet.cssRules];
+      if (rules.some((r) => r.constructor && r.constructor.name === 'CSSLayerStatementRule' && [...(r.nameList || [])].includes('pin'))) continue;
+      visit(rules, sheet.href ? sheet.href.split('/').pop() : '<style>');
     } catch { /* a cross-origin sheet cannot be read */ }
   }
   return found;

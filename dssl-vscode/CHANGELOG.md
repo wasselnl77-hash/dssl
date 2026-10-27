@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.2
+
+- Bundled engine 0.16.2: `DSSL.lint` also skips the output of `dssl build` (its reset sits under the engine on purpose).
+
 ## 0.16.1
 
 - Bundled engine 0.16.1: `DSSL.lint` no longer reports `css-loses` for a stylesheet that says the same thing as DSSL (a page that ships the compiled CSS and also runs the engine).

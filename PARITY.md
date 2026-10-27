@@ -62,6 +62,10 @@ so the boundary is explicit, not folklore.
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
 
+## v0.16.2
+
+`DSSL.lint`'s `css-loses` skips the output of `dssl build` (recognised by its `@layer tokens, base, components, utilities, pin` statement), because its reset is built to sit under the engine. The docs page of this site went from 4,314 false findings (0.16.0), to 111 (0.16.1), to none from its own CSS.
+
 ## v0.16.1
 
 `DSSL.lint`'s `css-loses` ignores a CSS rule whose value is the same as the inline value DSSL wrote (found on this site, which ships compiled CSS and runs the engine: 4,314 false findings on the docs page).

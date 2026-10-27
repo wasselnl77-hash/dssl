@@ -100,6 +100,13 @@ await withBrowser(async ({ open, errors }) => {
     const n = await p.evaluate(async () => (await DSSL.lint(document.body, { log: false })).filter((f) => f.kind === 'css-loses').length);
     ok('compiled CSS and the engine saying the same thing is not reported as css-loses', n === 0, String(n));
   }, { pages: { '/b': page('.dup { padding: 10; color: #123456 }', '<div class=dup></div>', '', built) } });
+  // and the built reset sits under everything on purpose: it must not be called a conflict either
+  const builtReset = (await import('../public/dssl/index.js')).toCSS('.dup { padding: 10; color: #123456 }', { file: 'a.dssl', reset: true }).css;
+  await withBrowser(async ({ open }) => {
+    const p = await open('/b2'); await ready(p); await p.waitForTimeout(250);
+    const n = await p.evaluate(async () => (await DSSL.lint(document.body, { log: false })).filter((f) => f.kind === 'css-loses').length);
+    ok('the reset layer of a built stylesheet is not called a conflict', n === 0, String(n));
+  }, { pages: { '/b2': page('p { margin: 7 }\n.dup { padding: 10; color: #123456 }', '<p class=dup>x</p><a href=#>a</a>', '', builtReset) } });
 }
 
 section('4. aura follows the real shape');

@@ -12,6 +12,14 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.16.2",
+    date: "growth phase \u00b7 a second small fix",
+    title: "css-loses leaves DSSL's own built CSS alone.",
+    why: "after the first fix this very site still showed 111 findings, all from the reset layer that dssl build writes to sit under the engine.",
+    kind: "add",
+    body: "DSSL.lint now recognises a stylesheet made by dssl build (it declares the DSSL layer order) and does not judge it. Your own CSS is still checked.",
+  },
+  {
     version: "v0.16.1",
     date: "growth phase \u00b7 a small fix",
     title: "DSSL.lint stops crying wolf on pages that ship compiled CSS and run the engine.",
