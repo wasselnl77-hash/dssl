@@ -119,6 +119,7 @@ function splitDecls(decls, kinds) {
   const keep = [];
   let engineProps = 0;
   for (const d of decls) {
+    if (d.prop === '@yield') continue;   // 0.16.0: yield: tells the engine to leave a property alone; a stylesheet has nothing to leave
     if (isEngineProp(d.prop)) { engineProps++; if (kinds) kinds.add(d.prop.replace(/^@/, '')); continue; }
     keep.push(d);
   }

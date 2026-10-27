@@ -31,8 +31,67 @@ import { parseTexture, makeMask, splitWords, rng } from './texture.js';
  * vocabulary
  * ------------------------------------------------------------------ */
 
-export const FROM_WORDS = ['edge', 'bottom', 'top', 'left', 'right', 'center', 'corners', 'thumb'];
-export const SHAPES = ['circle', 'spark', 'square', 'ring', 'star', 'flame', 'smoke', 'line'];
+export const FROM_WORDS = ['edge', 'outline', 'bottom', 'top', 'left', 'right', 'center', 'corners', 'thumb'];
+export const SHAPES = ['circle', 'spark', 'square', 'ring', 'star', 'flame', 'smoke', 'line',
+  'heart', 'diamond', 'triangle', 'plus', 'drop', 'bubble', 'snowflake', 'confetti', 'leaf'];   // 0.16.0: the last nine
+
+/* ---- shapes an aura can follow (0.16.0) ---- */
+const TWO_PI = Math.PI * 2;
+const ngon = (n, rot = -Math.PI / 2) => Array.from({ length: n }, (_, i) => { const a = rot + (i / n) * TWO_PI; return [0.5 + 0.5 * Math.cos(a), 0.5 + 0.5 * Math.sin(a)]; });
+const starOf = (n, inner) => Array.from({ length: n * 2 }, (_, i) => { const a = -Math.PI / 2 + (i / (n * 2)) * TWO_PI, r = i % 2 ? inner : 1; return [0.5 + 0.5 * r * Math.cos(a), 0.5 + 0.5 * r * Math.sin(a)]; });
+const heartOf = () => {
+  const pts = [];
+  for (let i = 0; i < 48; i++) { const t = (i / 48) * TWO_PI; pts.push([16 * Math.pow(Math.sin(t), 3), -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))]); }
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  return pts.map(([x, y]) => [(x - x0) / (x1 - x0), (y - y0) / (y1 - y0)]);
+};
+const dropOf = () => {
+  const pts = [[0.5, 0]];
+  for (let deg = -32.6; deg <= 212.6; deg += 8) { const a = (deg * Math.PI) / 180; pts.push([0.5 + 0.35 * Math.cos(a), 0.65 + 0.35 * Math.sin(a)]); }
+  return pts;
+};
+/** the polygons, as fractions of the element's box (0..1, y down) */
+const UNIT_SHAPES = {
+  diamond: [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]],
+  triangle: [[0.5, 0], [1, 1], [0, 1]],
+  hexagon: ngon(6, 0),
+  octagon: ngon(8, Math.PI / 8),
+  pentagon: ngon(5),
+  star: starOf(5, 0.4),
+  star4: starOf(4, 0.36),
+  star6: starOf(6, 0.5),
+  cross: [[0.33, 0], [0.67, 0], [0.67, 0.33], [1, 0.33], [1, 0.67], [0.67, 0.67], [0.67, 1], [0.33, 1], [0.33, 0.67], [0, 0.67], [0, 0.33], [0.33, 0.33]],
+  heart: heartOf(),
+  drop: dropOf(),
+  bolt: [[0.58, 0], [0.18, 0.56], [0.46, 0.56], [0.34, 1], [0.82, 0.38], [0.54, 0.38], [0.72, 0]],
+};
+/** the names `around` takes (polygon(...) is the other form) */
+export const AROUND_NAMES = ['follow', 'box', 'round', 'pill', 'alpha', ...Object.keys(UNIT_SHAPES)];
+
+/** `around` in its parsed form to a polygon, as [x, y] fractions of the box, or null for a shape that is not a polygon (box, round, pill, follow, alpha) */
+export function aroundPoints(spec) {
+  if (!spec) return null;
+  if (spec.name === 'polygon') return spec.pts;
+  return UNIT_SHAPES[spec.name] || null;
+}
+
+/** `around` words to {name} or {name:'polygon', pts}; null with a message when it is neither */
+export function parseAround(word, hooks) {
+  const w = String(word || '').trim();
+  if (AROUND_NAMES.includes(w)) return { name: w };
+  const m = /^polygon\((.*)\)$/s.exec(w);
+  if (!m) { hooks.error(`unknown around "${w}"`, hooks.suggest(w, AROUND_NAMES) || `use one of: ${AROUND_NAMES.join(', ')}, or polygon(50% 0, 100% 50%, 50% 100%, 0 50%)`); return null; }
+  const pts = [];
+  for (const part of m[1].split(',')) {
+    const t = part.trim().split(/\s+/);
+    const v = t.map((x) => (/^-?[\d.]+%$/.test(x) ? parseFloat(x) / 100 : /^-?[\d.]+$/.test(x) ? parseFloat(x) / 100 : NaN));
+    if (t.length !== 2 || v.some((n) => !Number.isFinite(n))) { hooks.error(`polygon needs "x y" pairs in percent, got "${part.trim()}"`, 'around polygon(50% 0, 100% 50%, 50% 100%, 0 50%)'); return null; }
+    pts.push(v);
+  }
+  if (pts.length < 3) { hooks.error('a polygon needs at least 3 points', 'around polygon(50% 0, 100% 100%, 0 100%)'); return null; }
+  return { name: 'polygon', pts };
+}
 export const DIR_WORDS = { up: -90, down: 90, left: 180, right: 0, out: 'out', in: 'in' };
 export const AURA_BLENDS = ['add', 'normal'];
 
@@ -49,6 +108,12 @@ export const GLOW_KEYS = {
   texture:   { kind: 'texture', words: 1, doc: 'texture(grain scale 2): break the light up with a texture' },
   essential: { kind: 'flag', words: 0, doc: 'keep animating even when the visitor prefers reduced motion' },
   unclipped: { kind: 'flag', words: 0, doc: 'let the light spill out of a parent that clips (overflow: hidden, auto, scroll). Without it the aura is cut at that edge, like the element itself' },
+  around:    { kind: 'around', words: 1, doc: 'the shape the light follows: follow (the default: the element\'s clip-path or rounded corners), box, round, pill, diamond, triangle, hexagon, octagon, pentagon, star, star4, star6, cross, heart, drop, bolt, alpha (an <img> or <canvas>\'s visible pixels), or polygon(50% 0, 100% 50%, 50% 100%, 0 50%)' },
+  inner:     { kind: 'flag', words: 0, doc: 'light inside the edge (a rim) instead of outside it' },
+  rays:      num(1, 64, { int: true, doc: 'that many beams of light from the middle, slowly turning (see spin)' }),
+  spin:      num(-3600, 3600, { doc: 'rays turn this many degrees a second (default 10); on particles, how fast each one tumbles' }),
+  ripple:    num(200, 60000, { doc: 'rings that spread out from the shape and fade, one every this many milliseconds' }),
+  nohalo:    { kind: 'flag', words: 0, doc: 'only the rays and ripples, without the soft halo' },
   always:    { kind: 'flag', words: 0, doc: 'keep emitting even when the element cannot be seen (opacity 0, display: none, visibility: hidden, on it or an ancestor): for an invisible anchor that smoke or sparks come out of' },
   z:         num(-1000000, 2147483000, { int: true, doc: 'the z-index of the layer this light is drawn on: `z 5` puts it under a hill with z-index 10. It meets elements in the page\'s root stacking context' }),
 };
@@ -64,8 +129,8 @@ export const PARTICLE_KEYS = {
   gravity:    num(-2000, 2000, { doc: 'px/s squared; negative pulls up (flames), positive down (snow)' }),
   drag:       num(0, 10, { doc: 'air resistance: how fast particles slow down' }),
   turbulence: num(0, 1000, { doc: 'random sideways wobble, px/s' }),
-  from:       { kind: 'word', words: 1, values: FROM_WORDS, doc: 'where they are born: edge, bottom, top, left, right, center, corners, thumb (range sliders)' },
-  shape:      { kind: 'word', words: 1, values: SHAPES, doc: 'circle, spark, square, ring, star, flame, smoke or line' },
+  from:       { kind: 'word', words: 1, values: FROM_WORDS, doc: 'where they are born: edge or outline (along the element\'s real outline, see around), bottom, top, left, right, center, corners, thumb (range sliders)' },
+  shape:      { kind: 'word', words: 1, values: SHAPES, doc: 'circle, spark, square, ring, star, flame, smoke, line, heart, diamond, triangle, plus, drop, bubble, snowflake, confetti or leaf' },
   grow:       num(0, 10, { doc: 'size at the end of life as a multiple of the start: 0.2 shrinks, 3 swells' }),
   blend:      { kind: 'word', words: 1, values: AURA_BLENDS, doc: 'add makes overlapping particles brighter, normal just stacks them' },
   glowing:    { kind: 'flag', words: 0, doc: 'soft glowing particles that add light' },
@@ -74,6 +139,11 @@ export const PARTICLE_KEYS = {
   texture:    { kind: 'texture', words: 1, doc: 'texture(grain): grainy particles' },
   essential:  { kind: 'flag', words: 0, doc: 'keep animating even when the visitor prefers reduced motion' },
   unclipped:  { kind: 'flag', words: 0, doc: 'let the particles leave a parent that clips (overflow: hidden, auto, scroll). Without it they are cut at that edge' },
+  around:     { kind: 'around', words: 1, doc: 'the shape `from edge` and `from outline` follow: follow (the default), box, round, pill, diamond, triangle, hexagon, octagon, pentagon, star, star4, star6, cross, heart, drop, bolt, or polygon(...)' },
+  palette:    { kind: 'flag', words: 0, doc: 'each particle takes ONE of the colours (confetti) instead of fading through them' },
+  spin:       num(-3600, 3600, { doc: 'how fast each particle tumbles, in degrees a second (random direction)' }),
+  wind:       num(-3000, 3000, { doc: 'a sideways push, px/s squared; negative pushes left' }),
+  orbit:      num(-3600, 3600, { doc: 'the particles circle the middle of the element, this many degrees a second' }),
   always:     { kind: 'flag', words: 0, doc: 'keep emitting even when the element cannot be seen (opacity 0, display: none, visibility: hidden, on it or an ancestor): for an invisible anchor that smoke or sparks come out of' },
   z:          num(-1000000, 2147483000, { int: true, doc: 'the z-index of the layer these particles are drawn on: `z 5` puts them under a hill with z-index 10. It meets elements in the page\'s root stacking context' }),
 };
@@ -195,6 +265,13 @@ function parseLayerWords(words, kind, hooks, opts = {}) {
       const t = textureOf(inner);
       if (t === null) return null;
       setBoth('texture', t);
+      continue;
+    }
+    if (def.kind === 'around') {
+      const v = words[i]; i++;
+      const sp = parseAround(v, hooks);
+      if (sp === null) return null;
+      setBoth('around', sp);
       continue;
     }
     if (def.kind === 'dir') {
@@ -338,6 +415,107 @@ const TAU = Math.PI * 2;
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
+/* ---- geometry of an element's real shape (0.16.0) ---- */
+
+const ANGLE_UNIT = { deg: Math.PI / 180, rad: 1, turn: TAU, grad: Math.PI / 200 };
+
+/** the 2x2 part of everything the element does to itself: rotate, scale and transform (its translation is already in its rect) */
+function linearOf(cs) {
+  let a = 1, b = 0, c = 0, d = 1, any = false;
+  const mul = (ma, mb, mc, md) => {      // cur = cur * m  (m is applied to a point first)
+    const na = a * ma + c * mb, nb = b * ma + d * mb, nc = a * mc + c * md, nd = b * mc + d * md;
+    a = na; b = nb; c = nc; d = nd; any = true;
+  };
+  const rot = cs.rotate;
+  if (rot && rot !== 'none') {
+    const m = /^(?:z\s+)?(-?[\d.]+)(deg|rad|turn|grad)$/.exec(rot);
+    if (m) { const t = parseFloat(m[1]) * ANGLE_UNIT[m[2]]; mul(Math.cos(t), Math.sin(t), -Math.sin(t), Math.cos(t)); }
+  }
+  const sc = cs.scale;
+  if (sc && sc !== 'none') {
+    const m = /^(-?[\d.]+)(?:\s+(-?[\d.]+))?/.exec(sc);
+    if (m) { const sx = parseFloat(m[1]), sy = m[2] !== undefined ? parseFloat(m[2]) : sx; mul(sx, 0, 0, sy); }
+  }
+  const tr = cs.transform;
+  if (tr && tr !== 'none') {
+    let m = /^matrix\(([^)]*)\)$/.exec(tr);
+    if (m) { const v = m[1].split(',').map(parseFloat); if (v.length === 6 && v.every(Number.isFinite)) mul(v[0], v[1], v[2], v[3]); }
+    else if ((m = /^matrix3d\(([^)]*)\)$/.exec(tr))) { const v = m[1].split(',').map(parseFloat); if (v.length === 16 && v.every(Number.isFinite)) mul(v[0], v[1], v[4], v[5]); }
+  }
+  return any ? { a, b, c, d } : null;
+}
+
+/** clip-path: polygon / circle / ellipse / inset to a shape in fractions of the box; null for anything else (path(), url(), calc) */
+const clipCache = new Map();
+function parseClip(str) {
+  if (!str || str === 'none') return null;
+  if (clipCache.has(str)) return clipCache.get(str);
+  let out = null;
+  const val = (t, size) => (/%$/.test(t) ? parseFloat(t) / 100 : /px$/.test(t) ? parseFloat(t) / size : /^-?[\d.]+$/.test(t) ? (parseFloat(t) === 0 ? 0 : NaN) : NaN);
+  try {
+    let m;
+    if ((m = /^polygon\((?:(?:nonzero|evenodd)\s*,\s*)?(.*)\)$/s.exec(str))) {
+      const pts = m[1].split(',').map((p) => p.trim().split(/\s+/));
+      if (pts.length >= 3 && pts.every((p) => p.length === 2)) out = { kind: 'poly', pts: pts.map((p) => ({ x: p[0], y: p[1] })) };
+    } else if ((m = /^(circle|ellipse)\((.*)\)$/s.exec(str))) {
+      const at = m[2].split(/\s+at\s+/);
+      const radii = at[0].trim().split(/\s+/).filter(Boolean);
+      const pos = (at[1] || '50% 50%').trim().split(/\s+/);
+      out = { kind: 'ellipse', circle: m[1] === 'circle', radii, cx: pos[0], cy: pos[1] === undefined ? '50%' : pos[1] };
+    } else if ((m = /^inset\(([^)]*?)(?:\s+round\s+.*)?\)$/s.exec(str))) {
+      out = { kind: 'inset', v: m[1].trim().split(/\s+/) };
+    }
+  } catch { out = null; }
+  if (clipCache.size > 200) clipCache.clear();
+  clipCache.set(str, out);
+  return out;
+}
+
+/** a shape in the element's own box, centred on (0, 0), sized w by h, in CSS px */
+function resolveGeom(spec, clipStr, w, h, radius, srcEl) {
+  const name = spec ? spec.name : 'follow';
+  const pct = (t, size) => { const v = /%$/.test(t) ? parseFloat(t) / 100 * size : /px$/.test(t) ? parseFloat(t) : /^-?[\d.]+$/.test(t) ? parseFloat(t) : NaN; return v; };
+  const polyFrom = (pts) => ({ kind: 'poly', pts: pts.map(([fx, fy]) => [(fx - 0.5) * w, (fy - 0.5) * h]) });
+  if (name === 'follow') {
+    const cl = parseClip(clipStr);
+    if (cl) {
+      if (cl.kind === 'poly') {
+        const pts = cl.pts.map((p) => [pct(p.x, w) - w / 2, pct(p.y, h) - h / 2]);
+        if (pts.every((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]))) return { kind: 'poly', pts, sig: 'clip:' + clipStr };
+      } else if (cl.kind === 'ellipse') {
+        const cx = pct(cl.cx, w) - w / 2, cy = pct(cl.cy, h) - h / 2;
+        let rx, ry;
+        if (cl.circle) { const ref = Math.sqrt((w * w + h * h) / 2); const r = cl.radii[0] ? (/%$/.test(cl.radii[0]) ? parseFloat(cl.radii[0]) / 100 * ref : pct(cl.radii[0], ref)) : ref / 2; rx = ry = r; }
+        else { rx = cl.radii[0] ? pct(cl.radii[0], w) : w / 2; ry = cl.radii[1] ? pct(cl.radii[1], h) : h / 2; }
+        if ([cx, cy, rx, ry].every(Number.isFinite)) return { kind: 'ellipse', cx, cy, rx, ry, sig: 'clip:' + clipStr };
+      } else if (cl.kind === 'inset') {
+        const v = cl.v.map((t, i) => pct(t, i % 2 ? w : h));
+        const [t, r, b = t, l = r] = v.length === 1 ? [v[0], v[0], v[0], v[0]] : v.length === 2 ? [v[0], v[1], v[0], v[1]] : v;
+        if ([t, r, b, l].every(Number.isFinite)) return { kind: 'poly', pts: [[-w / 2 + l, -h / 2 + t], [w / 2 - r, -h / 2 + t], [w / 2 - r, h / 2 - b], [-w / 2 + l, h / 2 - b]], sig: 'clip:' + clipStr };
+      }
+    }
+    return { kind: 'rrect', r: radius, sig: 'rr' + radius };
+  }
+  if (name === 'box') return { kind: 'rrect', r: radius, sig: 'rr' + radius };
+  if (name === 'pill') return { kind: 'rrect', r: Math.min(w, h) / 2, sig: 'pill' };
+  if (name === 'round') return { kind: 'ellipse', cx: 0, cy: 0, rx: w / 2, ry: h / 2, sig: 'round' };
+  if (name === 'alpha') {
+    const ok = srcEl && ((srcEl.tagName === 'IMG' && srcEl.complete && srcEl.naturalWidth > 0) || srcEl.tagName === 'CANVAS' || (srcEl.tagName === 'VIDEO' && srcEl.readyState >= 2));
+    if (ok) return { kind: 'alpha', src: srcEl, sig: 'alpha' + (srcEl.currentSrc || srcEl.src || '') };
+    return { kind: 'rrect', r: radius, sig: 'rr' + radius };
+  }
+  const pts = aroundPoints(spec);
+  if (pts) return { ...polyFrom(pts), sig: 'poly' + name + w + 'x' + h };
+  return { kind: 'rrect', r: radius, sig: 'rr' + radius };
+}
+
+/** add a shape (centred, w by h) to the current path */
+function tracePath(ctx, g, w, h) {
+  if (g.kind === 'ellipse') { ctx.moveTo(g.cx + g.rx, g.cy); ctx.ellipse(g.cx, g.cy, Math.max(0.01, g.rx), Math.max(0.01, g.ry), 0, 0, TAU); ctx.closePath(); }
+  else if (g.kind === 'poly') { g.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); }
+  else roundRectPath(ctx, -w / 2, -h / 2, w, h, g.kind === 'rrect' ? g.r : 0);
+}
+
 function roundRectPath(ctx, x, y, w, h, r) {
   r = Math.max(0, Math.min(r, w / 2, h / 2));
   ctx.moveTo(x + r, y);
@@ -467,7 +645,9 @@ export class AuraManager {
   /** what a frame would draw for this emitter, as a string: the same string twice means nothing needs redrawing */
   stateKey(el, eo) {
     const r = el.getBoundingClientRect();
-    return `${r.left.toFixed(1)},${r.top.toFixed(1)},${r.width.toFixed(1)},${r.height.toFixed(1)},${eo.toFixed(2)}`;
+    let extra = '';
+    try { const cs = getComputedStyle(el); extra = `${cs.transform}|${cs.rotate}|${cs.scale}|${cs.clipPath}`; } catch { /* detached */ }
+    return `${r.left.toFixed(1)},${r.top.toFixed(1)},${r.width.toFixed(1)},${r.height.toFixed(1)},${eo.toFixed(2)},${extra}`;
   }
 
   /** reduced motion: has anything moved, resized or faded since the last frame? (cheap: no drawing) */
@@ -579,8 +759,11 @@ export class AuraManager {
       // 0.14.0: a stage scaled with transform: scale() has a rect the size you SEE, so the light follows it, and so must its size
       // and speed. The scale is how much bigger (or smaller) the box is than the box CSS says it is.
       em.scale = 1;
-      if (rect && el.offsetWidth > 0) em.scale = Math.max(0.05, Math.min(20, rect.width / el.offsetWidth));
       if (em.radiusAt < 0 || (em.age++ % 45) === 0) { em.radius = this.cornerRadius(el, rect); em.radiusAt = 0; em.clips = this.clipAncestors(el, em); }
+      // 0.16.0: where the element REALLY is: its rect is the box around the turned/scaled shape, so work out the shape's own size, the way it
+      // is turned (rotate, scale, transform) and how much a parent scales it. Glow, edge particles and the hidden-behind clip all use this.
+      em.base = rect ? this.baseOf(el, rect) : null;
+      if (em.base) em.scale = em.base.s;
 
       if (em.dying) em.fade = Math.max(0, em.fade - dt * 3);
       else em.fade = Math.min(1, em.fade + dt * 4);
@@ -603,8 +786,9 @@ export class AuraManager {
         const moving = !reduced || cfg.essential;
         L.scale = em.scale;
         L.eo = em.eo;
+        if (em.base) { L.cx = em.base.cx; L.cy = em.base.cy; }
         if (rect && em.visible && !em.dying && moving && seen) this.emit(L, rect, em, dt, share, el);
-        if (L.parts.length) { const ctx = this.ctxFor(cfg.z); open(ctx); this.stepAndDraw(ctx, L, dt, moving, cfg.behind && rect ? { rect, radius: em.radius } : null); close(ctx); }
+        if (L.parts.length) { const ctx = this.ctxFor(cfg.z); open(ctx); this.stepAndDraw(ctx, L, dt, moving, cfg.behind && em.base ? { base: em.base, geom: this.geomFor(em, cfg) } : null); close(ctx); }
         alive += L.parts.length;
         if (L.parts.length || (rect && em.visible && !em.dying && moving && seen)) anyActive = true;
       }
@@ -676,16 +860,69 @@ export class AuraManager {
 
   cornerRadius(el, rect) {
     try {
-      const v = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
-      const r = rect ? Math.min(rect.width, rect.height) / 2 : 0;
-      return Math.min(v, r);
+      const raw = getComputedStyle(el).borderTopLeftRadius;
+      const w = el.offsetWidth || (rect ? rect.width : 0), h = el.offsetHeight || (rect ? rect.height : 0);
+      // a percentage (border-radius: 50%) is a share of the box, not that many px
+      const v = /%$/.test(raw) ? (parseFloat(raw) / 100) * Math.min(w, h) : parseFloat(raw) || 0;
+      return Math.min(v, Math.min(w, h) / 2);
     } catch { return 0; }
+  }
+
+  /** the element's own box, centre and the way it is turned, scaled and clipped, read from the page */
+  baseOf(el, rect) {
+    let L = null, clip = 'none';
+    try { const cs = getComputedStyle(el); L = linearOf(cs); clip = cs.clipPath; } catch { /* detached */ }
+    let w = el.offsetWidth, h = el.offsetHeight;
+    let a = 1, b = 0, c = 0, d = 1;
+    if (!w || !h) { w = rect.width; h = rect.height; L = null; }
+    if (L) ({ a, b, c, d } = L);
+    const ew = Math.abs(a) * w + Math.abs(c) * h;
+    const s = ew > 0 ? Math.max(0.05, Math.min(20, rect.width / ew)) : 1;
+    return { cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, w, h, a, b, c, d, s, clip, turned: !!L };
+  }
+
+  /** the shape a layer follows (its `around`, else the element's clip-path or rounded corners), cached while nothing about it changes */
+  geomFor(em, cfg) {
+    const base = em.base;
+    const key = `${cfg.around ? cfg.around.name + (cfg.around.pts ? cfg.around.pts.length : '') : 'follow'}|${base.w}x${base.h}|${base.clip}|${em.radius}`;
+    const asks = cfg.around && cfg.around.name === 'alpha';      // an image can finish loading at any moment, so look again every frame
+    if (!asks && cfg._gc && cfg._gc.key === key) return cfg._gc.geom;
+    const geom = resolveGeom(cfg.around, base.clip, base.w, base.h, em.radius, em.el);
+    cfg._gc = { key, geom };
+    return geom;
+  }
+
+  /** put the shape into the current path of ctx, in page coordinates, whatever transform ctx has now */
+  addShape(ctx, base, geom) {
+    const m = ctx.getTransform();
+    ctx.transform(base.a * base.s, base.b * base.s, base.c * base.s, base.d * base.s, base.cx, base.cy);
+    tracePath(ctx, geom, base.w, base.h);
+    ctx.setTransform(m);
+  }
+
+  /** the outline of the shape as a closed polyline in page coordinates, with the length of each side, for particles born "from outline" */
+  outlineOf(em, cfg) {
+    const base = em.base;
+    if (!base) return null;
+    const geom = this.geomFor(em, cfg);
+    if (geom._olN === this._n && geom._olBase === base) return geom._ol;
+    let local;
+    if (geom.kind === 'poly') local = geom.pts;
+    else if (geom.kind === 'ellipse') { local = []; for (let i = 0; i < 48; i++) { const t = (i / 48) * TAU; local.push([geom.cx + geom.rx * Math.cos(t), geom.cy + geom.ry * Math.sin(t)]); } }
+    else { const hw = base.w / 2, hh = base.h / 2; local = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]]; }
+    const pts = local.map(([x, y]) => ({ x: base.cx + base.s * (base.a * x + base.c * y), y: base.cy + base.s * (base.b * x + base.d * y) }));
+    const lens = []; let total = 0;
+    for (let i = 0; i < pts.length; i++) { const q = pts[(i + 1) % pts.length]; const l = Math.hypot(q.x - pts[i].x, q.y - pts[i].y); lens.push(l); total += l; }
+    geom._ol = { pts, lens, total }; geom._olN = this._n; geom._olBase = base;
+    return geom._ol;
   }
 
   /* ---- glow ---- */
 
   drawGlow(ctx, rect, em, g, now, reduced) {
     const cfg = g.cfg;
+    const base = em.base;
+    if (!base) return;
     const moving = !reduced || cfg.essential;
     let a = cfg.intensity * em.fade * (em.eo === undefined ? 1 : em.eo);
     if (moving && cfg.pulse > 0) {
@@ -700,43 +937,67 @@ export class AuraManager {
     }
     if (a <= 0.004) return;
     const c = cfg.rgba;
-    const R = cfg.radius * (em.scale || 1);
+    const s = base.s;
+    const geom = this.geomFor(em, cfg);
+
+    // 0.16.0: beams and ripples, drawn straight onto the canvas (they move, so there is nothing to cache)
+    if (cfg.rays) this.drawRays(ctx, em, geom, cfg, a, now, moving);
+    if (cfg.ripple) this.drawRipple(ctx, em, geom, cfg, a, now, moving);
+    if (cfg.nohalo && (cfg.rays || cfg.ripple)) return;
+
+    const R = cfg.radius * s;
     const dpr = this.dpr;
-    const x = rect.left, y = rect.top, w = rect.width, h = rect.height;
     const pad = Math.ceil(R * 1.6);
-    const lw = Math.ceil(w + pad * 2), lh = Math.ceil(h + pad * 2);
+    const lw = Math.ceil(rect.width + pad * 2), lh = Math.ceil(rect.height + pad * 2);
     if (lw * lh * dpr * dpr > 6e6) return; // a glow bitmap bigger than this would cost more than it is worth
 
     // The blur is the expensive part, and pulsing and flickering only change how BRIGHT the shape is, not
     // what it looks like. So the shape is painted once into this glow's own bitmap, and each frame just
     // draws that bitmap at the current alpha. It repaints only when the shape really changes.
-    const key = `${lw}x${lh}|${dpr}|${c.r | 0},${c.g | 0},${c.b | 0},${c.a.toFixed(2)}|${R}|${em.radius}|${cfg.tex ? sigOf(cfg.tex[0]) : ''}`;
+    const m = [base.a, base.b, base.c, base.d].map((n) => n.toFixed(3)).join(',');
+    const live = geom.kind === 'alpha' && geom.src && geom.src.tagName !== 'IMG' ? Math.floor(now / 120) : '';   // a canvas or video changes under us
+    const key = `${lw}x${lh}|${dpr}|${c.r | 0},${c.g | 0},${c.b | 0},${c.a.toFixed(2)}|${R.toFixed(1)}|${cfg.inner ? 1 : 0}|${geom.sig}|${m}|${base.w}x${base.h}|${s.toFixed(3)}|${cfg.tex ? sigOf(cfg.tex[0]) : ''}|${live}`;
     if (!g.bitmap || g.bitmapKey !== key) {
       if (!g.bitmap) g.bitmap = document.createElement('canvas');
       const off = g.bitmap;
       off.width = Math.ceil(lw * dpr); off.height = Math.ceil(lh * dpr);
       const o = off.getContext('2d');
-      o.save();
-      // clip so the light never paints over the element itself
-      o.beginPath();
-      o.rect(0, 0, off.width, off.height);
-      o.scale(dpr, dpr);
-      roundRectPath(o, pad, pad, w, h, em.radius);
-      o.setTransform(1, 0, 0, 1, 0, 0);
-      o.clip('evenodd');
       const SH = 10000; // draw the shape far off-canvas and let only its blurred shadow land here
-      o.shadowOffsetX = SH * dpr;
-      o.fillStyle = '#000';
-      for (const [k, mul] of [[1, 0.8], [0.55, 0.45], [0.25, 0.4]]) {
-        o.shadowBlur = R * k * dpr;
-        o.shadowColor = `rgba(${c.r | 0},${c.g | 0},${c.b | 0},${clamp01(c.a * mul)})`;
-        o.beginPath();
-        o.scale(dpr, dpr);
-        roundRectPath(o, pad - SH, pad, w, h, em.radius);
+      // the shape in bitmap pixels: centred, turned and scaled like the element; shiftDev slides it sideways in device pixels
+      const put = (shiftDev) => {
+        o.setTransform(dpr * base.a * s, dpr * base.b * s, dpr * base.c * s, dpr * base.d * s, dpr * (lw / 2) + shiftDev, dpr * (lh / 2));
+        if (geom.kind === 'alpha') { try { o.drawImage(geom.src, -base.w / 2, -base.h / 2, base.w, base.h); } catch { /* an image that cannot be drawn */ } }
+        else tracePath(o, geom, base.w, base.h);
         o.setTransform(1, 0, 0, 1, 0, 0);
-        o.fill();
+      };
+      const addPath = () => { o.setTransform(dpr * base.a * s, dpr * base.b * s, dpr * base.c * s, dpr * base.d * s, dpr * (lw / 2), dpr * (lh / 2)); tracePath(o, geom.kind === 'alpha' ? { kind: 'rrect', r: 0 } : geom, base.w, base.h); o.setTransform(1, 0, 0, 1, 0, 0); };
+      const shadowOf = (shiftDev, blur, color) => {
+        o.shadowOffsetX = SH * dpr; o.shadowBlur = blur * dpr; o.shadowColor = color;
+        if (geom.kind === 'alpha') put(-SH * dpr);
+        else { o.beginPath(); put(-SH * dpr); o.fillStyle = '#000'; o.fill(); }
+      };
+      o.save();
+      if (cfg.inner) {
+        // light just inside the edge: fill the shape with the colour, then wipe out its blurred core
+        if (geom.kind === 'alpha') { o.fillStyle = `rgba(${c.r | 0},${c.g | 0},${c.b | 0},${clamp01(c.a)})`; o.fillRect(0, 0, off.width, off.height); o.globalCompositeOperation = 'destination-in'; o.shadowColor = 'transparent'; put(0); }
+        else {
+          o.beginPath(); addPath(); o.clip();
+          o.fillStyle = `rgba(${c.r | 0},${c.g | 0},${c.b | 0},${clamp01(c.a)})`;
+          o.fillRect(0, 0, off.width, off.height);
+        }
+        o.globalCompositeOperation = 'destination-out';
+        shadowOf(0, R * 0.9, 'rgba(0,0,0,1)');
+      } else {
+        // outside: the shape itself is cut out of the clip, so the light never paints over the element
+        if (geom.kind !== 'alpha') { o.beginPath(); o.rect(0, 0, off.width, off.height); addPath(); o.clip('evenodd'); }
+        for (const [k, mul] of [[1, 0.8], [0.55, 0.45], [0.25, 0.4]]) {
+          shadowOf(0, R * k, `rgba(${c.r | 0},${c.g | 0},${c.b | 0},${clamp01(c.a * mul)})`);
+        }
       }
       o.restore();
+      if (!cfg.inner && geom.kind === 'alpha') {
+        o.save(); o.globalCompositeOperation = 'destination-out'; o.shadowColor = 'transparent'; o.shadowBlur = 0; o.shadowOffsetX = 0; put(0); o.restore();
+      }
       if (cfg.tex) {
         const mask = this.maskCanvas(cfg.tex[0], 128);
         o.save();
@@ -752,8 +1013,51 @@ export class AuraManager {
     // intensity above 1 brightens by drawing the same light more than once
     const passes = Math.max(1, Math.ceil(a));
     ctx.globalAlpha = clamp01(a / passes);
-    for (let i = 0; i < passes; i++) ctx.drawImage(g.bitmap, 0, 0, g.bitmap.width, g.bitmap.height, x - pad, y - pad, lw, lh);
+    for (let i = 0; i < passes; i++) ctx.drawImage(g.bitmap, 0, 0, g.bitmap.width, g.bitmap.height, base.cx - lw / 2, base.cy - lh / 2, lw, lh);
     ctx.restore();
+  }
+
+  /** `rays N`: beams of light from the middle of the shape, turning slowly, never over the element itself */
+  drawRays(ctx, em, geom, cfg, a, now, moving) {
+    const base = em.base, c = cfg.rgba, n = cfg.rays;
+    const len = (Math.hypot(base.w, base.h) / 2 + cfg.radius) * base.s;
+    const turn = moving ? ((now / 1000) * (cfg.spin === undefined ? 10 : cfg.spin) * Math.PI) / 180 : 0;
+    ctx.save();
+    if (geom.kind !== 'alpha') { ctx.beginPath(); ctx.rect(-50, -50, this.vw + 100, this.vh + 100); this.addShape(ctx, base, geom); ctx.clip('evenodd'); }
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(base.cx, base.cy);
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, len);
+    grad.addColorStop(0, `rgba(${c.r | 0},${c.g | 0},${c.b | 0},${clamp01(c.a * a * 0.85)})`);
+    grad.addColorStop(1, `rgba(${c.r | 0},${c.g | 0},${c.b | 0},0)`);
+    ctx.fillStyle = grad;
+    const half = (Math.PI / n) * 0.42;
+    for (let i = 0; i < n; i++) {
+      const ang = turn + (i / n) * TAU;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, len, ang - half, ang + half); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  /** `ripple P`: three rings that spread out from the outline and fade; one still ring under reduced motion */
+  drawRipple(ctx, em, geom, cfg, a, now, moving) {
+    const base = em.base, c = cfg.rgba, P = cfg.ripple;
+    const reach = (cfg.radius * base.s) / Math.max(1, (Math.min(base.w, base.h) * base.s) / 2);
+    const phase0 = moving ? now / P : 0.4;
+    for (let k = 0; k < 3; k++) {
+      const t = (phase0 + k / 3) % 1;
+      const ga = clamp01(a * (1 - t) * (moving ? 1 : 0.6));
+      if (ga < 0.01) continue;
+      const grow = 1 + t * reach;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.transform(base.a * base.s * grow, base.b * base.s * grow, base.c * base.s * grow, base.d * base.s * grow, base.cx, base.cy);
+      ctx.beginPath();
+      tracePath(ctx, geom.kind === 'alpha' ? { kind: 'rrect', r: 0 } : geom, base.w, base.h);
+      ctx.lineWidth = 2 / (base.s * grow);
+      ctx.strokeStyle = `rgba(${c.r | 0},${c.g | 0},${c.b | 0},${ga})`;
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   /* ---- masks and sprites ---- */
@@ -793,6 +1097,34 @@ export class AuraManager {
       x.closePath(); x.fill();
     } else if (shape === 'square') {
       x.fillStyle = `rgb(${rgb})`; x.fillRect(S * 0.15, S * 0.15, S * 0.7, S * 0.7);
+    } else if (shape === 'heart' || shape === 'diamond' || shape === 'triangle' || shape === 'drop' || shape === 'plus') {
+      // the same polygons an aura can follow, filled
+      const pts = UNIT_SHAPES[shape === 'plus' ? 'cross' : shape];
+      x.fillStyle = `rgb(${rgb})`; x.beginPath();
+      pts.forEach(([px, py], i) => { const X = S * (0.08 + 0.84 * px), Y = S * (0.08 + 0.84 * py); if (i) x.lineTo(X, Y); else x.moveTo(X, Y); });
+      x.closePath(); x.fill();
+    } else if (shape === 'bubble') {
+      const g = x.createRadialGradient(S / 2, S / 2, S * 0.2, S / 2, S / 2, S / 2 - 3);
+      g.addColorStop(0, `rgba(${rgb},0.05)`); g.addColorStop(1, `rgba(${rgb},0.35)`);
+      x.fillStyle = g; x.beginPath(); x.arc(S / 2, S / 2, S / 2 - 3, 0, TAU); x.fill();
+      x.strokeStyle = `rgba(${rgb},0.9)`; x.lineWidth = 3; x.stroke();
+      x.strokeStyle = 'rgba(255,255,255,0.8)'; x.lineWidth = 4; x.lineCap = 'round'; x.beginPath(); x.arc(S / 2, S / 2, S / 2 - 12, Math.PI * 1.1, Math.PI * 1.45); x.stroke();
+    } else if (shape === 'snowflake') {
+      x.strokeStyle = `rgb(${rgb})`; x.lineWidth = 4; x.lineCap = 'round';
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU, cx = Math.cos(a), cy = Math.sin(a);
+        x.beginPath(); x.moveTo(S / 2, S / 2); x.lineTo(S / 2 + cx * S * 0.44, S / 2 + cy * S * 0.44);
+        for (const f of [0.55, 0.8]) {          // two little branches on each arm
+          const bx = S / 2 + cx * S * 0.44 * f, by = S / 2 + cy * S * 0.44 * f;
+          for (const d of [-0.9, 0.9]) { x.moveTo(bx, by); x.lineTo(bx + Math.cos(a + d) * S * 0.12, by + Math.sin(a + d) * S * 0.12); }
+        }
+        x.stroke();
+      }
+    } else if (shape === 'confetti') {
+      x.fillStyle = `rgb(${rgb})`; x.fillRect(S * 0.05, S * 0.05, S * 0.9, S * 0.9);
+    } else if (shape === 'leaf') {
+      x.fillStyle = `rgb(${rgb})`; x.beginPath(); x.moveTo(S * 0.12, S * 0.88); x.quadraticCurveTo(S * 0.08, S * 0.12, S * 0.9, S * 0.1); x.quadraticCurveTo(S * 0.92, S * 0.9, S * 0.12, S * 0.88); x.closePath(); x.fill();
+      x.strokeStyle = 'rgba(0,0,0,0.25)'; x.lineWidth = 2; x.beginPath(); x.moveTo(S * 0.15, S * 0.85); x.lineTo(S * 0.75, S * 0.25); x.stroke();
     } else {
       const g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
       const hard = shape === 'circle' ? 0.55 : 0.0;
@@ -829,11 +1161,11 @@ export class AuraManager {
     while (L.acc >= 1) {
       L.acc -= 1;
       if (L.parts.length >= cap) { L.acc = Math.min(L.acc, 1); break; }
-      L.parts.push(this.spawn(L, rect, el, em.scale || 1));
+      L.parts.push(this.spawn(L, rect, el, em.scale || 1, em));
     }
   }
 
-  spawn(L, rect, el, scale = 1) {
+  spawn(L, rect, el, scale = 1, em = null) {
     const c = L.cfg, r = L.rnd;
     const between = (a, b) => a + (b - a) * r();
     let x, y;
@@ -851,7 +1183,16 @@ export class AuraManager {
         const pad = 10;
         x = rect.left + pad + p * Math.max(0, rect.width - pad * 2); y = rect.top + rect.height / 2 + (r() - 0.5) * 6; break;
       }
-      default: { // edge: a random point on the perimeter
+      default: { // edge / outline: a random point on the perimeter
+        // 0.16.0: along the element's REAL outline (turned, clipped to a diamond or a star), not the box around it
+        const ol = em && this.outlineOf(em, c);
+        if (ol && ol.total > 0) {
+          let d = r() * ol.total, i = 0;
+          while (i < ol.lens.length - 1 && d > ol.lens[i]) { d -= ol.lens[i]; i++; }
+          const p0 = ol.pts[i], p1 = ol.pts[(i + 1) % ol.pts.length], t = ol.lens[i] > 0 ? d / ol.lens[i] : 0;
+          x = p0.x + (p1.x - p0.x) * t; y = p0.y + (p1.y - p0.y) * t;
+          break;
+        }
         const per = 2 * (rect.width + rect.height);
         let d = r() * per;
         if (d < rect.width) { x = rect.left + d; y = rect.top; }
@@ -871,7 +1212,9 @@ export class AuraManager {
     return {
       x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
       age: 0, life: between(c.life[0], c.life[1]) / 1000,
-      size: between(c.size[0], c.size[1]) * scale, rot: r() * TAU, spin: (r() - 0.5) * 4, variant: (r() * 4) | 0, ph: r() * TAU,
+      size: between(c.size[0], c.size[1]) * scale, rot: r() * TAU,
+      spin: c.spin !== undefined ? (r() < 0.5 ? -1 : 1) * ((c.spin * Math.PI) / 180) * (0.6 + 0.8 * r()) : (r() - 0.5) * 4,
+      variant: (r() * 4) | 0, ph: r() * TAU, pc: (r() * 1000) | 0,
     };
   }
 
@@ -880,10 +1223,10 @@ export class AuraManager {
     const additive = c.blend === 'add';
     ctx.save();
     if (hide) {
-      // clip the element's own box OUT, so the layer reads as sitting behind it
+      // clip the element's own shape OUT, so the layer reads as sitting behind it
       ctx.beginPath();
       ctx.rect(-50, -50, this.vw + 100, this.vh + 100);
-      roundRectPath(ctx, hide.rect.left, hide.rect.top, hide.rect.width, hide.rect.height, hide.radius);
+      this.addShape(ctx, hide.base, hide.geom);
       ctx.clip('evenodd');
     }
     ctx.globalCompositeOperation = additive ? 'lighter' : 'source-over';
@@ -895,14 +1238,24 @@ export class AuraManager {
         if (p.age >= p.life) { parts[i] = parts[parts.length - 1]; parts.pop(); continue; }
         const sc = L.scale || 1;
         p.vy += c.gravity * sc * dt;
+        if (c.wind) p.vx += c.wind * sc * dt;
         if (c.turbulence) { p.vx += Math.sin(p.ph + p.age * 7) * c.turbulence * sc * dt; p.vy += Math.cos(p.ph * 1.3 + p.age * 5) * c.turbulence * sc * 0.3 * dt; }
         if (c.drag) { p.vx *= drag; p.vy *= drag; }
         p.x += p.vx * dt; p.y += p.vy * dt;
+        if (c.orbit && L.cx !== undefined) {          // 0.16.0: circle the middle of the element
+          const ang = (c.orbit * Math.PI / 180) * dt, co = Math.cos(ang), si = Math.sin(ang), dx = p.x - L.cx, dy = p.y - L.cy;
+          p.x = L.cx + dx * co - dy * si; p.y = L.cy + dx * si + dy * co;
+        }
         p.rot += p.spin * dt;
       }
       const t = p.age / p.life;
-      const col = colorAt(c.stops, t);
-      const alpha = clamp01(col.a) * (L.eo === undefined ? 1 : L.eo);
+      let col, alphaIn;
+      if (c.palette) {
+        // confetti: ONE colour per particle, fading in and out over its life
+        const base = c.stops[p.pc % Math.max(1, c.stops.length - (c.stops.length > 1 && c.stops[c.stops.length - 1].a === 0 ? 1 : 0))];
+        col = base; alphaIn = base.a * Math.min(1, t / 0.08, (1 - t) / 0.3);
+      } else { col = colorAt(c.stops, t); alphaIn = col.a; }
+      const alpha = clamp01(alphaIn) * (L.eo === undefined ? 1 : L.eo);
       if (alpha <= 0.003) continue;
       const size = p.size * lerp(1, c.grow, t);
       this.drawParticle(ctx, c, p, col, alpha, size);
@@ -936,8 +1289,14 @@ export class AuraManager {
       const w = size * 2.2, h = size * 3.4;
       ctx.drawImage(s, -w / 2, -h * 0.65, w, h);
       ctx.restore();
-    } else if (shape === 'ring' || shape === 'star' || shape === 'square') {
+    } else if (shape === 'confetti') {
+      // a flat scrap tumbling: its height shrinks and grows as it turns over
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      const w = size * 1.5, h = Math.max(0.5, size * 0.8 * Math.abs(Math.cos(p.ph + p.age * 9)));
+      ctx.drawImage(s, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    } else if (shape === 'ring' || shape === 'star' || shape === 'square' || shape === 'heart' || shape === 'diamond' || shape === 'triangle' || shape === 'plus' || shape === 'drop' || shape === 'bubble' || shape === 'snowflake' || shape === 'leaf') {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(shape === 'drop' ? Math.atan2(p.vy, p.vx) + Math.PI / 2 : p.rot);
       const d = size * (shape === 'ring' ? 1.2 : 1.4);
       ctx.drawImage(s, -d / 2, -d / 2, d, d);
       ctx.restore();

@@ -5,7 +5,7 @@
 - Site (docs, playground, changelog, bench): https://dssl-sable.vercel.app
 - Repo + full docs in the README: https://huggingface.co/EHS-Studio/dssl
 - Install: `curl -fsSL https://dssl-sable.vercel.app/install.sh | sh` (or the zip: https://dssl-sable.vercel.app/dssl-engine.zip)
-- Version: 0.15.0 (engine), MIT license
+- Version: 0.16.0 (engine), MIT license
 - Feature matrix vs CSS: see PARITY.md in the repo
 - For agents working ON the codebase: see AGENTS.md in the repo
 
@@ -64,6 +64,14 @@ DSSL.replay(sel) / DSSL.refresh([el]) / DSSL.errors() (a function) / DSSL.versio
 - Alpha on a named colour works: `white/12`, `currentColor/20`. It used to compile to `white/12px`.
 - The playground has a canvas.html tab, `?example=` links, lint warnings and an "as CSS" tab. The canvas keeps a short allow-list of tags and drops scripts, handlers, styles and ids.
 
+## 0.16.0: round three
+- `yield: padding-top padding-bottom` hands properties back to plain CSS (the engine writes inline styles, which beat a stylesheet): the CSS wins with no `!important`. `yield: padding` covers the family, `yield: none` clears it. `DSSL.lint` reports `css-loses` when your CSS rule loses to DSSL, naming the fix. `dssl build` ignores `yield`.
+- Valid CSS is accepted: `env(safe-area-inset-top)`, `font-variant-numeric: tabular-nums`, `touch-action`, `scroll-snap-type`, `-webkit-user-select`, `direction` and the rest. The known words and properties are generated from the MDN data (`node scripts/gen-css-keywords.mjs`). A typo still errors with did-you-mean.
+- `tokens { radius { pill: 999 card: 22 } }` on one line is two tokens; a token error points at its own line.
+- Aura follows the real shape: it reads `clip-path`, `border-radius` (also `50%`) and rotate/scale/transform, so a diamond, a star or a turned square glows in its own shape. `around box|round|pill|diamond|triangle|hexagon|octagon|pentagon|star|star4|star6|cross|heart|drop|bolt|alpha|polygon(50% 0, 100% 50%, 50% 100%, 0 50%)`; `alpha` follows an <img> or <canvas> pixels. Particles `from edge` or `from outline` are born along that outline.
+- More aura: glow `inner`, `rays N` + `spin`, `ripple ms`, `nohalo`; particle shapes heart, diamond, triangle, plus, drop, bubble, snowflake, confetti, leaf; particle `palette`, `spin`, `wind`, `orbit`.
+- 33 new texture presets (73 in all: bricks, herringbone, tartan, gingham, scales, mermaid, shingles, chevron, argyle, lowpoly, tiles, blueprint, granite, slate, sandstone, terrazzo, confetti, rust, corrugated, cork, kraft, felt, burlap, stucco, starfield, snow, grass, water, rain, lava, topo, bricks-old, plaid) and nine generators (bricks, herringbone, plaid, scales, chevron, diamonds, triangles, starfield, terrazzo) with `density`.
+
 ## 0.15.0: the second game review
 - Aura: it follows moving things under reduced motion (a quick look every 100ms, a full frame whenever something moved), skips emitters that cannot be seen (opacity 0 or display: none or visibility: hidden on it or any ancestor, and what they let go fades with them; the word `always` keeps an invisible anchor emitting), and takes `z N` to draw a layer on its own canvas at that z-index (`aura-glow: #f80 40 z 5` goes under a hill with z-index 10; it meets elements in the root stacking context).
 - `dssl check` and the console name rules that can never apply: a rule that a LATER rule matches everywhere and overrides (`.prop.broc { z-index: 1 }` before a plain `.prop { z-index: 2 }`; there is no specificity). The same selector again is left alone, that is an override.
@@ -121,4 +129,4 @@ Wait for the `dssl-ready` event on `window` before measuring layout: the engine 
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.15.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.16.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.

@@ -159,6 +159,138 @@
     {
       "name": "hex",
       "doc": "honeycomb"
+    },
+    {
+      "name": "bricks",
+      "doc": "a red brick wall, light mortar"
+    },
+    {
+      "name": "bricks-old",
+      "doc": "weathered dark brick"
+    },
+    {
+      "name": "herringbone",
+      "doc": "parquet laid in a zigzag, every board a slightly different shade"
+    },
+    {
+      "name": "plaid",
+      "doc": "simple plaid: wide bands crossing, thin lines between"
+    },
+    {
+      "name": "tartan",
+      "doc": "a red tartan with green and navy bands"
+    },
+    {
+      "name": "gingham",
+      "doc": "small checks, the picnic cloth"
+    },
+    {
+      "name": "scales",
+      "doc": "overlapping scales"
+    },
+    {
+      "name": "mermaid",
+      "doc": "teal fish scales"
+    },
+    {
+      "name": "shingles",
+      "doc": "roof shingles"
+    },
+    {
+      "name": "chevron",
+      "doc": "zigzag bands"
+    },
+    {
+      "name": "argyle",
+      "doc": "a diamond lattice, filled"
+    },
+    {
+      "name": "lowpoly",
+      "doc": "low-poly facets in two tones"
+    },
+    {
+      "name": "tiles",
+      "doc": "square tiles with grout"
+    },
+    {
+      "name": "blueprint",
+      "doc": "drafting grid, fine and coarse"
+    },
+    {
+      "name": "granite",
+      "doc": "speckled granite"
+    },
+    {
+      "name": "slate",
+      "doc": "layered slate"
+    },
+    {
+      "name": "sandstone",
+      "doc": "banded sandstone"
+    },
+    {
+      "name": "terrazzo",
+      "doc": "chips of stone in cement"
+    },
+    {
+      "name": "confetti",
+      "doc": "bright scraps scattered, flat"
+    },
+    {
+      "name": "rust",
+      "doc": "rusted metal"
+    },
+    {
+      "name": "corrugated",
+      "doc": "corrugated metal sheet"
+    },
+    {
+      "name": "cork",
+      "doc": "cork board"
+    },
+    {
+      "name": "kraft",
+      "doc": "brown packing paper"
+    },
+    {
+      "name": "felt",
+      "doc": "soft wool felt"
+    },
+    {
+      "name": "burlap",
+      "doc": "coarse sacking"
+    },
+    {
+      "name": "stucco",
+      "doc": "rough plaster"
+    },
+    {
+      "name": "starfield",
+      "doc": "a night sky of small and large stars"
+    },
+    {
+      "name": "snow",
+      "doc": "fresh snow with a few sparkles"
+    },
+    {
+      "name": "grass",
+      "doc": "blades of grass seen from above"
+    },
+    {
+      "name": "water",
+      "doc": "water with light ripples"
+    },
+    {
+      "name": "rain",
+      "doc": "slanted rain streaks"
+    },
+    {
+      "name": "lava",
+      "doc": "glowing cracks in dark rock"
+    },
+    {
+      "name": "topo",
+      "doc": "contour lines, like a map"
     }
   ],
   "generators": [
@@ -172,7 +304,16 @@
     "carbon",
     "waves",
     "hex",
-    "rings"
+    "rings",
+    "bricks",
+    "herringbone",
+    "plaid",
+    "scales",
+    "chevron",
+    "diamonds",
+    "triangles",
+    "starfield",
+    "terrazzo"
   ],
   "textureKeys": [
     {
@@ -237,7 +378,7 @@
     },
     {
       "key": "radius",
-      "doc": "dot size as a fraction of the cell",
+      "doc": "dot size as a fraction of the cell (plaid: how wide the bands are as a fraction of the repeat)",
       "words": 1
     },
     {
@@ -301,6 +442,11 @@
       "words": 1
     },
     {
+      "key": "density",
+      "doc": "starfield and terrazzo: how many stars or chips in a tile, 1 is normal",
+      "words": 1
+    },
+    {
       "key": "invert",
       "doc": "swap the two colours",
       "words": 0
@@ -346,6 +492,30 @@
     {
       "key": "unclipped",
       "doc": "let the light spill out of a parent that clips (overflow: hidden, auto, scroll). Without it the aura is cut at that edge, like the element itself"
+    },
+    {
+      "key": "around",
+      "doc": "the shape the light follows: follow (the default: the element's clip-path or rounded corners), box, round, pill, diamond, triangle, hexagon, octagon, pentagon, star, star4, star6, cross, heart, drop, bolt, alpha (an <img> or <canvas>'s visible pixels), or polygon(50% 0, 100% 50%, 50% 100%, 0 50%)"
+    },
+    {
+      "key": "inner",
+      "doc": "light inside the edge (a rim) instead of outside it"
+    },
+    {
+      "key": "rays",
+      "doc": "that many beams of light from the middle, slowly turning (see spin)"
+    },
+    {
+      "key": "spin",
+      "doc": "rays turn this many degrees a second (default 10); on particles, how fast each one tumbles"
+    },
+    {
+      "key": "ripple",
+      "doc": "rings that spread out from the shape and fade, one every this many milliseconds"
+    },
+    {
+      "key": "nohalo",
+      "doc": "only the rays and ripples, without the soft halo"
     },
     {
       "key": "always",
@@ -399,11 +569,11 @@
     },
     {
       "key": "from",
-      "doc": "where they are born: edge, bottom, top, left, right, center, corners, thumb (range sliders)"
+      "doc": "where they are born: edge or outline (along the element's real outline, see around), bottom, top, left, right, center, corners, thumb (range sliders)"
     },
     {
       "key": "shape",
-      "doc": "circle, spark, square, ring, star, flame, smoke or line"
+      "doc": "circle, spark, square, ring, star, flame, smoke, line, heart, diamond, triangle, plus, drop, bubble, snowflake, confetti or leaf"
     },
     {
       "key": "grow",
@@ -436,6 +606,26 @@
     {
       "key": "unclipped",
       "doc": "let the particles leave a parent that clips (overflow: hidden, auto, scroll). Without it they are cut at that edge"
+    },
+    {
+      "key": "around",
+      "doc": "the shape `from edge` and `from outline` follow: follow (the default), box, round, pill, diamond, triangle, hexagon, octagon, pentagon, star, star4, star6, cross, heart, drop, bolt, or polygon(...)"
+    },
+    {
+      "key": "palette",
+      "doc": "each particle takes ONE of the colours (confetti) instead of fading through them"
+    },
+    {
+      "key": "spin",
+      "doc": "how fast each particle tumbles, in degrees a second (random direction)"
+    },
+    {
+      "key": "wind",
+      "doc": "a sideways push, px/s squared; negative pushes left"
+    },
+    {
+      "key": "orbit",
+      "doc": "the particles circle the middle of the element, this many degrees a second"
     },
     {
       "key": "always",

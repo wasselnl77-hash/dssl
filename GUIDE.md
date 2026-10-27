@@ -18,7 +18,7 @@ hand-rolled CSS for creative pages, docs, playgrounds and internal tools.
 
 | Path | What it is |
 |---|---|
-| `public/dssl/` | The engine: plain ESM files with no dependencies, loaded by one script tag. `parser.js` (text to tree), `resolver.js` (tree to rules), `engine.js` (applies them in the browser), `index.js` (the public API), `boot.js` (auto-boot), `utils.js`, `static.js` (`dssl build`), `server.js` (the same compiler with no DOM), `texture.js`, `aura.js`, `slider.js`, `effects.js` (glass, tilt), `color.js`, `lint.js`, `import.js` (CSS to DSSL), `fonts.js`, `dev.js` (inspector, hot reload, runtime lint; loaded only when asked for). This is the whole language. |
+| `public/dssl/` | The engine: plain ESM files with no dependencies, loaded by one script tag. `parser.js` (text to tree), `resolver.js` (tree to rules), `engine.js` (applies them in the browser), `index.js` (the public API), `boot.js` (auto-boot), `utils.js`, `static.js` (`dssl build`), `css-keywords.js` (every CSS keyword and property, generated from the MDN data by `scripts/gen-css-keywords.mjs`), `server.js` (the same compiler with no DOM), `texture.js`, `aura.js`, `slider.js`, `effects.js` (glass, tilt), `color.js`, `lint.js`, `import.js` (CSS to DSSL), `fonts.js`, `dev.js` (inspector, hot reload, runtime lint; loaded only when asked for). This is the whole language. |
 | `public/styles/*.dssl` | The stylesheets that drive the docs site itself. The site is styled entirely by its own engine, which makes it the de-facto test suite. |
 | `public/examples/hello.dssl` | The starter stylesheet. Small, commented, every interaction real. |
 | `package/` + `public/install.sh`, `install.ps1` | The downloadable engine package: `curl -fsSL https://dssl-sable.vercel.app/install.sh \| sh`. |
@@ -591,6 +591,80 @@ It is four hard drop-shadows, one in each direction, which is what you wrote by 
 **For tests of a game**: `DSSL.pauseMotion()` freezes every animation on the page (and the ones started afterwards),
 `DSSL.stepMotion(250)` moves them all forward by exactly 250ms, `DSSL.resumeMotion()` lets them run.
 
+### Round three (0.16.0)
+
+**Plain CSS next to DSSL.** The engine writes its styles inline, and an inline style beats any normal stylesheet rule, so a CSS rule for a
+property DSSL also sets used to lose unless you wrote `!important`. Now you say which properties to hand back:
+
+```dssl
+.app { padding: 16; yield: padding-top padding-bottom }      // DSSL keeps the sides, your CSS decides the top and bottom
+```
+
+```css
+.app { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom) }   /* no !important */
+```
+
+`yield: padding` hands back `padding` and every `padding-*`; `yield: border` covers the border longhands (not `border-radius`);
+`yield: none` takes it back. A shorthand DSSL writes (`padding: 16`) is split first, so the sides you did not yield are still DSSL's. A
+build (`dssl build`) writes the CSS as it is and says nothing about `yield`, because a stylesheet has nothing to hand back.
+
+If you forget, `await DSSL.lint(document.body)` finds it: a finding of kind `css-loses` names your CSS rule, the property, and the fix
+(`yield: padding-top`, or `!important` in the CSS).
+
+**Valid CSS is accepted.** `env(safe-area-inset-top)`, `font-variant-numeric: tabular-nums`, `touch-action: manipulation`,
+`scroll-snap-type: x mandatory`, `contain: layout paint`, `-webkit-user-select`, `direction`, all of it. The list of words and properties
+the compiler knows is now generated from the MDN CSS data (`node scripts/gen-css-keywords.mjs`), so it is the whole of CSS and not
+what one person remembered. A typo is still an error with a "did you mean". `font-feature-settings: "tnum" 1` no longer turns the 1
+into `1px`.
+
+**Tokens on one line.** `radius { pill: 999 card: 22 }` is two tokens (it used to be one token with a broken value). A mistake in a token
+points at the token's own line, and is said once.
+
+**Aura follows the real shape.** The glow was drawn around the element's box, so a diamond, a star or a turned square got a square halo.
+Now the light follows the shape the element really has:
+
+- By default it reads the element: `clip-path` (polygon, circle, ellipse, inset), `border-radius` (including `50%`), and the way it is
+  turned (`rotate`, `scale`, `transform`). A square with `rotate: 45deg` glows as a diamond.
+- `around` picks a shape yourself: `follow` (the default), `box`, `round`, `pill`, `diamond`, `triangle`, `hexagon`, `octagon`,
+  `pentagon`, `star`, `star4`, `star6`, `cross`, `heart`, `drop`, `bolt`, `alpha`, or `polygon(50% 0, 100% 50%, 50% 100%, 0 50%)` in percent.
+  `alpha` follows the visible pixels of an `<img>` or `<canvas>` (a sprite).
+- Particles `from edge` (and `from outline`) are born along that outline, not along the box.
+
+```dssl
+.gem   { aura-glow: #6cf 40 around diamond pulse 1800 }
+.sprite { aura-glow: #fc4 24 around alpha }                    // an <img> with a transparent background
+.star  { clip-path: polygon(50% 0, 100% 38%, 82% 100%, 18% 100%, 0 38%); aura-glow: #fd0 30 }   // follows its own clip-path, no `around` needed
+```
+
+**More kinds of aura**
+
+- Glow: `inner` (light just inside the edge), `rays 12` with `spin 20` (turning beams), `ripple 1600` (rings that spread out and fade),
+  `nohalo` (only the rays and ripples). Under reduced motion they hold still unless `essential`.
+- Particle shapes: `heart`, `diamond`, `triangle`, `plus`, `drop`, `bubble`, `snowflake`, `confetti`, `leaf`, joining circle, spark,
+  square, ring, star, flame, smoke and line.
+- Particle settings: `palette` (each particle takes ONE of your colours, for confetti), `spin 120` (tumble speed), `wind 30` (a steady
+  sideways push), `orbit 90` (circle the middle of the element, degrees a second).
+
+```dssl
+.party { aura-particle: #ff4d6d #ffd166 #06d6a0 #4dabf7 count 60 life 1600 size 9 shape confetti palette dir up spread 70 speed 90 gravity 160 from top }
+.cold  { aura-particle: #fff count 40 life 4000 size 7 shape snowflake dir down speed 30 spin 60 wind -15 from top }
+.moon  { aura-particle: #cfe count 16 life 5000 size 4 speed 0 orbit 40 from outline glowing }
+```
+
+**More textures.** 33 new presets, 73 in all: `bricks`, `bricks-old`, `herringbone`, `plaid`, `tartan`, `gingham`, `scales`, `mermaid`, `shingles`,
+`chevron`, `argyle`, `lowpoly`, `tiles`, `blueprint`, `granite`, `slate`, `sandstone`, `terrazzo`, `confetti`, `rust`, `corrugated`, `cork`, `kraft`,
+`felt`, `burlap`, `stucco`, `starfield`, `snow`, `grass`, `water`, `rain`, `lava`, `topo`. They come from nine new generators you can use
+yourself: `bricks`, `herringbone`, `plaid`, `scales`, `chevron`, `diamonds`, `triangles`, `starfield` and `terrazzo`, with the usual
+settings (`scale`, `thickness`, `color`, `color2`, `seed`, `intensity`) plus `density` (how many stars or chips) and, for plaid, `radius` (how
+wide the bands are). The patterns are small vector tiles, so `dssl build` bakes them into your CSS like the others, and `symmetrical`
+works on them.
+
+```dssl
+.wall  { texture: bricks scale 64 color2 #7a3a2a }
+.floor { texture: herringbone scale 30 color2 #8a5a33 }
+.sky   { background: #070a1c; texture: starfield density 1.6 }
+```
+
 ### Fonts
 
 ```dssl
@@ -876,7 +950,7 @@ and listed, so the file you get always compiles.
 ```js
 import { DSSL } from '/dssl/index.js'     // or just use window.DSSL after boot
 
-DSSL.version                          // "0.15.0": a string, not a function
+DSSL.version                          // "0.16.0": a string, not a function
 DSSL.compile(source)                  // { ok, errors, warnings, stats, doc }: parse and resolve, no DOM
 DSSL.apply(source, { name, scope, replace })
 await DSSL.load(['a.dssl', 'b.dssl'])
@@ -911,7 +985,7 @@ Three ways to get it:
 
 1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
    https://open-vsx.org/extension/ehs-studio/dssl-vscode
-2. VS Code: download `dssl-vscode/dssl-vscode-0.15.0.vsix` from the repo files, then
+2. VS Code: download `dssl-vscode/dssl-vscode-0.16.0.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
 3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 
@@ -1069,6 +1143,7 @@ node scripts/test-v0130.mjs             # 0.13.0: build fidelity, source maps, s
 node scripts/bench-compiled.mjs         # 0.13.0: compiled DSSL vs hand-written CSS, startup and churn (takes minutes)
 node scripts/test-v0140.mjs             # 0.14.0: the game-review fixes, and that the docs match the code
 node scripts/test-v0150.mjs             # 0.15.0: the second game review
+node scripts/test-v0160.mjs             # 0.16.0: plain CSS beside DSSL, valid CSS accepted, aura that follows shapes, more textures
 node scripts/test-v0100.mjs             # 0.10.0: glass, tilt, named-colour alpha, playground examples, HTML filter
 node scripts/test-designer.mjs          # the designer's state to DSSL and back, plus a random sweep
 node scripts/test-designer-browser.mjs  # the designer panel, driven like a person would

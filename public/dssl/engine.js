@@ -143,8 +143,23 @@ const POSITIONAL_FAMILIES = {
   'gap': ['row-gap', 'column-gap'],
 };
 
+/** split on spaces that are not inside parentheses or quotes: calc(1px + 2px) 4px is two values */
+function splitSpaces(str) {
+  const out = []; let depth = 0, q = null, cur = '';
+  for (const c of String(str).trim()) {
+    if (q) { cur += c; if (c === q) q = null; continue; }
+    if (c === '"' || c === "'") { q = c; cur += c; continue; }
+    if (c === '(') depth++;
+    if (c === ')') depth--;
+    if (depth === 0 && /\s/.test(c)) { if (cur) { out.push(cur); cur = ''; } continue; }
+    cur += c;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
 function expandPositional(shVal, longhands) {
-  const parts = String(shVal).trim().split(/\s+/);
+  const parts = splitSpaces(shVal);
   let vals;
   if (longhands.length === 2) {
     vals = parts.length > 1 ? [parts[0], parts[1]] : [parts[0], parts[0]];
@@ -156,6 +171,40 @@ function expandPositional(shVal, longhands) {
          : [a, b, c, d];
   }
   return longhands.map((p, i) => [p, vals[i]]);
+}
+
+// 0.16.0: shorthands that are four (or two) values for known sides, so yielding one side keeps the others
+const YIELD_SIDES = {
+  ...POSITIONAL_FAMILIES,
+  'inset': ['top', 'right', 'bottom', 'left'],
+  'border-width': ['border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width'],
+  'border-style': ['border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style'],
+  'border-color': ['border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'],
+};
+
+/** does the name `y` (from yield:) cover the property `prop`? yield: padding covers padding-top; yield: border covers border-top-color but not border-radius */
+function yieldCovers(y, prop) {
+  if (prop === y) return true;
+  if (y === 'border') return /^border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-(width|style|color))?$/.test(prop);
+  return prop.startsWith(y + '-');
+}
+
+function applyYield(newOwned, yieldSet) {
+  // a shorthand we write (padding: 8 0) that covers a longhand being yielded (padding-top) is split first, so the other sides are still ours
+  for (const [fam, longs] of Object.entries(YIELD_SIDES)) {
+    const sh = newOwned.get(fam);
+    if (!sh) continue;
+    if ([...yieldSet].some((y) => yieldCovers(y, fam))) continue;                       // yielding the whole shorthand: dropped below
+    if (!longs.some((l) => [...yieldSet].some((y) => yieldCovers(y, l)))) continue;      // no side of it is yielded
+    newOwned.delete(fam);
+    for (const [p, v] of expandPositional(sh.value, longs)) {
+      const prevL = newOwned.get(p);
+      if (!prevL || (prevL.seq || 0) < (sh.seq || 0)) newOwned.set(p, { value: v, imp: sh.imp, seq: sh.seq });
+    }
+  }
+  for (const prop of [...newOwned.keys()]) {
+    if ([...yieldSet].some((y) => yieldCovers(y, prop))) newOwned.delete(prop);
+  }
 }
 
 // state pseudo-classes that may appear inside a rule selector. Used to strip
@@ -986,6 +1035,7 @@ export class DsslEngine {
     let gflowVal;                          // v0.6.0 - @gradient-flow spec
     let textureVal, auraGlowVal, auraPartsVal, sliderVal; // 0.9.0
     let tiltVal = null;                    // 0.10.0
+    let yieldSet = null;                   // 0.16.0: properties handed back to plain CSS (yield:)
     let declSeq = 0;                       // cascade position of each declaration, so a longhand can tell whether it came after its shorthand
 
     // flatten matched decls in cascade order (last decl of a prop wins, exactly
@@ -1002,6 +1052,7 @@ export class DsslEngine {
         animSpecs.push({ ...d.value, key: /* filled below */ null });
         continue;
       }
+      if (d.prop === '@yield') { if (d.value === null) yieldSet = null; else { yieldSet = yieldSet || new Set(); for (const n of d.value) yieldSet.add(n); } continue; }
       if (d.prop === '@stack') { stack = true; continue; }
       if (d.prop === '@stagger') { staggerMs = d.value; continue; }
       // v0.6.0 - the deform family + gradient tools are engine-native: they
@@ -1123,6 +1174,9 @@ export class DsslEngine {
       texUserLayers = shv ? splitList(shv.value).length : imv ? splitList(imv.value).length : 0;
       builtTex = this.composeTexture(el, newOwned, textureVal);
     }
+
+    // 0.16.0: yield: hands properties back to plain CSS, so they are not ours to write (and anything we wrote before is removed below)
+    if (yieldSet) applyYield(newOwned, yieldSet);
 
     // REMOVE pass - properties we owned but the new cascade no longer sets.
     // This runs BEFORE the promotion read below, so getComputedStyle sees the

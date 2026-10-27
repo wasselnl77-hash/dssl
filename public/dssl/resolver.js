@@ -30,6 +30,7 @@ import { glassDecls, parseTilt } from './effects.js';
 // v0.5.0 - the resolver validates the `::name` half of full selectors so a
 // typo like .card::befor is a LOUD error, never a silently dead rule.
 import { PSEUDO_ELEMENTS, VENDOR_PSEUDO, STATE_WORDS } from './parser.js';
+import { CSS_VALUE_WORDS, CSS_PROPERTY_NAMES } from './css-keywords.js';
 
 /* ------------------------------------------------------------------ *
  * Vocabulary
@@ -76,7 +77,9 @@ export const CSS_KEYWORDS = new Set(('inherit,initial,unset,revert,revert-layer,
   // v0.5.0 - hyphens: manual used to be rejected ("unknown value") even though
   // the property existed; plus the rendering keywords people actually type.
   'manual,pixelated,crisp-edges,optimizeSpeed,optimizeLegibility,geometricPrecision,' +
-  'flex-start,flex-end,self-start,self-end,snap-block,snap-inline').split(','));
+  'flex-start,flex-end,self-start,self-end,snap-block,snap-inline,' +
+  // @font-face's font-display, which no property's grammar lists
+  'block,swap,fallback,optional').split(',').concat(CSS_VALUE_WORDS.split(',')));   // 0.16.0: plus every keyword CSS defines (generated from the MDN data)
 
 export const UNITLESS_PROPS = new Set([
   'opacity', 'line-height', 'z-index', 'font-weight', 'flex-grow', 'flex-shrink',
@@ -85,6 +88,8 @@ export const UNITLESS_PROPS = new Set([
   'shape-image-threshold', 'counter-reset', 'counter-increment', 'counter-set',
   // grid line placement takes integers, not lengths:  grid-column: span 2
   'grid-row', 'grid-column', 'grid-area',
+  // 0.16.0: these take plain numbers, so `font-feature-settings: "tnum" 1` is not "tnum" 1px
+  'font-feature-settings', 'font-variation-settings', 'tab-size', '-webkit-line-clamp', 'line-clamp', 'stroke-miterlimit', 'stroke-opacity', 'initial-letter', 'font-size-adjust',
 ]);
 
 // v0.7.2 - time properties: a bare number is milliseconds, never px, and
@@ -112,7 +117,8 @@ export const KNOWN_PROPS = new Set(('all,appearance,accent-color,align-content,a
   'hanging-punctuation,height,hyphenate-character,hyphenate-limit-chars,hyphens,image-orientation,image-rendering,inline-size,inset,inset-block,inset-block-end,inset-block-start,inset-inline,inset-inline-end,inset-inline-start,isolation,justify-content,justify-items,justify-self,justify-tracks,left,letter-spacing,line-break,line-height,list-style,list-style-image,list-style-position,list-style-type,margin,margin-block,margin-block-end,margin-block-start,margin-bottom,margin-inline,margin-inline-end,margin-inline-start,margin-left,margin-right,margin-top,margin-trim,mask,mask-border,mask-border-mode,mask-border-outset,mask-border-repeat,mask-border-slice,mask-border-source,mask-border-width,mask-clip,mask-composite,mask-image,mask-mode,mask-origin,mask-position,mask-repeat,mask-size,max-height,max-inline-size,max-width,min-block-size,min-height,min-inline-size,min-width,mix-blend-mode,object-fit,object-position,offset,offset-anchor,offset-distance,offset-path,offset-rotate,opacity,order,outline,outline-color,outline-offset,outline-style,outline-width,overflow,overflow-anchor,overflow-clip-margin,overflow-wrap,overflow-x,overflow-y,overscroll-behavior,overscroll-behavior-block,overscroll-behavior-inline,overscroll-behavior-x,overscroll-behavior-y,padding,padding-block,padding-block-end,padding-block-start,padding-bottom,padding-inline,padding-inline-end,padding-inline-start,padding-left,padding-right,padding-top,page-break-after,page-break-before,page-break-inside,paint-order,perspective,perspective-origin,place-content,place-items,place-self,pointer-events,position,print-color-adjust,quotes,resize,right,rotate,row-gap,ruby-align,ruby-merge,scale,scroll-behavior,scroll-margin,scroll-margin-block,scroll-margin-block-end,scroll-margin-block-start,scroll-margin-bottom,scroll-margin-inline,scroll-margin-inline-end,scroll-margin-inline-start,scroll-margin-left,scroll-margin-right,scroll-margin-top,scroll-padding,scroll-padding-block,scroll-padding-bottom,scroll-padding-inline,scroll-padding-left,scroll-padding-right,scroll-padding-top,scroll-snap-align,scroll-snap-stop,scroll-snap-type,scrollbar-color,scrollbar-gutter,scrollbar-width,shape-image-threshold,shape-margin,shape-outside,tab-size,table-layout,text-align,text-align-last,text-combine-upright,text-decoration,text-decoration-color,text-decoration-line,text-decoration-skip-ink,text-decoration-style,text-decoration-thickness,text-emphasis,text-emphasis-color,text-emphasis-position,text-emphasis-style,text-indent,text-justify,text-orientation,text-overflow,text-rendering,text-shadow,text-transform,text-underline-offset,text-underline-position,text-wrap,top,touch-action,transform,transform-box,transform-origin,transform-style,transition,transition-behavior,transition-delay,transition-duration,transition-property,transition-timing-function,translate,unicode-bidi,user-select,vertical-align,visibility,white-space,white-space-collapse,width,will-change,word-break,word-spacing,word-wrap,writing-mode,z-index,zoom,' +
   'animation,animation-composition,animation-delay,animation-direction,animation-duration,animation-fill-mode,animation-iteration-count,animation-name,animation-play-state,animation-range,animation-timeline,animation-timing-function,' +
   'view-transition-name,interpolate-size,text-box,text-box-edge,text-box-trim,dynamic-range-limit,field-sizing,anchor-name,position-anchor,position-area,scroll-timeline,scroll-timeline-axis,scroll-timeline-name,timeline-scope,view-timeline,view-timeline-axis,view-timeline-name,' +
-  '-webkit-background-clip,-webkit-text-fill-color,-webkit-box-orient,-webkit-line-clamp,-webkit-tap-highlight-color,-webkit-font-smoothing,-moz-osx-font-smoothing,-webkit-box-shadow,-webkit-text-stroke').split(','));
+  '-webkit-background-clip,-webkit-text-fill-color,-webkit-box-orient,-webkit-line-clamp,-webkit-tap-highlight-color,-webkit-font-smoothing,-moz-osx-font-smoothing,-webkit-box-shadow,-webkit-text-stroke,' +
+  '-webkit-user-select,-webkit-touch-callout,-webkit-overflow-scrolling,-webkit-appearance,-moz-appearance').split(',').concat(CSS_PROPERTY_NAMES.split(',')));   // 0.16.0: plus every property CSS has (generated from the MDN data)
 
 /* ------------------------------------------------------------------ *
  * Built-in token defaults (overridable via `tokens { }`)
@@ -271,7 +277,7 @@ function resolveValue(raw, ctx) {
         // color-ish functions keep bare numbers bare; calc-family gets px
         const innerUnitless = UNITLESS_FN.has(fname) ? true : LENGTH_FN.has(fname) ? false : ctx.unitless;
         // counter(step), counters(step, "."), attr(data-x): the names inside are the author's own, not tokens
-        const nameFn = fname === 'counter' || fname === 'counters' || fname === 'attr';
+        const nameFn = fname === 'counter' || fname === 'counters' || fname === 'attr' || fname === 'env' || fname === 'format' || fname === 'local' || fname === 'paint' || fname === 'element';   // env(safe-area-inset-top): the name is CSS's own
         const resolvedInner = resolveValue(inner, { ...ctx, unitless: innerUnitless, bareIdents: nameFn ? true : ctx.bareIdents });
         out += ident + '(' + resolvedInner + ')';
         i = j;
@@ -1091,6 +1097,23 @@ const SEMANTIC = {
     if (!inside) out.push({ prop: 'paint-order', value: 'stroke fill' });
     return out;
   },
+  // 0.16.0: the engine writes its styles inline, so a plain CSS rule for the same property loses to them (short of !important).
+  // `yield:` hands properties back: the engine stops writing them on the elements this rule matches, and plain CSS (a stylesheet, env(),
+  // a media query in another file) decides. yield: padding yields padding-top and the rest too; yield: none clears it.
+  //   .app { yield: padding-top padding-bottom }      then, in a normal stylesheet:   .app { padding-top: env(safe-area-inset-top) }
+  yield(v, ctx) {
+    const t = (v || '').trim();
+    if (t === 'none') return [{ prop: '@yield', value: null }];
+    const names = t.split(/[\s,]+/).filter(Boolean).map((x) => x.toLowerCase());
+    if (!names.length) { ctx.errors.push({ file: ctx.file, line: ctx.line, message: 'yield needs the properties to hand back', hint: 'yield: padding-top padding-bottom' }); return []; }
+    for (const n of names) {
+      if (!KNOWN_PROPS.has(n) && !Object.prototype.hasOwnProperty.call(SEMANTIC, n)) {
+        ctx.errors.push({ file: ctx.file, line: ctx.line, message: `yield: "${n}" is not a CSS property`, hint: didYouMean(n, [...KNOWN_PROPS]) });
+        return [];
+      }
+    }
+    return [{ prop: '@yield', value: names }];
+  },
   // 0.15.0: an outline that follows the SHAPE's alpha (a sprite, an icon, a cut-out), not its box. It is four drop-shadows with no blur,
   // one in each direction, which is what people write by hand. The corners come out square. It uses `filter`, so it replaces another filter on the same rule.
   //   outline-shape: 3 color.ink      outline-shape: none
@@ -1528,7 +1551,9 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null, baseMotion
       const raw = tokenMap.get(key);
       const prop = '--dssl-' + key.replace(/\./g, '-');
       // font.* tokens hold font stacks - proper nouns, not keywords (v0.5.0)
-      decls.push({ prop, value: resolveValue(raw, { ...ctxBase, prop: key, bareIdents: /^font/.test(key) }) });
+      // 0.16.0: an error in a token points at the token's own line (it used to say line 0), and only the file that defines the token reports it
+      const own = tokenLines.has(key);
+      decls.push({ prop, value: resolveValue(raw, { ...ctxBase, line: tokenLines.get(key) || 0, errors: own ? errors : [], prop: key, bareIdents: /^font/.test(key) }) });
     }
     if (!decls.length) return null;
     return {
@@ -1958,6 +1983,14 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null, baseMotion
   const mediaQueries = new Set();
   for (const r of [...rules, ...shadowRules]) r.media.forEach(q => mediaQueries.add(q));
 
+  // 0.16.0: the same problem at the same line is said once (a token is checked by the registry pass and by its own block)
+  {
+    const seen = new Set();
+    for (let i = errors.length - 1; i >= 0; i--) {
+      const k = `${errors[i].file}:${errors[i].line}:${errors[i].message}`;
+      if (seen.has(k)) errors.splice(i, 1); else seen.add(k);
+    }
+  }
   return { rules, shadowRules, raws, fontLinks, motions, motionFrames, errors, warnings, mediaQueries: [...mediaQueries], tokens: Object.fromEntries(tokenMap), registryRule };
 }
 

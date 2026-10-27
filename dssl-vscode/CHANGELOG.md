@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.0
+
+- Bundled engine updated to 0.16.0. The editor now accepts the whole of CSS (`env()`, `tabular-nums`, `touch-action`, vendor properties)
+  and still flags typos. New in the language, with hovers and completions: `yield:`, aura `around`, `inner`, `rays`, `ripple`, `nohalo`,
+  particle `palette`, `spin`, `wind`, `orbit`, `from outline`, nine new particle shapes, 33 new texture presets and nine generators.
+- A token pair on one line (`pill: 999 card: 22`) is two tokens, and a token error shows on the token's own line.
+
 ## 0.15.0
 
 - Bundled engine updated to 0.15.0 (the second game review). In the editor: `outline-shape`, `animate:` lists

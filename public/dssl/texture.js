@@ -28,7 +28,8 @@ const mix2 = (x, y, t) => mix(x, y, t, 'srgb');
 
 export const BLEND_MODES = ['normal', 'multiply', 'screen', 'overlay', 'soft-light', 'hard-light', 'color-burn', 'color-dodge', 'darken', 'lighten', 'difference', 'exclusion'];
 
-export const GENERATORS = ['noise', 'bump', 'lines', 'dots', 'grid', 'checker', 'weave', 'carbon', 'waves', 'hex', 'rings'];
+export const GENERATORS = ['noise', 'bump', 'lines', 'dots', 'grid', 'checker', 'weave', 'carbon', 'waves', 'hex', 'rings',
+  'bricks', 'herringbone', 'plaid', 'scales', 'chevron', 'diamonds', 'triangles', 'starfield', 'terrazzo'];   // 0.16.0: the last nine
 
 /** the settings a texture layer understands, with how many value words each takes */
 export const TEXTURE_KEYS = {
@@ -44,7 +45,7 @@ export const TEXTURE_KEYS = {
   light:     { words: 1, kind: 'number', min: -360, max: 360, doc: 'bump light direction in degrees' },
   angle:     { words: 1, kind: 'number', min: -360, max: 360, doc: 'direction of lines and patterns, in degrees' },
   thickness: { words: 1, kind: 'number', min: 0.1, max: 500, doc: 'line or grid-line width in px' },
-  radius:    { words: 1, kind: 'number', min: 0.02, max: 1, doc: 'dot size as a fraction of the cell' },
+  radius:    { words: 1, kind: 'number', min: 0.02, max: 1, doc: 'dot size as a fraction of the cell (plaid: how wide the bands are as a fraction of the repeat)' },
   softness:  { words: 1, kind: 'number', min: 0, max: 1, doc: 'how soft the edges of dots and lines are' },
   animate:   { words: 1, kind: 'number', min: 0, max: 60000, doc: 'milliseconds per shimmer step (film-grain flicker); 0 is still' },
   type:      { words: 1, kind: 'word', values: ['fractal', 'turbulence'], doc: 'noise flavour: fractal is clouds, turbulence is veins' },
@@ -57,6 +58,7 @@ export const TEXTURE_KEYS = {
   knots:     { words: 1, kind: 'number', min: 0, max: 8, int: true, doc: 'rings generator: how many knots in one tile (the pattern repeats, so keep it small)' },
   planks:    { words: 1, kind: 'number', min: 24, max: 1200, doc: 'rings generator: lay it out as planks this many px tall, with a seam and a slightly different board each' },
   symmetrical: { words: 1, kind: 'word', values: ['both', 'x', 'y'], optional: true, doc: 'mirror every other tile, so each edge meets its own reflection: no seam, and the repeat is twice as far apart. x mirrors left to right, y top to bottom, both (the default) does both. Works on the image-based textures (noise, bump, rings, waves, hex).' },
+  density:   { words: 1, kind: 'number', min: 0.05, max: 20, doc: 'starfield and terrazzo: how many stars or chips in a tile, 1 is normal' },
   invert:    { words: 0, kind: 'flag', doc: 'swap the two colours' },
 };
 
@@ -174,6 +176,140 @@ export const PRESETS = {
     layers: [{ gen: 'waves', scale: 40, thickness: 1.2, intensity: 0.3, color: '#000', blend: 'normal' }] },
   hex:        { doc: 'honeycomb',
     layers: [{ gen: 'hex', scale: 28, thickness: 1, intensity: 0.28, color: '#000', blend: 'normal' }] },
+
+  // ---- 0.16.0: walls, floors and cloth
+  bricks:     { doc: 'a red brick wall, light mortar',
+    layers: [
+      { gen: 'bump', scale: 3, octaves: 3, depth: 2.2, light: 135, intensity: 0.55, color: '#000', color2: '#fff', blend: 'overlay', seed: 3 },
+      { gen: 'bricks', scale: 56, thickness: 3.5, intensity: 1, color: '#d9d0c4', color2: '#a4402b', blend: 'normal' },
+    ] },
+  'bricks-old': { doc: 'weathered dark brick',
+    layers: [
+      { gen: 'noise', scale: 40, octaves: 4, contrast: 1.5, intensity: 0.5, color: '#000', color2: '#fff', blend: 'soft-light', seed: 12 },
+      { gen: 'bump', scale: 3, octaves: 4, depth: 3.2, light: 135, intensity: 0.7, color: '#000', color2: '#fff', blend: 'overlay', seed: 5 },
+      { gen: 'bricks', scale: 52, thickness: 4, intensity: 1, color: '#6d665e', color2: '#74301f', blend: 'normal' },
+    ] },
+  herringbone: { doc: 'parquet laid in a zigzag, every board a slightly different shade',
+    layers: [
+      { gen: 'noise', scale: 1.2, octaves: 3, contrast: 1.4, stretch: [30, 1], intensity: 0.25, color: '#000', color2: '#fff', blend: 'overlay', seed: 4 },
+      { gen: 'herringbone', scale: 22, thickness: 1.4, intensity: 1, color: '#2a1a0e', color2: '#b9854d', seed: 4, blend: 'normal' },
+    ] },
+  plaid:      { doc: 'simple plaid: wide bands crossing, thin lines between',
+    layers: [{ gen: 'plaid', scale: 64, thickness: 2, intensity: 0.5, color: '#9b1b1b', blend: 'multiply' }] },
+  tartan:     { doc: 'a red tartan with green and navy bands',
+    layers: [
+      { gen: 'plaid', scale: 96, thickness: 3, radius: 0.18, intensity: 0.6, color: '#0f1f55', blend: 'multiply' },
+      { gen: 'plaid', scale: 48, thickness: 2, radius: 0.3, intensity: 0.65, color: '#12503a', blend: 'multiply' },
+      { gen: 'plaid', scale: 48, thickness: 1, radius: 0.001, intensity: 1, color: '#a11d24', color2: '#a11d24', blend: 'normal' },
+    ] },
+  gingham:    { doc: 'small checks, the picnic cloth',
+    layers: [{ gen: 'plaid', scale: 28, thickness: 1, radius: 0.5, intensity: 0.5, color: '#c0392b', color2: '#ffffff', blend: 'normal' }] },
+  scales:     { doc: 'overlapping scales',
+    layers: [{ gen: 'scales', scale: 36, thickness: 1.2, intensity: 0.4, color: '#000', blend: 'normal' }] },
+  mermaid:    { doc: 'teal fish scales',
+    layers: [{ gen: 'scales', scale: 34, thickness: 1.4, intensity: 1, color: '#0a5560', color2: '#1fa8a0', blend: 'normal' }] },
+  shingles:   { doc: 'roof shingles',
+    layers: [{ gen: 'scales', scale: 60, thickness: 2, intensity: 1, color: '#201c1a', color2: '#5b4a42', blend: 'normal' }] },
+  chevron:    { doc: 'zigzag bands',
+    layers: [{ gen: 'chevron', scale: 40, thickness: 6, intensity: 0.3, color: '#000', blend: 'normal' }] },
+  argyle:     { doc: 'a diamond lattice, filled',
+    layers: [{ gen: 'diamonds', scale: 44, thickness: 1.4, intensity: 0.9, color: '#e8e0d0', color2: '#2f3e6b', blend: 'normal' }] },
+  lowpoly:    { doc: 'low-poly facets in two tones',
+    layers: [{ gen: 'triangles', scale: 72, intensity: 0.5, color: '#000', color2: '#fff', seed: 3, blend: 'overlay' }] },
+  tiles:      { doc: 'square tiles with grout',
+    layers: [
+      { gen: 'bump', scale: 40, octaves: 2, depth: 1.4, light: 135, intensity: 0.4, color: '#000', color2: '#fff', blend: 'overlay', seed: 6 },
+      { gen: 'grid', scale: 64, thickness: 3, intensity: 0.5, color: '#000', blend: 'normal' },
+    ] },
+  blueprint:  { doc: 'drafting grid, fine and coarse',
+    layers: [
+      { gen: 'grid', scale: 100, thickness: 1.4, intensity: 0.5, color: '#ffffff', blend: 'normal' },
+      { gen: 'grid', scale: 20, thickness: 1, intensity: 0.22, color: '#ffffff', blend: 'normal' },
+    ] },
+  // ---- 0.16.0: stone, ground and metal
+  granite:    { doc: 'speckled granite',
+    layers: [
+      { gen: 'noise', scale: 1.8, octaves: 1, contrast: 9, threshold: 0.62, intensity: 0.5, color: 'rgba(0,0,0,0)', color2: '#000', blend: 'multiply', seed: 2 },
+      { gen: 'noise', scale: 1.8, octaves: 1, contrast: 9, threshold: 0.7, intensity: 0.55, color: 'rgba(255,255,255,0)', color2: '#fff', blend: 'screen', seed: 7 },
+      { gen: 'bump', scale: 8, octaves: 3, depth: 1.2, light: 135, intensity: 0.4, color: '#000', color2: '#fff', blend: 'overlay', seed: 4 },
+    ] },
+  slate:      { doc: 'layered slate',
+    layers: [
+      { gen: 'bump', scale: 18, octaves: 4, depth: 2.4, stretch: [2.4, 1], light: 135, intensity: 0.8, color: '#000', color2: '#fff', blend: 'overlay', seed: 5 },
+      { gen: 'noise', scale: 90, octaves: 3, contrast: 1.4, intensity: 0.35, color: '#000', color2: '#fff', blend: 'soft-light', seed: 8 },
+    ] },
+  sandstone:  { doc: 'banded sandstone',
+    layers: [
+      { gen: 'bump', scale: 3, octaves: 3, depth: 1.6, light: 130, intensity: 0.5, color: '#000', color2: '#fff', blend: 'overlay', seed: 9 },
+      { gen: 'noise', scale: 10, octaves: 3, contrast: 1.6, stretch: [30, 1], intensity: 0.8, color: '#8a5a3a', color2: '#e2b784', blend: 'multiply', seed: 14 },
+    ] },
+  terrazzo:   { doc: 'chips of stone in cement',
+    layers: [{ gen: 'terrazzo', scale: 240, density: 1, intensity: 0.9, color: '#c9a98f', color2: '#6b7a8f', seed: 6, blend: 'normal' }] },
+  confetti:   { doc: 'bright scraps scattered, flat',
+    layers: [{ gen: 'terrazzo', scale: 260, density: 0.5, intensity: 1, color: '#ff4d6d', color2: '#4dabf7', seed: 11, blend: 'normal' }] },
+  rust:       { doc: 'rusted metal',
+    layers: [
+      { gen: 'bump', scale: 4, octaves: 4, depth: 3, light: 135, intensity: 0.6, color: '#000', color2: '#fff', blend: 'overlay', seed: 3 },
+      { gen: 'noise', scale: 70, octaves: 5, contrast: 1.9, intensity: 0.85, color: '#3b1d0b', color2: '#b4602a', blend: 'multiply', seed: 5 },
+    ] },
+  corrugated: { doc: 'corrugated metal sheet',
+    layers: [{ gen: 'lines', angle: 90, scale: 12, thickness: 6, softness: 1, intensity: 0.3, color: '#000', blend: 'overlay' }] },
+  cork:       { doc: 'cork board',
+    layers: [
+      { gen: 'bump', scale: 4, octaves: 3, depth: 3, light: 135, intensity: 0.7, color: '#000', color2: '#fff', blend: 'overlay', seed: 2 },
+      { gen: 'noise', scale: 3, octaves: 3, contrast: 2.2, intensity: 0.8, color: '#8a5a2b', color2: '#d6a566', blend: 'multiply', seed: 8 },
+    ] },
+  kraft:      { doc: 'brown packing paper',
+    layers: [
+      { gen: 'noise', scale: 1.4, octaves: 3, contrast: 1.4, stretch: [6, 1], intensity: 0.35, color: '#000', color2: '#fff', blend: 'overlay', seed: 2 },
+      { gen: 'noise', scale: 60, octaves: 3, contrast: 1.3, intensity: 0.25, color: '#6b4a2a', color2: '#d1a874', blend: 'multiply', seed: 7 },
+    ] },
+  felt:       { doc: 'soft wool felt',
+    layers: [
+      { gen: 'noise', scale: 1, octaves: 4, contrast: 1.2, intensity: 0.45, color: '#000', color2: '#fff', blend: 'overlay', seed: 3 },
+      { gen: 'noise', scale: 40, octaves: 3, contrast: 1.2, intensity: 0.2, color: '#000', color2: '#fff', blend: 'soft-light', seed: 9 },
+    ] },
+  burlap:     { doc: 'coarse sacking',
+    layers: [
+      { gen: 'weave', scale: 7, thickness: 2.2, intensity: 0.55, color: '#3b2a14', blend: 'multiply' },
+      { gen: 'noise', scale: 30, octaves: 3, contrast: 1.5, stretch: [6, 1], intensity: 0.3, color: '#000', color2: '#fff', blend: 'overlay', seed: 4 },
+    ] },
+  stucco:     { doc: 'rough plaster',
+    layers: [
+      { gen: 'bump', scale: 9, octaves: 3, depth: 3.6, light: 135, intensity: 0.7, color: '#000', color2: '#fff', blend: 'overlay', seed: 6 },
+      { gen: 'noise', scale: 120, octaves: 3, contrast: 1.2, intensity: 0.2, color: '#000', color2: '#fff', blend: 'soft-light', seed: 1 },
+    ] },
+  // ---- 0.16.0: weather and terrain
+  starfield:  { doc: 'a night sky of small and large stars',
+    layers: [
+      { gen: 'starfield', scale: 300, thickness: 2.4, density: 0.25, intensity: 1, color: '#cfe3ff', seed: 9, blend: 'normal' },
+      { gen: 'starfield', scale: 240, thickness: 1.2, density: 1.3, intensity: 0.9, color: '#ffffff', seed: 5, blend: 'normal' },
+    ] },
+  snow:       { doc: 'fresh snow with a few sparkles',
+    layers: [
+      { gen: 'noise', scale: 1.2, octaves: 1, contrast: 16, threshold: 0.72, intensity: 1, color: 'rgba(255,255,255,0)', color2: '#fff', blend: 'screen', seed: 5 },
+      { gen: 'noise', scale: 90, octaves: 4, contrast: 1.4, intensity: 0.5, color: '#9fb6d6', color2: '#ffffff', blend: 'soft-light', seed: 3 },
+    ] },
+  grass:      { doc: 'blades of grass seen from above',
+    layers: [{ gen: 'noise', scale: 2, octaves: 4, contrast: 2, stretch: [1, 9], intensity: 0.9, color: '#2f6b2a', color2: '#8cc152', blend: 'multiply', seed: 4 }] },
+  water:      { doc: 'water with light ripples',
+    layers: [
+      { gen: 'waves', scale: 56, thickness: 1.6, intensity: 0.22, color: '#ffffff', blend: 'normal' },
+      { gen: 'noise', scale: 100, octaves: 4, contrast: 1.5, intensity: 0.8, color: '#0a3d62', color2: '#3c9bd6', blend: 'multiply', seed: 6 },
+    ] },
+  rain:       { doc: 'slanted rain streaks',
+    layers: [{ gen: 'lines', angle: 100, scale: 14, thickness: 1, softness: 0.6, intensity: 0.35, color: '#ffffff', blend: 'normal' }] },
+  lava:       { doc: 'glowing cracks in dark rock',
+    layers: [
+      { gen: 'noise', scale: 90, octaves: 4, contour: 0.05, threshold: 0.5, intensity: 1, color: '#ffb300', color2: 'rgba(255,60,0,0)', blend: 'screen', seed: 7 },
+      { gen: 'noise', scale: 60, octaves: 5, contrast: 1.8, intensity: 0.9, color: '#1a0500', color2: '#7a1a00', blend: 'multiply', seed: 3 },
+    ] },
+  topo:       { doc: 'contour lines, like a map',
+    layers: [
+      { gen: 'noise', scale: 140, octaves: 4, contour: 0.02, threshold: 0.4, intensity: 0.35, color: '#000', color2: 'rgba(0,0,0,0)', blend: 'normal', seed: 8 },
+      { gen: 'noise', scale: 140, octaves: 4, contour: 0.02, threshold: 0.5, intensity: 0.5, color: '#000', color2: 'rgba(0,0,0,0)', blend: 'normal', seed: 8 },
+      { gen: 'noise', scale: 140, octaves: 4, contour: 0.02, threshold: 0.6, intensity: 0.35, color: '#000', color2: 'rgba(0,0,0,0)', blend: 'normal', seed: 8 },
+    ] },
 };
 
 export const PRESET_NAMES = Object.keys(PRESETS);
@@ -190,6 +326,15 @@ const GEN_DEFAULTS = {
   carbon:  { scale: 20, intensity: 1, color: '#151515', color2: '#262626', blend: 'normal' },
   waves:   { scale: 40, thickness: 1.2, intensity: 0.3, color: '#000', blend: 'normal' },
   hex:     { scale: 28, thickness: 1, intensity: 0.28, color: '#000', blend: 'normal' },
+  bricks:  { scale: 48, thickness: 3, intensity: 0.55, color: '#2a1d16', blend: 'normal' },
+  herringbone: { scale: 22, thickness: 1.5, intensity: 1, color: '#2a1a0e', color2: '#b9854d', seed: 4, blend: 'normal' },
+  plaid:   { scale: 64, thickness: 2, intensity: 0.5, color: '#9b1b1b', blend: 'multiply' },
+  scales:  { scale: 36, thickness: 1.2, intensity: 0.5, color: '#000', blend: 'normal' },
+  chevron: { scale: 40, thickness: 6, intensity: 0.35, color: '#000', blend: 'normal' },
+  diamonds: { scale: 40, thickness: 1.2, intensity: 0.4, color: '#000', blend: 'normal' },
+  triangles: { scale: 60, intensity: 0.5, color: '#000', color2: '#fff', seed: 3, blend: 'overlay' },
+  starfield: { scale: 240, thickness: 1.4, density: 1, intensity: 1, color: '#ffffff', seed: 5, blend: 'normal' },
+  terrazzo: { scale: 240, density: 1, intensity: 0.9, color: '#c9a98f', color2: '#6b7a8f', seed: 6, blend: 'normal' },
   rings:   { scale: 10, color: '#7a4b24', color2: '#d1a770', contrast: 1.2, figure: 0.5, warp: 0.4, pores: 0.4, intensity: 1, blend: 'normal' },
 };
 
@@ -608,7 +753,137 @@ function buildRings(spec, rc) {
   return [{ image: smallUrl(svg), size: rot ? `${H}px ${W}px` : `${W}px ${H}px`, repeat: 'repeat', position: '0 0', blend: spec.blend || 'normal', tile: Math.max(W, H) }];
 }
 
-const BUILDERS = { rings: buildRings, noise: buildNoise, bump: buildBump, lines: buildLines, dots: buildDots, grid: buildGrid, checker: buildChecker, weave: buildWeave, carbon: buildCarbon, waves: buildWaves, hex: buildHex };
+/* ------------------------------------------------------------------ *
+ * 0.16.0: patterns drawn as small vector tiles (so a build keeps them as plain CSS)
+ * ------------------------------------------------------------------ */
+
+const tile = (W, H, inner) => `<svg xmlns='http://www.w3.org/2000/svg' width='${f(W)}' height='${f(H)}' viewBox='0 0 ${f(W)} ${f(H)}'>${inner}</svg>`;
+const piece = (svg, W, H, blend) => [{ image: svgUrl(svg), size: `${f(W)}px ${f(H)}px`, repeat: 'repeat', position: '0 0', blend: blend || 'normal', tile: Math.max(W, H) }];
+const darken = (c, t) => mix2(c, parseColor('#000'), t);
+
+/** running-bond bricks: color is the mortar, color2 (optional) fills the bricks */
+function buildBricks(spec, rc) {
+  const { a, b } = layerColors(spec, rc);
+  const W = Math.max(12, spec.scale || 48), H = W / 2, t = Math.max(0.5, spec.thickness || 3);
+  const seams = `M0 0H${f(W)}M0 ${f(H)}H${f(W)}M0 ${f(2 * H)}H${f(W)}M0 0V${f(H)}M${f(W)} 0V${f(H)}M${f(W / 2)} ${f(H)}V${f(2 * H)}`;
+  const fill = b ? `<rect width='${f(W)}' height='${f(2 * H)}' fill='${toRgba(b)}'/>` : '';
+  return piece(tile(W, 2 * H, `${fill}<path d='${seams}' stroke='${toRgba(a)}' stroke-width='${f(t)}' fill='none'/>`), W, 2 * H, spec.blend);
+}
+
+/** herringbone parquet: planks laid in a zigzag, each a slightly different shade. color is the seam, color2 the board. */
+function buildHerringbone(spec, rc) {
+  const { a, b } = layerColors(spec, rc);
+  const w = Math.max(6, spec.scale || 22), t = Math.max(0.3, spec.thickness || 1.5);
+  const board = b || parseColor('#b9854d'), rand = rng((spec.seed || 4) + 101);
+  // the base cell (two planks) repeats every sqrt(2)w across and 2*sqrt(2)w down; the tile holds N1 x N2 of them so the planks can differ in
+  // shade, and a plank's shade depends only on where it sits modulo the tile, so the tile repeats without a seam
+  const N1 = 3, N2 = 2, TW = Math.SQRT2 * w * N1, TH = 2 * Math.SQRT2 * w * N2;
+  const shades = Array.from({ length: 2 * N2 }, () => Array.from({ length: N1 }, () => toRgba(darken(board, 0.14 * rand()))));
+  let planks = '';
+  for (let s = -12; s <= 12; s++) for (let k = -14; k <= 14; k++) {
+    const x = (k - s) * w, y = (k + s) * w, horizontal = (((k % 2) + 2) % 2) === 0;
+    const pw = horizontal ? 2 * w : w, ph = horizontal ? w : 2 * w;
+    const mx = (x + pw / 2 - (y + ph / 2)) / Math.SQRT2, my = (x + pw / 2 + (y + ph / 2)) / Math.SQRT2;   // the plank's middle, once turned
+    if (mx < -2.5 * w || mx > TW + 2.5 * w || my < -2.5 * w || my > TH + 2.5 * w) continue;            // only what reaches the tile
+    const shade = shades[((k % (2 * N2)) + 2 * N2) % (2 * N2)][((s % N1) + N1) % N1];
+    planks += `<rect x='${f(x)}' y='${f(y)}' width='${f(pw)}' height='${f(ph)}' fill='${shade}'/>`;
+  }
+  const svg = tile(TW, TH, `<g transform='rotate(45)'><g stroke='${toRgba(a)}' stroke-width='${f(t)}'>${planks}</g></g>`);
+  return piece(svg, TW, TH, spec.blend);
+}
+
+/** tartan: wide soft bands one way and the other, crossed, with a thin line in each; color2 (optional) is the ground */
+function buildPlaid(spec, rc) {
+  const { a, b } = layerColors(spec, rc);
+  const S = Math.max(10, spec.scale || 64), band = S * (spec.radius === undefined ? 0.3 : spec.radius), line = Math.max(0.5, spec.thickness || 2);
+  const ink = toRgba(a), clear = toRgba(withAlpha(a, 0)), dark = toRgba(withAlpha(darken(a, 0.45), a.a));
+  const blend = spec.blend || 'multiply';
+  const out = [];
+  for (const deg of [0, 90]) {
+    out.push({ image: `repeating-linear-gradient(${deg}deg, ${ink} 0, ${ink} ${f(band)}px, ${clear} ${f(band)}px, ${clear} ${f(S)}px)`, size: 'auto', repeat: 'repeat', position: '0 0', blend, tile: S });
+    out.push({ image: `repeating-linear-gradient(${deg}deg, transparent 0, transparent ${f(S * 0.55)}px, ${dark} ${f(S * 0.55)}px, ${dark} ${f(S * 0.55 + line)}px, transparent ${f(S * 0.55 + line)}px, transparent ${f(S)}px)`, size: 'auto', repeat: 'repeat', position: '0 0', blend, tile: S });
+  }
+  if (b) out.push({ image: `linear-gradient(${toRgba(b)}, ${toRgba(b)})`, size: 'auto', repeat: 'repeat', position: '0 0', blend: 'normal', tile: S });
+  return out;
+}
+
+/** fish scales / roof shingles: overlapping arcs. color2 (optional) fills each scale. */
+function buildScales(spec, rc) {
+  const { a, b } = layerColors(spec, rc);
+  const S = Math.max(10, spec.scale || 36), t = Math.max(0.3, spec.thickness || 1.2), r = S / 2;
+  const fill = b ? toRgba(b) : 'none';
+  const circle = (cx, cy) => `<circle cx='${f(cx)}' cy='${f(cy)}' r='${f(r)}' fill='${fill}' stroke='${toRgba(a)}' stroke-width='${f(t)}'/>`;
+  const svg = tile(S, r, `${circle(0, 0)}${circle(S, 0)}${circle(S / 2, r)}`);
+  return piece(svg, S, r, spec.blend);
+}
+
+/** zigzag bands */
+function buildChevron(spec, rc) {
+  const { a, b } = layerColors(spec, rc);
+  const S = Math.max(8, spec.scale || 40), t = Math.max(0.5, spec.thickness || 6);
+  const bg = b ? `<rect width='${f(S)}' height='${f(S)}' fill='${toRgba(b)}'/>` : '';
+  const zig = (y) => `<path d='M${f(-S / 4)} ${f(y + S / 4)}L${f(S / 4)} ${f(y - S / 4 + 0)}L${f(S * 0.75)} ${f(y + S / 4)}L${f(S * 1.25)} ${f(y - S / 4)}' fill='none' stroke='${toRgba(a)}' stroke-width='${f(t)}' stroke-linejoin='miter'/>`;
+  const svg = tile(S, S, `${bg}${zig(S / 4)}${zig(S * 0.75)}${zig(S * 1.25)}${zig(-S / 4)}`);
+  return piece(svg, S, S, spec.blend);
+}
+
+/** a diamond lattice (argyle); color2 (optional) fills the diamonds */
+function buildDiamonds(spec, rc) {
+  const { a, b } = layerColors(spec, rc);
+  const S = Math.max(8, spec.scale || 40), t = Math.max(0.3, spec.thickness || 1.2);
+  const d = `M${f(S / 2)} 0L${f(S)} ${f(S / 2)}L${f(S / 2)} ${f(S)}L0 ${f(S / 2)}Z`;
+  const svg = tile(S, S, `<path d='${d}' fill='${b ? toRgba(b) : 'none'}' stroke='${toRgba(a)}' stroke-width='${f(t)}'/>`);
+  return piece(svg, S, S, spec.blend);
+}
+
+/** low-poly facets: a grid of triangles, each shaded somewhere between color and color2 */
+function buildTriangles(spec, rc) {
+  const { a, b } = layerColors(spec, rc);
+  const S = Math.max(16, spec.scale || 60), n = 4, c = S / n, rand = rng((spec.seed || 3) + 211);
+  const lo = a, hi = b || parseColor('#fff');
+  let tris = '';
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const x0 = x * c, y0 = y * c, flip = (x + y) % 2 === 0;
+    const A = flip ? [[x0, y0], [x0 + c, y0], [x0, y0 + c]] : [[x0, y0], [x0 + c, y0 + c], [x0, y0 + c]];
+    const B = flip ? [[x0 + c, y0], [x0 + c, y0 + c], [x0, y0 + c]] : [[x0, y0], [x0 + c, y0], [x0 + c, y0 + c]];
+    for (const tri of [A, B]) tris += `<polygon points='${tri.map((p) => f(p[0], 2) + ',' + f(p[1], 2)).join(' ')}' fill='${toRgba(mix2(lo, hi, rand()))}'/>`;
+  }
+  return piece(tile(S, S, tris), S, S, spec.blend);
+}
+
+/** scattered stars, some with a little cross. The tile is random, so it has no seam and no visible repeat at normal sizes. */
+function buildStarfield(spec, rc) {
+  const { a } = layerColors(spec, rc);
+  const S = Math.max(60, spec.scale || 240), rmax = Math.max(0.4, spec.thickness || 1.4), rand = rng((spec.seed || 5) + 307);
+  const count = Math.round(((S * S) / 700) * (spec.density === undefined ? 1 : spec.density));
+  let stars = '';
+  for (let i = 0; i < count; i++) {
+    const x = rand() * S, y = rand() * S, big = rand();
+    const r = rmax * (0.25 + 0.75 * big * big), o = 0.35 + 0.65 * rand();
+    stars += `<circle cx='${f(x, 1)}' cy='${f(y, 1)}' r='${f(r, 2)}' fill='${toRgba(a)}' fill-opacity='${f(o, 2)}'/>`;
+    if (big > 0.93) stars += `<path d='M${f(x - r * 3.2, 1)} ${f(y, 1)}H${f(x + r * 3.2, 1)}M${f(x, 1)} ${f(y - r * 3.2, 1)}V${f(y + r * 3.2, 1)}' stroke='${toRgba(a)}' stroke-opacity='0.55' stroke-width='${f(Math.max(0.3, r * 0.5), 2)}'/>`;
+  }
+  return piece(tile(S, S, stars), S, S, spec.blend);
+}
+
+/** chips of stone in a few colours, scattered: terrazzo. Draws only the chips (no ground), so it lays over any background. */
+function buildTerrazzo(spec, rc) {
+  const { a, b } = layerColors(spec, rc);
+  const S = Math.max(60, spec.scale || 240), rand = rng((spec.seed || 6) + 401);
+  const count = Math.round(((S * S) / 450) * (spec.density === undefined ? 1 : spec.density));
+  const palette = [a, b || darken(a, 0.35), mix2(a, b || parseColor('#fff'), 0.5), darken(a, 0.25), mix2(b || a, parseColor('#fff'), 0.4)];
+  let chips = '';
+  for (let i = 0; i < count; i++) {
+    const cx = rand() * S, cy = rand() * S, r = 2.5 + rand() * rand() * 11, rot = rand() * TWO, k = 5 + ((rand() * 3) | 0);
+    const pts = [];
+    for (let j = 0; j < k; j++) { const ang = rot + (j / k) * TWO, rr = r * (0.6 + 0.4 * rand()); pts.push(`${f(cx + Math.cos(ang) * rr, 1)},${f(cy + Math.sin(ang) * rr * 0.8, 1)}`); }
+    chips += `<polygon points='${pts.join(' ')}' fill='${toRgba(palette[(rand() * palette.length) | 0])}'/>`;
+  }
+  return piece(tile(S, S, chips), S, S, spec.blend);
+}
+const TWO = Math.PI * 2;
+
+const BUILDERS = { bricks: buildBricks, herringbone: buildHerringbone, plaid: buildPlaid, scales: buildScales, chevron: buildChevron, diamonds: buildDiamonds, triangles: buildTriangles, starfield: buildStarfield, terrazzo: buildTerrazzo, rings: buildRings, noise: buildNoise, bump: buildBump, lines: buildLines, dots: buildDots, grid: buildGrid, checker: buildChecker, weave: buildWeave, carbon: buildCarbon, waves: buildWaves, hex: buildHex };
 
 /**
  * Turn parsed layers into the CSS lists for background-image, -size, -repeat,

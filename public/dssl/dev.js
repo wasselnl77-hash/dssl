@@ -187,6 +187,60 @@ export function createWatcher({ apply, sources }) {
 /* ------------------------------------------------------------------ runtime lint */
 
 /**
+ * The engine writes its styles inline, and an inline style beats any normal stylesheet rule. So a rule in the page's own CSS that sets a
+ * property DSSL also sets on the same element silently loses. This finds those: for every readable stylesheet rule that matches an
+ * element DSSL styles, a property both touch. The fix is `yield: <property>` on the DSSL rule (DSSL stops writing it, your CSS decides),
+ * or `!important` in the CSS.
+ */
+function cssThatLoses(eng, scope) {
+  const found = [];
+  const seen = new Set();
+  const visit = (rules, label) => {
+    for (const r of rules) {
+      try {
+        if (r.type === 1 && r.selectorText) {                                         // a style rule
+          if (/::|:hover|:focus|:active/.test(r.selectorText)) { visit(r.cssRules ? [...r.cssRules] : [], label); continue; }
+          const props = [];
+          for (let i = 0; i < r.style.length; i++) { const n = r.style[i]; if (r.style.getPropertyPriority(n) !== 'important') props.push(n); }
+          if (props.length) {
+            let els = [];
+            try { els = scope.querySelectorAll(r.selectorText); } catch { /* a selector the browser rejects */ }
+            for (const el of els) {
+              const owned = eng.ownMap.get(el);
+              if (!owned || !owned.size) continue;
+              for (const q of props) {
+                for (const [p, v] of owned) {
+                  if (v.imp) continue;
+                  if (p === q || q.startsWith(p + '-') || p.startsWith(q + '-')) {
+                    const key = `${r.selectorText}|${p}|${q}|${describe(el)}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    found.push({ el, message: `your CSS (${label} ${r.selectorText} { ${q} }) loses: DSSL writes ${p} on this element inline, and an inline style beats a stylesheet. Add  yield: ${q}  to the DSSL rule so the CSS decides, or put !important on the CSS` });
+                  }
+                }
+              }
+            }
+          }
+          if (r.cssRules && r.cssRules.length) visit([...r.cssRules], label);          // nested CSS
+        } else if (r.cssRules) {
+          if (r.type === 4 && r.media && !window.matchMedia(r.media.mediaText).matches) continue;   // @media that is off
+          if (r.type === 12 && r.conditionText && typeof CSS !== 'undefined' && CSS.supports && !CSS.supports(r.conditionText)) continue;
+          visit([...r.cssRules], label);                                               // @media, @supports, @layer
+        }
+      } catch { /* a rule we cannot read */ }
+    }
+  };
+  for (const sheet of [...document.styleSheets]) {
+    try {
+      const owner = sheet.ownerNode;
+      if (owner && owner.getAttributeNames && owner.getAttributeNames().some((n) => n.startsWith('data-dssl'))) continue;   // the engine's own sheets
+      visit([...sheet.cssRules], sheet.href ? sheet.href.split('/').pop() : '<style>');
+    } catch { /* a cross-origin sheet cannot be read */ }
+  }
+  return found;
+}
+
+/**
  * DSSL.lint(root): the checks a stylesheet linter cannot make, because they need the page. It reads what the browser actually
  * computed, so it sees the cream text that inherited onto a cream card (two rules, two files, no warning from `dssl check`).
  *
@@ -277,6 +331,8 @@ export function lintDocument(root, { explain, engines }, opts = {}) {
         out.push({ kind: 'promoted', el, selector: describe(el), message: `the engine made this a ${disp.value} because a rule aligns its children without a display (it was ${natural}); dssl build will not` });
       }
     }
+    // 0.16.0: plain CSS that loses to what the engine writes inline
+    for (const f of cssThatLoses(eng, scope)) out.push({ kind: 'css-loses', el: f.el, selector: describe(f.el), message: f.message });
     for (const w of shadowWarnings(eng.rules || [])) out.push({ kind: 'shadowed', el: null, selector: `${w.file || ''}:${w.line ?? ''}`, message: w.message });
     if (eng._reducedTold) out.push({ kind: 'motion', el: null, selector: '(page)', message: 'some animate: motions did not run because reduced motion is on; mark the ones that carry meaning `essential`, or DSSL.motion("full")' });
   }

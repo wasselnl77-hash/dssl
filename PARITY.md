@@ -62,6 +62,19 @@ so the boundary is explicit, not folklore.
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
 
+## v0.16.0: round three
+
+| Item from the game builder | Status |
+|---|---|
+| Normal CSS loses to DSSL's inline styles (needed `!important`) | done: `yield:` hands properties back; `DSSL.lint` finds the losers (`css-loses`). Still true: without `yield`, an inline style beats a stylesheet. |
+| `env()` and `font-variant-numeric: tabular-nums` refused | done: the known words and properties come from the MDN CSS data |
+| `radius { pill: 999 card: 22 }` read as one value, error at line 0 | done: two tokens; errors point at the token's line |
+| Aura glows the box, not the shape | done: follows clip-path, border-radius, rotate/scale/transform, or `around ...`; `alpha` for images and canvases |
+| More aura types | done: inner glow, rays, ripples, 9 particle shapes, palette, spin, wind, orbit |
+| More textures | done: 33 presets, 9 generators |
+
+Not verified: Firefox and Safari. `around alpha` needs an `<img>`, `<canvas>` or `<video>` (a `div` with a `background-image` is not readable). The shape follows the element's own rotate, scale and transform, not a rotation on a parent.
+
 ## v0.15.0: the second game review
 
 | Review item | Status |

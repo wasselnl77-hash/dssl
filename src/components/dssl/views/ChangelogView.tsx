@@ -12,6 +12,19 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.16.0",
+    date: "growth phase \u00b7 round three",
+    title: "Your CSS wins when you say so, valid CSS is accepted, and light follows the shape.",
+    why: "the builder came back a third time: plain CSS lost to DSSL's inline styles, env() and tabular-nums were refused, a one-line token pair confused the parser, and aura lit the box around a diamond instead of the diamond.",
+    kind: "add",
+    body:
+      "yield: padding-top hands a property back, so a normal stylesheet rule (with env(safe-area-inset-top), say) wins without !important, and DSSL.lint names any CSS rule that loses. The compiler's lists of CSS words and properties are now generated from the MDN data, so env(), tabular-nums, touch-action, scroll-snap-type, -webkit-user-select and the rest are accepted while a typo is still an error. tokens { radius { pill: 999 card: 22 } } is two tokens, and a token error points at its own line. Aura reads the element's clip-path, border-radius and rotation, so a diamond, a star or a turned square glows in its own shape, and around picks one (diamond, star, heart, polygon(...), alpha for a sprite's pixels). New aura: inner glow, rays, ripples, heart, drop, bubble, snowflake, confetti and leaf particles, palette, spin, wind and orbit. 33 new textures (bricks, herringbone, tartan, scales, terrazzo, starfield, lava and more) built from nine new generators. Not verified: Firefox and Safari.",
+    code: `.app { padding: 16; yield: padding-top padding-bottom }   // then plain CSS: padding-top: env(safe-area-inset-top)
+.gem { aura-glow: #6cf 40 around diamond }
+.party { aura-particle: #ff4d6d #ffd166 #06d6a0 count 60 shape confetti palette from top }
+.wall { texture: bricks }  .floor { texture: herringbone }`,
+  },
+  {
     version: "v0.15.0",
     date: "growth phase \u00b7 the second game review",
     title: "Smoke that stops, scoped signals, and rules that tell you they never win.",

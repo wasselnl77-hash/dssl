@@ -298,8 +298,30 @@ export function parse(source, file = 'inline.dssl') {
     rawCapture.node.css += raw + '\n';
   };
 
+  // 0.16.0: inside tokens { }, `pill: 999 card: 22` on one line is two tokens. Split where a space is followed by `name:`
+  // (outside quotes and parentheses), so the second one is not swallowed into the first one's value.
+  const splitTokenPairs = (text) => {
+    const out = []; let depth = 0, q = null, start = 0, seenColon = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === q && text[i - 1] !== '\\') q = null; continue; }
+      if (c === '"' || c === "'") { q = c; continue; }
+      if (c === '(' || c === '[') { depth++; continue; }
+      if (c === ')' || c === ']') { depth = Math.max(0, depth - 1); continue; }
+      if (depth) continue;
+      if (c === ':' && text[i + 1] !== ':') { seenColon = true; continue; }
+      if (seenColon && /\s/.test(c) && /^\s*[A-Za-z0-9][\w.-]*\s*:(?!:)/.test(text.slice(i))) {
+        out.push(text.slice(start, i)); start = i + 1; seenColon = false;
+      }
+    }
+    out.push(text.slice(start));
+    return out;
+  };
+
   const processContent = (content, line) => {
-    for (const piece of splitTop(content, ';')) {
+    const inTokens = stack.some((n) => n.kind === 'tokens');
+    const pieces = splitTop(content, ';').flatMap((piece) => (inTokens ? splitTokenPairs(piece) : [piece]));
+    for (const piece of pieces) {
       const part = piece.trim();
       if (!part) continue;
       const colon = scanFor(part, ':');

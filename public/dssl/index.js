@@ -19,7 +19,7 @@ import { resolve, DEFAULT_TOKENS, EASINGS } from './resolver.js';
 import { toCSS as docToCSS } from './static.js';
 import { DsslEngine } from './engine.js';
 
-export const VERSION = '0.15.0';
+export const VERSION = '0.16.0';
 
 let counter = 0;
 const loadedUrls = new Set();   // every .dssl file fetched by load(), so DSSL.watch() knows what to follow

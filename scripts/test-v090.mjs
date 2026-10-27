@@ -41,7 +41,7 @@ ok('evalColorExpr reads tokens, token/alpha and literals', (() => { const lk = (
 
 /* ------------------------------------------------------------------ */
 section('texture: vocabulary');
-ok(`there are 38 to 44 presets: 30 general ones and the wood species (${PRESET_NAMES.length})`, PRESET_NAMES.length >= 38 && PRESET_NAMES.length <= 44);
+ok(`there are at least 38 presets (30 general ones and the wood species, then more) (${PRESET_NAMES.length})`, PRESET_NAMES.length >= 38);
 ok('every preset has a one-line description', PRESET_NAMES.every((n) => PRESETS[n].doc && PRESETS[n].doc.length > 8));
 ok('every preset is built only from known generators and settings', PRESET_NAMES.every((n) => PRESETS[n].layers.every((l) => GENERATORS.includes(l.gen) && Object.keys(l).every((k) => ['gen', 'stagger', 'preset'].includes(k) || k in TEXTURE_KEYS))));
 ok('every setting documents itself', Object.values(TEXTURE_KEYS).every((k) => k.doc));
@@ -264,7 +264,7 @@ section('import: conversion');
   ok('selectors, pseudo-classes and pseudo-elements pass straight through', r('a:not(.x)::after{content:"x"}').dssl.includes('a:not(.x)::after {'));
   const rep = r('a{-moz-foo:1;color:red}').report;
   ok('a property DSSL does not know is commented out and reported, not lost silently', rep.dropped.length === 1 && /-moz-foo/.test(rep.dropped[0].text) && r('a{-moz-foo:1;color:red}').dssl.includes('// dssl import dropped'));
-  ok('what the compiler rejects is commented out so the output always compiles', (() => { const x = r('a{scroll-snap-type:x mandatory;color:red}'); return x.report.compile.ok && x.report.dropped.some((d) => /scroll-snap-type/.test(d.text)); })());
+  ok('what the compiler rejects is commented out so the output always compiles', (() => { const x = r('a{display:flexx;color:red}'); return x.report.compile.ok && x.report.dropped.some((d) => /display/.test(d.text)); })());
   ok('a typical stylesheet round-trips into something that compiles', (() => { const x = r('body{margin:0;font:16px/1.5 system-ui}.card{border:1px solid #ddd;border-radius:14px;transition:all .2s ease}.card:hover{transform:translateY(-4px)}@media (max-width:600px){.card{padding:12px}}'); return x.report.compile.ok; })());
   ok('the report counts what it did', (() => { const x = r('a{margin:0px !important;color:red}@font-face{font-family:Q;src:url(q)}@keyframes k{from{opacity:0}to{opacity:1}}'); return x.report.pinned === 1 && x.report.raw === 1 && x.report.motions === 1; })());
   ok('empty input gives empty, valid output', (() => { const x = r(''); return x.dssl.trim() === '' && x.report.compile.ok; })());
@@ -301,7 +301,7 @@ section('dssl build: what stays in the runtime');
 
 /* ------------------------------------------------------------------ */
 section('release');
-ok('the engine version is 0.9 or later', /^0\.(9|1[0-5])\./.test(VERSION), VERSION);
+ok('the engine version is 0.9 or later', /^0\.(9|1[0-6])\./.test(VERSION), VERSION);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

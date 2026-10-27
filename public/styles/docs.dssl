@@ -783,6 +783,39 @@ motion pe-pulse {
 .tx-stripes { texture: stripes }
 .tx-waves { texture: waves }
 .tx-hex { texture: hex }
+.tx-bricks { texture: bricks }
+.tx-bricks-old { texture: bricks-old }
+.tx-herringbone { texture: herringbone }
+.tx-plaid { texture: plaid }
+.tx-tartan { texture: tartan }
+.tx-gingham { texture: gingham }
+.tx-scales { texture: scales }
+.tx-mermaid { texture: mermaid }
+.tx-shingles { texture: shingles }
+.tx-chevron { texture: chevron }
+.tx-argyle { texture: argyle }
+.tx-lowpoly { texture: lowpoly }
+.tx-tiles { texture: tiles }
+.tx-blueprint { texture: blueprint }
+.tx-granite { texture: granite }
+.tx-slate { texture: slate }
+.tx-sandstone { texture: sandstone }
+.tx-terrazzo { texture: terrazzo }
+.tx-confetti { texture: confetti }
+.tx-rust { texture: rust }
+.tx-corrugated { texture: corrugated }
+.tx-cork { texture: cork }
+.tx-kraft { texture: kraft }
+.tx-felt { texture: felt }
+.tx-burlap { texture: burlap }
+.tx-stucco { texture: stucco }
+.tx-starfield { texture: starfield }
+.tx-snow { texture: snow }
+.tx-grass { texture: grass }
+.tx-water { texture: water }
+.tx-rain { texture: rain }
+.tx-lava { texture: lava }
+.tx-topo { texture: topo }
 // </generated>
 
 // ---- aura: the recipes from the guide, written here exactly as a reader would write them
