@@ -212,6 +212,9 @@ function cssThatLoses(eng, scope) {
                 for (const [p, v] of owned) {
                   if (v.imp) continue;
                   if (p === q || q.startsWith(p + '-') || p.startsWith(q + '-')) {
+                    // the same value on both sides is no conflict (a page that ships the compiled CSS AND runs the engine says everything twice)
+                    const iv = el.style.getPropertyValue(q), rv = r.style.getPropertyValue(q);
+                    if (!iv || iv === rv) continue;
                     const key = `${r.selectorText}|${p}|${q}|${describe(el)}`;
                     if (seen.has(key)) continue;
                     seen.add(key);

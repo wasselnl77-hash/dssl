@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.1
+
+- Bundled engine 0.16.1: `DSSL.lint` no longer reports `css-loses` for a stylesheet that says the same thing as DSSL (a page that ships the compiled CSS and also runs the engine).
+
 ## 0.16.0
 
 - Bundled engine updated to 0.16.0. The editor now accepts the whole of CSS (`env()`, `tabular-nums`, `touch-action`, vendor properties)

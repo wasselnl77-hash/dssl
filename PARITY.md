@@ -62,6 +62,10 @@ so the boundary is explicit, not folklore.
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
 
+## v0.16.1
+
+`DSSL.lint`'s `css-loses` ignores a CSS rule whose value is the same as the inline value DSSL wrote (found on this site, which ships compiled CSS and runs the engine: 4,314 false findings on the docs page).
+
 ## v0.16.0: round three
 
 | Item from the game builder | Status |

@@ -92,6 +92,16 @@ await withBrowser(async ({ open, errors }) => {
   ok('dssl build writes the padding and does not count or print yield (a stylesheet has nothing to hand back)', r.status === 0 && /padding: 10px/.test(css) && !/yield/.test(css) && !/engine-native/.test(r.stdout), r.stdout + r.stderr);
 }
 
+{
+  // a page that ships `dssl build` output AND runs the engine says every rule twice: that is not a conflict
+  const built = (await import('../public/dssl/index.js')).toCSS('.dup { padding: 10; color: #123456 }', { file: 'a.dssl' }).css;
+  await withBrowser(async ({ open }) => {
+    const p = await open('/b'); await ready(p); await p.waitForTimeout(250);
+    const n = await p.evaluate(async () => (await DSSL.lint(document.body, { log: false })).filter((f) => f.kind === 'css-loses').length);
+    ok('compiled CSS and the engine saying the same thing is not reported as css-loses', n === 0, String(n));
+  }, { pages: { '/b': page('.dup { padding: 10; color: #123456 }', '<div class=dup></div>', '', built) } });
+}
+
 section('4. aura follows the real shape');
 {
   const around = (w) => { const out = parseAura('aura-glow', `#f00 30 around ${w}`, { error() { }, color: (c) => c, suggest: () => null }); return out && out.glow && out.glow[0] && out.glow[0].around; };
@@ -230,8 +240,8 @@ section('7. docs and version');
 {
   const read = (f) => readFileSync(path.join(ROOT, f), 'utf8');
   const API = await import('../public/dssl/index.js');
-  ok('the engine says 0.16.0', API.VERSION === '0.16.0');
-  for (const f of ['GUIDE.md', 'README.md', 'llms.txt', 'PARITY.md', 'src/components/dssl/views/ChangelogView.tsx', 'dssl-vscode/CHANGELOG.md']) ok(`${f} has a 0.16.0 section`, /0\.16\.0/.test(read(f)));
+  ok('the engine says 0.16', /^0\.16\./.test(API.VERSION));
+  for (const f of ['GUIDE.md', 'README.md', 'llms.txt', 'PARITY.md', 'src/components/dssl/views/ChangelogView.tsx', 'dssl-vscode/CHANGELOG.md']) ok(`${f} has a 0.16 section`, /0\.16\.\d/.test(read(f)));
   const guide = read('GUIDE.md');
   for (const w of ['yield:', 'around diamond', 'from outline', 'palette', 'orbit', 'herringbone', 'tartan', 'css-loses', 'env(safe-area-inset-top']) ok(`the guide covers ${w}`, guide.includes(w));
   ok('no em dashes in the new guide chapter', !/—/.test(guide.slice(guide.indexOf('### Round three (0.16.0)'), guide.indexOf('### Fonts'))));

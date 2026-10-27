@@ -68,7 +68,7 @@ Both drop a `dssl-engine/` folder next to you: the engine, a starter token set, 
 
 Prefer to click: [dssl-engine.zip](https://dssl-sable.vercel.app/dssl-engine.zip) or [dssl-engine.tar.gz](https://dssl-sable.vercel.app/dssl-engine.tar.gz). Same package, straight from the browser.
 
-Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API). In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.16.0.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. See `dssl-vscode/PUBLISHING.md` for publishing.
+Writing your own .dssl? The official editor extension (`ehs-studio.dssl-vscode`) puts the real compiler in your editor: the squiggles are the same errors the browser console prints, completions come from your own token registry, and hovers explain the semantic vocabulary. One package for VS Code and VSCodium (same extension API). In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.16.1.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. See `dssl-vscode/PUBLISHING.md` for publishing.
 
 AI agents and machine reviewers: this repo ships `llms.txt` (dense, structured facts), `AGENTS.md` (how to work on the codebase) and `PARITY.md` (the honest feature matrix against CSS). The site serves the same `llms.txt` at https://dssl-sable.vercel.app/llms.txt
 
@@ -470,7 +470,7 @@ await DSSL.lint(root)                  // contrast against the real background, 
 DSSL.play(el, 'boing', opts)           // a one-shot motion from JS, as a promise
 DSSL.motion('full')                    // run every motion whatever the system asks for
 DSSL.auraZ(20)                         // where the aura canvas sits in the stack
-DSSL.version                           // "0.16.0", a string
+DSSL.version                           // "0.16.1", a string
 ```
 
 Auto-boot picks up every `link[rel="stylesheet/dssl"]` and `style[type="text/dssl"]`, applies them, and fires `dssl-ready` on `window`. `<html data-dssl-reset>` enables the small built-in reset.
@@ -546,7 +546,7 @@ const rep = DSSL.explain(document.querySelector('.doc-card'))
 
 The matcher also pre-filters every rule through a cheap class/tag/id gate extracted from the selector's rightmost compound, so a recompute skips obvious non-matches instead of asking the browser rule by rule. The gate only ever says no; anything it does not fully understand falls back to native matching.
 
-## What works today (v0.16.0)
+## What works today (v0.16.1)
 
 - the full selector surface, including `:nth-child`, `:not`, `:is`, `:where`, `:has`
 - flexbox and grid with `row:` / `column:` / `grid:` / `stack:` / `center:` sugar, place words now own an axis (`between` is main-axis, `stretch` is cross-axis) and conflicts warn instead of silently overwriting
@@ -586,7 +586,7 @@ The matcher also pre-filters every rule through a cheap class/tag/id gate extrac
 
 ## Status
 
-v0.16.0, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite, and the docs examples are rendered and asserted in a real browser, so the guide cannot lie. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; when a page must work without JavaScript, build the static subset with `dssl build` or pick another tool for that page. Freeze makes big static pages viable; live interaction is what the engine is for.
+v0.16.1, experimental, moving fast. The language grows whenever the site needs something it cannot express yet, so the site doubles as the test suite, and the docs examples are rendered and asserted in a real browser, so the guide cannot lie. Honest ledger: great for creative sites, prototypes, docs, playgrounds and internal tools; when a page must work without JavaScript, build the static subset with `dssl build` or pick another tool for that page. Freeze makes big static pages viable; live interaction is what the engine is for.
 
 ## License
 

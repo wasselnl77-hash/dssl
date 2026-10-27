@@ -12,6 +12,14 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.16.1",
+    date: "growth phase \u00b7 a small fix",
+    title: "DSSL.lint stops crying wolf on pages that ship compiled CSS and run the engine.",
+    why: "the new css-loses check, run on this very site, reported 4,314 conflicts: the compiled stylesheet and the engine say the same thing, which is not a conflict.",
+    kind: "add",
+    body: "css-loses now compares values. A rule is reported only when its value differs from what DSSL wrote inline, so a page that links the output of dssl build and also runs the engine is quiet, and a real conflict (your padding-top: 40px against DSSL's padding: 10) is still named, with the fix.",
+  },
+  {
     version: "v0.16.0",
     date: "growth phase \u00b7 round three",
     title: "Your CSS wins when you say so, valid CSS is accepted, and light follows the shape.",

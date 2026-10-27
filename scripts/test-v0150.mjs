@@ -312,7 +312,7 @@ section('12. docs and version');
   const read = (f) => readFileSync(path.join(ROOT, f), 'utf8');
   const API = await import('../public/dssl/index.js');
   ok('the engine says 0.15.0 or later', /^0\.(15|16)\./.test(API.VERSION));
-  for (const f of ['GUIDE.md', 'README.md', 'llms.txt', 'PARITY.md', 'src/components/dssl/views/ChangelogView.tsx', 'dssl-vscode/CHANGELOG.md']) ok(`${f} has a 0.15.0 (or later) section`, /0\.1[5-9]\.0/.test(read(f)));
+  for (const f of ['GUIDE.md', 'README.md', 'llms.txt', 'PARITY.md', 'src/components/dssl/views/ChangelogView.tsx', 'dssl-vscode/CHANGELOG.md']) ok(`${f} has a 0.15.0 (or later) section`, /0\.1[5-9]\.\d/.test(read(f)));
   const guide = read('GUIDE.md');
   for (const w of ['outline-shape', 'DSSL.settled', 'DSSL.signal(\'hp\'', 'pauseMotion', '--engine', 'z 5']) ok(`the guide covers ${w}`, guide.includes(w));
   ok('llms.txt and public/llms.txt are the same file', read('llms.txt') === read('public/llms.txt'));
