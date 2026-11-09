@@ -182,6 +182,13 @@ const LENGTH_FN = new Set('calc,min,max,clamp,round,mod,rem,abs,sign,hypot,pow,s
  *   - token references become var(--dssl-…), `token/NN` becomes color-mix
  *   - unknown identifiers are errors (with did-you-mean)
  */
+/** HTML element names: a bare one nested in a rule is a descendant selector on purpose, never a mistyped state word */
+const HTML_ELEMENTS = new Set(('a,abbr,acronym,address,area,article,aside,audio,b,base,bdi,bdo,big,blockquote,body,br,button,canvas,caption,center,cite,code,col,colgroup,' +
+  'data,datalist,dd,del,details,dfn,dialog,dir,div,dl,dt,em,embed,fieldset,figcaption,figure,font,footer,form,frame,frameset,h1,h2,h3,h4,h5,h6,head,header,hgroup,hr,html,' +
+  'i,iframe,img,input,ins,kbd,label,legend,li,link,main,map,mark,marquee,menu,meta,meter,nav,nobr,noscript,object,ol,optgroup,option,output,p,param,picture,pre,progress,q,' +
+  'rp,rt,ruby,s,samp,script,search,section,select,slot,small,source,span,strike,strong,style,sub,summary,sup,table,tbody,td,template,textarea,tfoot,th,thead,time,title,tr,' +
+  'track,tt,u,ul,var,video,wbr,svg,math').split(','));
+
 /** split a selector list at top-level commas (not inside :is(...) and friends) */
 function splitTopLevel(sel) {
   const out = []; let depth = 0, cur = '';
@@ -209,7 +216,7 @@ function resolveValue(raw, ctx) {
 
     if (c === '"' || c === "'") {
       let j = i + 1;
-      while (j < n && raw[j] !== c) j++;
+      while (j < n && raw[j] !== c) j += raw[j] === '\\' ? 2 : 1;   // a backslash escapes the next character
       out += raw.slice(i, j + 1);
       i = j + 1;
       continue;
@@ -247,7 +254,7 @@ function resolveValue(raw, ctx) {
           if (raw[j] === ')') depth--;
           if (depth > 0 && (raw[j] === '"' || raw[j] === "'")) {
             const q = raw[j]; j++;
-            while (j < n && raw[j] !== q) j++;
+            while (j < n && raw[j] !== q) j += raw[j] === '\\' ? 2 : 1;
           }
           j++;
         }
@@ -386,16 +393,8 @@ function topSplit(str, sep) {
 }
 
 function findToken(tokens, ident) {
-  if (tokens.has(ident)) return ident;
-  // try progressive dot paths (a.b.c defined, user typed a.b.c - exact only, plus flat fallback)
-  if (ident.includes('.')) {
-    const parts = ident.split('.');
-    for (let k = parts.length - 1; k > 0; k--) {
-      const key = parts.slice(0, k).join('.');
-      if (tokens.has(key)) return key; // hmm - partial match would change meaning; require exact
-    }
-  }
-  return null;
+  // exact key only: color.ink2.bogus must not quietly become color.ink2, it falls through to "unknown value"
+  return tokens.has(ident) ? ident : null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -438,7 +437,7 @@ function splitLayers(s) {
   const out = []; let depth = 0, q = null, cur = '';
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
-    if (q) { cur += c; if (c === q) q = null; continue; }
+    if (q) { cur += c; if (c === q && s[i - 1] !== '\\') q = null; continue; }
     if (c === '"' || c === "'") { q = c; cur += c; continue; }
     if (c === '(' || c === '[') depth++;
     else if (c === ')' || c === ']') depth = Math.max(0, depth - 1);
@@ -866,7 +865,12 @@ const SEMANTIC = {
   radius(v, ctx) {
     const atoms = v.trim().split(/\s+/).filter(Boolean);
     const out = atoms.map(a => {
-      if (['sm', 'md', 'lg', 'full', 'xl'].includes(a)) return `var(--dssl-radius-${a})`;
+      if (['sm', 'md', 'lg', 'full', 'xl'].includes(a)) {
+        if (ctx.tokens && !ctx.tokens.has('radius.' + a) && ctx.warnings) {
+          ctx.warnings.push({ file: ctx.file, line: ctx.line, message: `radius "${a}" is not defined, so it will not apply`, hint: `add it with  tokens { radius { ${a}: 32 } }` });
+        }
+        return `var(--dssl-radius-${a})`;
+      }
       if (/^[A-Za-z][\w-]*$/.test(a) && ctx.tokens && ctx.tokens.has('radius.' + a)) return `var(--dssl-radius-${a})`;   // 0.14.0: radius { pill: 99 }  then  radius: pill
       return resolveValue(a, ctx);
     });
@@ -1614,7 +1618,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null, baseMotion
           break;
         }
         case 'selector': {
-          if (/^[a-zA-Z][a-zA-Z0-9-]*$/.test(node.sel) && ctx.sel) {
+          if (/^[a-zA-Z][a-zA-Z0-9-]*$/.test(node.sel) && ctx.sel && !HTML_ELEMENTS.has(node.sel.toLowerCase())) {
             const near = didYouMean(node.sel.toLowerCase(), [...STATE_WORDS]);
             if (near) warnings.push({ file, line: node.line, message: `"${node.sel}" compiled as a descendant selector ("${combine(ctx.sel, node.sel)}")`, hint: `if you meant the state, it is spelled "${near}" - this block currently styles descendants called <${node.sel}>` });
           }
@@ -1632,7 +1636,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null, baseMotion
             break;
           }
           flushPending(node.line);
-          const childCtx = { ...ctx, sel: ctx.sel + ':' + node.name };
+          const childCtx = { ...ctx, sel: withState(ctx.sel, node.name) };
           // v0.7.2 - the arrow is motion/gradient-stop syntax; inside a seen
           // block it compiled into an inline style the browser rejects, so the
           // element just sat at its base style forever. Say so, loudly, and
@@ -1678,7 +1682,11 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null, baseMotion
         }
         case 'layer':
         case 'pin': {
-          const layer = node.kind === 'pin' ? 'pin' : (['tokens', 'base', 'components', 'utilities', 'pin'].includes(node.name) ? node.name : 'components');
+          const LAYERS = ['tokens', 'base', 'components', 'utilities', 'pin'];
+          const layer = node.kind === 'pin' ? 'pin' : (LAYERS.includes(node.name) ? node.name : 'components');
+          if (node.kind === 'layer' && !LAYERS.includes(node.name)) {
+            warnings.push({ file, line: node.line, message: `unknown layer "${node.name}", treated as "components"`, hint: didYouMean(node.name, LAYERS) || 'the layers are tokens, base, components, utilities, pin' });
+          }
           flushPending(node.line);
           const childCtx = { ...ctx, layer };
           const sub = { decls: [] };
@@ -1688,6 +1696,7 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null, baseMotion
         }
         case 'pseudo': {
           const base = ctx.sel || '*'; // top-level ::selection etc. means every element
+          const parts = splitTopLevel(base);
           const srule = {
             id: ruleId++, sel: base, pseudo: node.name,
             media: ctx.media, signals: ctx.signals, containers: ctx.containers,
@@ -1724,6 +1733,17 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null, baseMotion
           fill(srule, node.children);
           if (srule.decls.length) shadowRules.push(srule);
           for (const st of stateRules) if (st.decls.length) shadowRules.push(st);
+          // a selector list in front of the block (.a, .b { ::before { } }): the rules above were built on the whole
+          // list; give every further part its own copy so each gets its own pseudo-element rule
+          if (parts.length > 1) {
+            const built = [srule, ...stateRules].filter((r) => r.decls.length);
+            for (const part of parts.slice(1)) {
+              for (const r of built) {
+                shadowRules.push({ ...r, decls: r.decls.map((d) => ({ ...d })), id: ruleId++, order: order++, sel: part + r.sel.slice(base.length) });
+              }
+            }
+            for (const r of built) r.sel = parts[0] + r.sel.slice(base.length);
+          }
           break;
         }
         case 'tokens': {
@@ -1994,10 +2014,24 @@ export function resolve(ast, file = 'inline.dssl', baseTokens = null, baseMotion
   return { rules, shadowRules, raws, fontLinks, motions, motionFrames, errors, warnings, mediaQueries: [...mediaQueries], tokens: Object.fromEntries(tokenMap), registryRule };
 }
 
-/** naive `&` substitution + descendant join */
+/** `&` substitution + descendant join. Lists are split at top-level commas and every parent part is joined with
+ *  every child part (parent-major), so `.a, .b { .c { } }` is `.a .c, .b .c`. Commas inside :is( ) or [ ] stay put. */
 function combine(parent, child) {
-  if (child.includes('&')) return child.split('&').join(parent);
-  return parent + ' ' + child;
+  const pp = splitTopLevel(parent), cp = splitTopLevel(child);
+  if (pp.length <= 1 && cp.length <= 1) {
+    if (child.includes('&')) return child.split('&').join(parent);
+    return parent + ' ' + child;
+  }
+  const out = [];
+  for (const p of pp) for (const c of cp) out.push(c.includes('&') ? c.split('&').join(p) : p + ' ' + c);
+  return out.join(', ');
+}
+
+/** append a state to every part of a selector list: `.a, .b` + hover is `.a:hover, .b:hover` */
+function withState(sel, name) {
+  const parts = splitTopLevel(sel);
+  if (parts.length <= 1) return sel + ':' + name;
+  return parts.map((p) => p + ':' + name).join(', ');
 }
 
 /* v0.5.0 - where does a selector carry a pseudo-element?

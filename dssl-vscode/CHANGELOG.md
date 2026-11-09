@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.3
+
+- Bundled engine 0.16.3: seven bug fixes found while writing the native spec (unquoted `url(http://...)`, nesting under selector lists, token path typos, escaped quotes, a false `li` warning) and two new warnings (unknown `@layer` name, `radius: xl` without a token).
+
 ## 0.16.2
 
 - Bundled engine 0.16.2: `DSSL.lint` also skips the output of `dssl build` (its reset sits under the engine on purpose).

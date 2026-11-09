@@ -62,6 +62,10 @@ so the boundary is explicit, not folklore.
 - loud errors with did-you-mean, and a warnings channel for cascade-order footguns
 - `freeze()` / `unfreeze()`: a live engine that can be parked at zero cost
 
+## v0.16.3
+
+Seven places where the engine disagreed with the language are fixed: unquoted `url(http://...)`, token paths with a typo at the end, nesting under a selector list, an escaped quote in a value, and the false "did you mean link" warning on `li`. An unknown `@layer` name and `radius: xl` with no token now warn. All of them were found by writing a specification for native, JavaScript-free DSSL (`native/spec/`). A browser that implements DSSL natively does not exist yet: this is a written spec and checks, not a browser feature.
+
 ## v0.16.2
 
 `DSSL.lint`'s `css-loses` skips the output of `dssl build` (recognised by its `@layer tokens, base, components, utilities, pin` statement), because its reset is built to sit under the engine. The docs page of this site went from 4,314 false findings (0.16.0), to 111 (0.16.1), to none from its own CSS.

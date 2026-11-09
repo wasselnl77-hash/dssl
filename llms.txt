@@ -5,7 +5,7 @@
 - Site (docs, playground, changelog, bench): https://dssl-sable.vercel.app
 - Repo + full docs in the README: https://huggingface.co/EHS-Studio/dssl
 - Install: `curl -fsSL https://dssl-sable.vercel.app/install.sh | sh` (or the zip: https://dssl-sable.vercel.app/dssl-engine.zip)
-- Version: 0.16.2 (engine), MIT license
+- Version: 0.16.3 (engine), MIT license
 - Feature matrix vs CSS: see PARITY.md in the repo
 - For agents working ON the codebase: see AGENTS.md in the repo
 
@@ -63,6 +63,10 @@ DSSL.replay(sel) / DSSL.refresh([el]) / DSSL.errors() (a function) / DSSL.versio
 - `tilt: 10 lift 1.04 perspective 900 speed 0.18 invert glare` turns toward the pointer in 3D. Runtime only. `glare` keeps `--dssl-gx` and `--dssl-gy` pointing at the pointer. Ignores touch, flat under reduced motion, stops on freeze. Do not combine with `bend` or `fold`.
 - Alpha on a named colour works: `white/12`, `currentColor/20`. It used to compile to `white/12px`.
 - The playground has a canvas.html tab, `?example=` links, lint warnings and an "as CSS" tab. The canvas keeps a short allow-list of tags and drops scripts, handlers, styles and ids.
+
+## 0.16.3
+- Seven bugs found by writing the native spec (`native/spec/`) are fixed. An unquoted `url(http://x.com/a.png)` no longer loses the rest of the line to the comment stripper (also inside `raw { }`). A typo at the end of a token path (`color.ink.bogus`) is an `unknown value` error instead of quietly becoming `color.ink`. Nesting under a selector list joins every part: `.a, .b { .c { } }` is `.a .c, .b .c`, `hover { }` gives `.a:hover, .b:hover`, `.c, .d { }` under `.a` gives `.a .c, .a .d`, and `::before { }` gets one rule per part. A backslash escapes a quote in a value (`content: "a\"b"`). A nested `li` or any other HTML element name no longer gets a "did you mean link" warning.
+- Two new warnings, both compile fine: an unknown `@layer` name (it is treated as `components`) and `radius: xl` when no `radius.xl` token exists.
 
 ## 0.16.2
 - `DSSL.lint`'s `css-loses` no longer judges the output of `dssl build` (its reset is built to sit under the engine), and ignores a rule whose value is the same as what DSSL wrote inline. On this site's docs page it reported 4,314 findings in 0.16.0; it now reports none from the site's own CSS.
@@ -132,4 +136,4 @@ Wait for the `dssl-ready` event on `window` before measuring layout: the engine 
 
 ## Editor support
 
-The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.16.2.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.
+The official extension (VS Code and VSCodium, same .vsix) bundles the real parser and resolver: diagnostics identical to the browser console, completions from the workspace token registry, hover docs for the semantic vocabulary. In VSCodium, search "DSSL" in the Extensions tab (it is on Open VSX: https://open-vsx.org/extension/ehs-studio/dssl-vscode). In VS Code, download `dssl-vscode/dssl-vscode-0.16.3.vsix` from the repo files, then Extensions panel -> ... -> Install from VSIX. Source lives in `dssl-vscode/` in the repo.

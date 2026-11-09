@@ -1,0 +1,18 @@
+[package]
+name = "dssl-native"
+version = "0.1.0"
+edition = "2021"
+description = "DSSL reference compiler: a native, JavaScript-free implementation of the DSSL language"
+license = "MIT"
+
+[lib]
+name = "dssl"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dssl-native"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+fancy-regex = "0.14"

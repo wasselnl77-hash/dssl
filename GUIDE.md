@@ -950,7 +950,7 @@ and listed, so the file you get always compiles.
 ```js
 import { DSSL } from '/dssl/index.js'     // or just use window.DSSL after boot
 
-DSSL.version                          // "0.16.2": a string, not a function
+DSSL.version                          // "0.16.3": a string, not a function
 DSSL.compile(source)                  // { ok, errors, warnings, stats, doc }: parse and resolve, no DOM
 DSSL.apply(source, { name, scope, replace })
 await DSSL.load(['a.dssl', 'b.dssl'])
@@ -985,7 +985,7 @@ Three ways to get it:
 
 1. VSCodium: open the Extensions tab, search "DSSL" and install. It is on Open VSX:
    https://open-vsx.org/extension/ehs-studio/dssl-vscode
-2. VS Code: download `dssl-vscode/dssl-vscode-0.16.2.vsix` from the repo files, then
+2. VS Code: download `dssl-vscode/dssl-vscode-0.16.3.vsix` from the repo files, then
    Extensions panel, `...`, Install from VSIX. (The Microsoft Marketplace listing is not published yet.)
 3. Build it yourself: `cd dssl-vscode && npx @vscode/vsce package --no-dependencies`.
 

@@ -12,6 +12,14 @@ const ENTRIES: {
   kind?: "spec" | "vote" | "add";
 }[] = [
   {
+    version: "v0.16.3",
+    date: "growth phase \u00b7 the spec found seven bugs",
+    title: "Writing the native spec found seven bugs. They are fixed.",
+    why: "a language a browser could implement needs a spec that can be checked against the engine, and checking it showed where the engine and the language disagreed.",
+    kind: "add",
+    body: "An unquoted url(http://...) no longer loses the rest of the line. A typo at the end of a token path is an error instead of quietly becoming its parent. Nesting under a selector list (.a, .b { .c { } }, hover { }) now joins every part. A backslash escapes a quote in a value. A nested li no longer gets a did you mean link warning. An unknown @layer name and radius: xl with no token now warn instead of failing silently.",
+  },
+  {
     version: "v0.16.2",
     date: "growth phase \u00b7 a second small fix",
     title: "css-loses leaves DSSL's own built CSS alone.",

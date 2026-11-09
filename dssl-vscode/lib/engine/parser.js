@@ -111,6 +111,17 @@ function stripComments(src) {
       continue;
     }
     if (c === '"' || c === "'") { q = c; out += c; continue; }
+    // An unquoted url(...) is one token: the // in http://x.com/a.png is not a comment. Copy it through the
+    // closing paren untouched (newlines included, so line numbers hold). A quoted url is handled by the string rule above.
+    if ((c === 'u' || c === 'U') && /^url\(/i.test(src.slice(i, i + 4)) && !/[\w-]/.test(src[i - 1] || '')) {
+      let k = i + 4;
+      while (k < src.length && /\s/.test(src[k])) k++;
+      if (src[k] !== '"' && src[k] !== "'") {
+        let e = k;
+        while (e < src.length && src[e] !== ')') e += src[e] === '\\' ? 2 : 1;
+        if (e < src.length) { out += src.slice(i, e + 1); i = e; continue; }
+      }
+    }
     if (c === '/' && n === '/') {
       // v0.7.1 bugfix: this handler used to emit its own '\n' AND rewind so
       // the main loop emitted the same newline again - every // comment

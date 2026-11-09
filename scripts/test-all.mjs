@@ -15,7 +15,7 @@ const SUITES = [
   ['engine 0.5', 'test-v050.mjs'], ['engine 0.6', 'test-v060.mjs'], ['engine 0.7', 'test-v070.mjs'], ['parser lines 0.7.1', 'test-v071.mjs'],
   ['review fixes 0.7.2', 'test-v072.mjs'], ['exit lane 0.8.0', 'test-v073.mjs'], ['follow-up 0.8.1', 'test-v081.mjs'], ['cascade 0.8.2', 'test-v082.mjs'],
   ['color, texture, aura, slider, lint, import, share 0.9.0', 'test-v090.mjs'], ['editor extension', 'test-extension-lib.mjs'],
-  ['site stylesheets compile', 'dssl-styles-check.mjs'], ['guide examples compile', 'test-guide-examples.mjs'],
+  ['site stylesheets compile', 'dssl-styles-check.mjs'], ['guide examples compile', 'test-guide-examples.mjs'], ['native spec: examples, prose, known bugs', 'test-native-spec.mjs'], ['known divergences fixed 0.16.3', 'test-v0163.mjs'],
   ['designer: state to DSSL and back', 'test-designer.mjs'], ['designer: editor wiring (fake vscode)', 'test-designer-host.mjs'],
   ['guide examples in a browser', 'test-guide-browser.mjs', true], ['0.9.0 in a browser', 'test-browser-v090.mjs', true], ['designer panel in a browser', 'test-designer-browser.mjs', true], ['glass, tilt, wood, baked textures, counters 0.10-0.11', 'test-v0100.mjs', true], ['symmetrical, fonts, gradients, inspector, hot reload 0.12', 'test-v0120.mjs', true], ['build fidelity, source maps, strict CSP, server rendering 0.13', 'test-v0130.mjs', true], ['made for games, docs match the code 0.14', 'test-v0140.mjs', true], ['the second game review 0.15', 'test-v0150.mjs', true], ['round three: yield, shapes, textures 0.16', 'test-v0160.mjs', true], ['built CSS with JavaScript off vs the engine, every page', 'test-static-parity.mjs', true],
 ];
