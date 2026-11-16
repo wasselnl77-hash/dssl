@@ -1,7 +1,3 @@
----
-license: mit
----
-
 # DSSL
 
 DSSL is a style language for the web. For the pages it fits, it replaces writing CSS entirely. It does not replace the CSS platform: the engine ends in inline styles that the browser parses, and it needs JavaScript. Where it wins is the authoring experience: tokens, words-as-layout, states and motion in one grammar, loud errors, zero build. PARITY.md keeps the honest feature ledger.
