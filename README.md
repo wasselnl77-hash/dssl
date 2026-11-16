@@ -587,3 +587,7 @@ v0.16.3, experimental, moving fast. The language grows whenever the site needs s
 ## License
 
 MIT
+
+---
+
+Made by EHS studio. If you'd like to keep it going: [buymeacoffee.com/wassel](https://buymeacoffee.com/wassel)
